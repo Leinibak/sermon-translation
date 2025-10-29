@@ -1,0 +1,68 @@
+
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import axios from '../api/axios';
+import './PostList.css';
+
+function PostList() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/posts/');
+      setPosts(response.data.results || response.data);
+      setError(null);
+    } catch (err) {
+      setError('게시글을 불러오는데 실패했습니다.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="loading">로딩 중...</div>;
+  if (error) return <div className="error">{error}</div>;
+
+  return (
+    <div className="post-list">
+      <h2>게시글 목록</h2>
+      {posts.length === 0 ? (
+        <p className="no-posts">게시글이 없습니다.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>제목</th>
+              <th>작성자</th>
+              <th>조회수</th>
+              <th>작성일</th>
+            </tr>
+          </thead>
+          <tbody>
+            {posts.map((post) => (
+              <tr key={post.id}>
+                <td>{post.id}</td>
+                <td>
+                  <Link to={`/post/${post.id}`}>{post.title}</Link>
+                </td>
+                <td>{post.author}</td>
+                <td>{post.view_count}</td>
+                <td>{new Date(post.created_at).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+export default PostList;

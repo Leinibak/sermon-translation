@@ -1,0 +1,79 @@
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 공통 */
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f4f6f8;
+  margin: 0;
+  padding: 0;
+}
+
+/* 컨테이너 */
+.container {
+  max-width: 800px;
+  margin: 40px auto;
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* 헤더 */
+h1, h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* 버튼 (Tailwind 정렬 깨지지 않게) */
+button {
+  font-family: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* 전역 버튼 모양 클래스 */
+.btn {
+  background-color: #4f46e5;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  display: inline-flex;       /* ⬅️ 중요: inline → flex 정렬 지원 */
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover {
+  background-color: #3730a3;
+}
+
+/* 삭제 버튼 */
+.btn-danger {
+  background-color: #dc2626;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+/* 게시글 카드 */
+.post-card {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 0;
+}
+
+.post-card:last-child {
+  border-bottom: none;
+}
+
+/* 상단 버튼 그룹 */
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}

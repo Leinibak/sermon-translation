@@ -1,0 +1,3 @@
+# .gitattributes
+* text eol=lf
+# 이 설정을 넣으면 Git이 자동으로 모든 텍스트 파일을 LF로 저장합니다.
