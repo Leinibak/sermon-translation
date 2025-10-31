@@ -4,8 +4,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # package.json과 package-lock.json 복사
-COPY package.json ./     
-# package-lock.json 없으면 제거
+COPY package.json package-lock.json ./
 RUN npm ci --only=production
 
 # 소스 코드 복사
