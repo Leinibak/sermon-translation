@@ -1,0 +1,81 @@
+# ============================================
+# docker-compose.dev.yml
+# 개발용 (local development)
+# ============================================
+# version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: webboard_db_dev
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    env_file:
+      - ./.env   # ← 루트 .env를 여기서 명시
+    # environment:
+    #   - POSTGRES_DB=${POSTGRES_DB}
+    #   - POSTGRES_USER=${POSTGRES_USER}
+    #   - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+    ports:
+      - "${POSTGRES_PORT}:5432"   
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - webboard_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: webboard_backend_dev
+    command: >
+      sh -c "python manage.py migrate &&
+            python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app   # 코드 변경 실시간 반영
+      - ./backend/staticfiles:/app/staticfiles   # ✅ 추가: 정적파일 공유
+      # - static_volume_dev:/app/staticfiles    # production환경일경우
+      - media_volume_dev:/app/media
+    ports:
+      - "8000:8000"  # 로컬 브라우저에서 접근 가능
+    env_file:
+      - ./backend/.env        # ✅ 개발용 환경 변수
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - webboard_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: webboard_frontend_dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    networks:
+      - webboard_network
+
+volumes:
+  postgres_data_dev:
+  static_volume_dev:
+  media_volume_dev:
+
+networks:
+  webboard_network:
+    driver: bridge
+
+
+ 

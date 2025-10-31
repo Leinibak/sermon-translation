@@ -70,6 +70,5 @@ Thumbs.db
 # Docker
 *.pid
 docker-compose.override.yml
-docker-compose.*.yml
 *.log
 *.sock
