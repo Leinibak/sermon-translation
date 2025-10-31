@@ -16,7 +16,7 @@ else
 fi
 
 # === 필수 env 파일 존재 확인 ===
-for file in backend/.env.production frontend/.env.production; do
+for file in .env.production ; do
   if [ ! -f "$file" ]; then
     echo "❌ Missing $file"
     exit 1
