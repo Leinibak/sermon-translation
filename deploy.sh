@@ -39,7 +39,8 @@ sudo usermod -aG docker $USER
 
 # === Docker Compose 재빌드 및 실행 ===
 echo "🔨 Building & starting containers..."
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml up -d
 
 # === Django 마이그레이션 & 정적파일 ===
 echo "🗄️  Running database migrations..."
