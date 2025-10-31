@@ -1,7 +1,3 @@
-# ============================================
-# docker-compose.prod.yml
-# 운영용 (production)
-# ============================================
 version: '3.9'
 
 services:
@@ -9,7 +5,7 @@ services:
     image: postgres:15-alpine
     container_name: webboard_db_prod
     env_file:
-      - ./backend/.env.production
+      - ./.env.production
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
@@ -29,39 +25,32 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-      - ./backend/.env.production:/app/.env.production:ro
+    env_file:
+      - ./backend/.env.production
     expose:
       - "8000"
-    env_file:
-      - ./.env.production
-      - ./backend/.env.production
     depends_on:
       db:
         condition: service_healthy
     restart: always
-    networks:
-      - webboard_network
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    networks:
+      - webboard_network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - REACT_APP_API_URL=${REACT_APP_API_URL}
+        - VITE_API_URL=${VITE_API_URL}
     container_name: webboard_frontend_prod
-    expose:
-      - "80"
     env_file:
       - ./.env.production
-      - ./frontend/.env.production
     depends_on:
       - backend
-    volumes:
-      - ./frontend/build:/usr/share/nginx/html
     restart: always
     networks:
       - webboard_network
