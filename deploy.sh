@@ -11,22 +11,22 @@ trap 'error_exit $LINENO' ERR
 echo "🚀 Starting deployment..."
 
 # 환경 변수 로드
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+if [ -f .env.production ]; then
+  export $(grep -v '^#' .env.production | xargs)
 else
   echo ".env 파일을 찾을 수 없습니다!"
   exit 1
 fi
 
 # Backend 환경변수 확인
-if [ ! -f backend/.env ]; then
-    echo "❌ backend/.env not found! Please create it."
+if [ ! -f backend/.env.production ]; then
+    echo "❌ backend/.env.production not found! Please create it."
     exit 1
 fi
 
 # Frontend 환경변수 확인
-if [ ! -f frontend/.env ]; then
-    echo "❌ frontend/.env not found! Please create it."
+if [ ! -f frontend/.env.production ]; then
+    echo "❌ frontend/.env.production not found! Please create it."
     exit 1
 fi
 

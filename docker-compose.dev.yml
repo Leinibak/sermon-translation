@@ -2,7 +2,7 @@
 # docker-compose.dev.yml
 # 개발용 (local development)
 # ============================================
-# version: '3.8'
+# version: '3.9'
 
 services:
   db:
@@ -35,15 +35,17 @@ services:
     command: >
       sh -c "python manage.py migrate &&
             python manage.py runserver 0.0.0.0:8000"
+    env_file:
+      - ./backend/.env        # ✅ 개발용 환경 변수
     volumes:
       - ./backend:/app   # 코드 변경 실시간 반영
+      - ./backend/.env:/app/.env:ro
       - ./backend/staticfiles:/app/staticfiles   # ✅ 추가: 정적파일 공유
       # - static_volume_dev:/app/staticfiles    # production환경일경우
       - media_volume_dev:/app/media
     ports:
       - "8000:8000"  # 로컬 브라우저에서 접근 가능
-    env_file:
-      - ./backend/.env        # ✅ 개발용 환경 변수
+
     depends_on:
       db:
         condition: service_healthy
@@ -60,9 +62,8 @@ services:
       - /app/node_modules
     ports:
       - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - CHOKIDAR_USEPOLLING=true
+    env_file:
+      - ./frontend/.env
     depends_on:
       - backend
     networks:

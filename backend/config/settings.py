@@ -12,14 +12,27 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from decouple import config, Csv
+from decouple import Config, RepositoryEnv
 import os
  
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+BASE_DIR_ENV = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
  
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+
+# env 파일 경로 지정
+# 개발/배포 구분: DEV 환경에서는 .env, PROD 환경에서는 .env.production
+ENVIRONMENT = os.getenv("DJANGO_ENV", "dev")  # dev 또는 prod
+
+if ENVIRONMENT == "prod":
+    env_file = os.path.join(BASE_DIR_ENV, ".env.production")
+else:
+    env_file = os.path.join(BASE_DIR_ENV, ".env")
+
+config = Config(RepositoryEnv(env_file))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-&zbf7nc$y97egv(xiilnu4mci6366t*a^=x7m*h*hfq2u2-#+4')
@@ -141,11 +154,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # CORS 설정
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:8000',
-    cast=Csv()
-)
+# CORS_ALLOWED_ORIGINS = config(
+#     'CORS_ALLOWED_ORIGINS',
+#     default='http://localhost:3000,http://frontend:3000',
+#     cast=Csv()
+# )
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # 로컬
+    "http://frontend:3000",   # Docker 내부 네트워크
+]
 
 CORS_ALLOW_CREDENTIALS = True
 

@@ -1,10 +1,23 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "0.0.0.0", // Docker 외부 접속 허용
-    port: 3000        // 포트 3000으로 열기
-  }
-});
+    port: 3000,
+    host: true, // Docker에서 접근 가능하도록
+    proxy: {
+      // 백엔드 프록시 설정 (CORS 해결)
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/admin': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+})

@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y jq curl
 # 소스 복사
 COPY . .
 
+
 # 포트 노출
 EXPOSE 8000
 
