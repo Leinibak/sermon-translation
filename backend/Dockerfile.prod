@@ -45,7 +45,7 @@ EXPOSE 8000
 # 환경 변수 설정
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=backend.settings
+ENV DJANGO_SETTINGS_MODULE=backend.config.settings
 
 # 실행 명령 (배포용)
 CMD ["/app/entrypoint.sh"]

@@ -37,7 +37,6 @@ media/
 .env.local
 
 # Node
-package-lock.json
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
@@ -50,7 +49,6 @@ frontend/.env.development
 frontend/.env.production
 frontend/npm-debug.log
 frontend/yarn-error.log
-frontend/package-lock.json
 node_modules/
 frontend/*.log
 frontend/.vscode/
