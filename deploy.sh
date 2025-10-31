@@ -34,6 +34,9 @@ git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
+
+sudo usermod -aG docker $USER
+
 # === Docker Compose 재빌드 및 실행 ===
 echo "🔨 Building & starting containers..."
 docker compose -f docker-compose.prod.yml up -d --build

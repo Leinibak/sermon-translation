@@ -26,7 +26,7 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     env_file:
-      - ./backend/.env.production
+      - ./.env.production
     expose:
       - "8000"
     depends_on:

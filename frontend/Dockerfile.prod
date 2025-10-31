@@ -3,7 +3,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # package.json과 package-lock.json 복사
-COPY package.json package-lock.json ./
+COPY package.json ./     
+# package-lock.json 없으면 제거
 
 # 의존성 설치
 RUN npm install
@@ -21,7 +22,7 @@ FROM nginx:stable-alpine
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Nginx 설정 복사 (필요 시)
-COPY nginx/nginx.prod.frontend.conf /etc/nginx/conf.d/default.conf
+# COPY nginx/nginx.prod.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
