@@ -3,22 +3,32 @@ set -e
 
 echo "⏳ Waiting for PostgreSQL..."
 
-# PostgreSQL이 준비될 때까지 대기
-while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
+# PostgreSQL 준비 대기
+while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
   echo "PostgreSQL is unavailable - sleeping"
   sleep 1
 done
 
 echo "✅ PostgreSQL is up and running!"
 
-# 데이터베이스 마이그레이션
-echo "🔄 Running migrations..."
+# 필수 환경 변수 확인
+: "${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE is not set!}"
+
+echo "🔄 Running database migrations..."
 python manage.py migrate --noinput
 
-# Static 파일 수집
 echo "📦 Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Gunicorn으로 서버 실행
-echo "🚀 Starting Gunicorn..."
-gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+# 환경 구분 실행
+if [ "$DJANGO_ENV" = "production" ]; then
+  echo "🚀 Starting Gunicorn (Production Mode)..."
+  exec gunicorn config.wsgi:application \
+    --bind 0.0.0.0:8000 \
+    --workers 3 \
+    --access-logfile - \
+    --error-logfile -
+else
+  echo "🧩 Starting Django development server..."
+  exec python manage.py runserver 0.0.0.0:8000
+fi
