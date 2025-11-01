@@ -57,7 +57,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=/api/board
+        - VITE_API_URL=/api/
     container_name: webboard_frontend_prod
     expose:
       - "80"
