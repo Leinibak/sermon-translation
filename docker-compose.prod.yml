@@ -1,11 +1,11 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:15-alpine
     container_name: webboard_db_prod
-    env_file:
-      - ./.env.production
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
@@ -25,11 +25,21 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-      - ./backend:/app/backend
-    env_file:
-      - ./.env.production
-    expose:
-      - "8000"
+    environment:
+      # Django 환경변수 직접 전달
+      - DJANGO_ENV=prod
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-89.168.102.116,localhost}
+      # 데이터베이스
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      # CORS
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://89.168.102.116}
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +59,8 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL}
     container_name: webboard_frontend_prod
+    expose:
+      - "80"
     env_file:
       - ./.env.production
     depends_on:
