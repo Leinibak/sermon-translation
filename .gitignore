@@ -21,7 +21,8 @@ backend/*.sqlite3
 backend/media/
 backend/static/
 backend/staticfiles/
-*.env
+*.env.* 
+*copy*
 
 # Django
 *.log

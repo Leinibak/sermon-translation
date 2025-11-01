@@ -1,63 +1,64 @@
-#!/bin/bash
-set -e
+# ============================================
+# deploy.sh (수정된 배포 스크립트)
+# ============================================
 
-BRANCH=${1:-main}   # 기본 브랜치는 main
-echo "🚀 Deploying branch: $BRANCH"
+set -e  # 에러 발생 시 중단
 
-# 에러 핸들링
-trap 'echo "❌ Deployment failed at line $LINENO"' ERR
+echo "🚀 배포 시작..."
 
-# === 환경 변수 로드 ===
-if [ -f .env.production ]; then
-  export $(grep -v '^#' .env.production | xargs)
-else
-  echo "❌ .env.production not found!"
-  exit 1
-fi
-
-# === 필수 env 파일 존재 확인 ===
-for file in .env.production ; do
-  if [ ! -f "$file" ]; then
-    echo "❌ Missing $file"
+# 환경변수 파일 확인
+if [ ! -f .env.production ]; then
+    echo "❌ .env.production 파일이 없습니다!"
     exit 1
-  fi
-done
-
-# === 최신 코드 가져오기 ===
-if [ ! -d .git ]; then
-  echo "📦 Cloning repository..."
-  git clone git@github.com:Leinibak/sermon-translation.git .
 fi
 
-echo "📥 Pulling latest code..."
-git fetch origin
-git checkout "$BRANCH"
-git pull origin "$BRANCH"
+if [ ! -f backend/.env.production ]; then
+    echo "❌ backend/.env.production 파일이 없습니다!"
+    exit 1
+fi
 
+if [ ! -f frontend/.env.production ]; then
+    echo "❌ frontend/.env.production 파일이 없습니다!"
+    exit 1
+fi
 
-sudo usermod -aG docker $USER
+echo "✅ 환경변수 파일 확인 완료"
 
-# === Docker Compose 재빌드 및 실행 ===
-echo "🔨 Building & starting containers..."
+# Git Pull
+echo "📥 Git Pull..."
+git pull origin main
+
+# 기존 컨테이너 중지
+echo "🛑 기존 컨테이너 중지..."
+docker compose -f docker-compose.prod.yml down
+
+# Docker 이미지 빌드
+echo "🔨 Docker 이미지 빌드..."
 docker compose -f docker-compose.prod.yml build --no-cache
+
+# 컨테이너 시작
+echo "▶️ 컨테이너 시작..."
 docker compose -f docker-compose.prod.yml up -d
 
-# === Django 마이그레이션 & 정적파일 ===
-echo "🗄️  Running database migrations..."
-docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate
+# 컨테이너 준비 대기
+echo "⏳ 컨테이너 준비 대기 (10초)..."
+sleep 10
 
-echo "📦 Collecting static files..."
+# 마이그레이션 실행
+echo "🗄️ 마이그레이션 실행..."
+docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+
+# Static 파일 수집
+echo "📦 Static 파일 수집..."
 docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
 
-# === 헬스체크 ===
-echo "🔍 Checking app health..."
-sleep 5
-if curl -fs http://localhost:8000/health/ > /dev/null; then
-  echo "✅ Deployment successful!"
-else
-  echo "⚠️  Warning: App may not be responding yet."
-fi
+echo "✅ 배포 완료!"
+echo ""
+echo "📊 컨테이너 상태:"
+docker compose -f docker-compose.prod.yml ps
 
-# === 로그 보기 ===
-echo "📝 Showing logs (Ctrl+C to exit)..."
-docker compose -f docker-compose.prod.yml logs -f
+echo ""
+echo "🌐 접속 정보:"
+echo "Frontend: http://89.168.102.116"
+echo "Backend API: http://89.168.102.116:8000/api"
+echo "Django Admin: http://89.168.102.116:8000/admin"
