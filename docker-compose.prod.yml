@@ -57,12 +57,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=${VITE_API_URL}
+        - VITE_API_URL=/api
     container_name: webboard_frontend_prod
     expose:
       - "80"
-    env_file:
-      - ./.env.production
     depends_on:
       - backend
     restart: always
