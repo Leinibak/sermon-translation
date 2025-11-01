@@ -25,6 +25,7 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      - ./backend:/app/backend
     env_file:
       - ./.env.production
     expose:

@@ -3,6 +3,8 @@ set -e
 
 echo "⏳ Waiting for PostgreSQL..."
 
+cd /app/backend
+
 # PostgreSQL 준비 대기
 while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
   echo "PostgreSQL is unavailable - sleeping"
