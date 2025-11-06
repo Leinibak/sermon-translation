@@ -3,7 +3,12 @@ set -e
 
 echo "⏳ Waiting for PostgreSQL..."
 
-cd /app/backend
+# dev 환경이면 /app, prod 환경이면 /app/backend
+if [ "$DJANGO_ENV" = "prod" ]; then
+    cd /app/backend
+else
+    cd /app
+fi
 
 # PostgreSQL 준비 대기
 while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
@@ -23,7 +28,7 @@ echo "📦 Collecting static files..."
 python manage.py collectstatic --noinput
 
 # 환경 구분 실행
-if [ "$DJANGO_ENV" = "production" ]; then
+if [ "$DJANGO_ENV" = "prod" ]; then
   echo "🚀 Starting Gunicorn (Production Mode)..."
   exec gunicorn config.wsgi:application \
     --bind 0.0.0.0:8000 \

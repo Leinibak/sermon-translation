@@ -1,82 +1,96 @@
-# ============================================
-# docker-compose.dev.yml
-# 개발용 (local development)
-# ============================================
-# version: '3.9'
-
 services:
+  # ===============================
+  # PostgreSQL
+  # ===============================
   db:
     image: postgres:15-alpine
     container_name: webboard_db_dev
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-    env_file:
-      - ./.env   # ← 루트 .env를 여기서 명시
-    # environment:
-    #   - POSTGRES_DB=${POSTGRES_DB}
-    #   - POSTGRES_USER=${POSTGRES_USER}
-    #   - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-
     ports:
-      - "${POSTGRES_PORT}:5432"   
+      - "5432:5432"
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - webboard_network
 
+  # ===============================
+  # Django Backend
+  # ===============================
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile  # 개발용 Dockerfile (gunicorn 없이 runserver)
     container_name: webboard_backend_dev
     command: >
-      sh -c "python manage.py migrate &&
-            python manage.py runserver 0.0.0.0:8000"
-    env_file:
-      - ./backend/.env        # ✅ 개발용 환경 변수
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      - DJANGO_ENV=dev
+      - DEBUG=True
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DJANGO_SETTINGS_MODULE=config.settings  
+      #DB
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173
     volumes:
-      - ./backend:/app   # 코드 변경 실시간 반영
-      - ./backend/.env:/app/.env:ro
-      - ./backend/staticfiles:/app/staticfiles   # ✅ 추가: 정적파일 공유
-      # - static_volume_dev:/app/staticfiles    # production환경일경우
-      - media_volume_dev:/app/media
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     ports:
-      - "8000:8000"  # 로컬 브라우저에서 접근 가능
-
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - webboard_network
 
+  # ===============================
+  # React Frontend
+  # ===============================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: webboard_frontend_dev
+    ports:
+      - "3000:3000"
+    working_dir: /app
+    command: npm run dev
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/board/posts/
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./frontend/.env
     depends_on:
       - backend
+    restart: always
     networks:
       - webboard_network
 
+# ===============================
+# Volumes & Networks
+# ===============================
 volumes:
   postgres_data_dev:
-  static_volume_dev:
-  media_volume_dev:
+  static_volume:
+  media_volume:
 
 networks:
   webboard_network:
     driver: bridge
-
-
- 

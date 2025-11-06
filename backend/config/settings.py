@@ -23,12 +23,14 @@ else:
     from decouple import config
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-&zbf7nc$y97egv(xiilnu4mci6366t*a^=x7m*h*hfq2u2-#+4')
+SECRET_KEY = config('SECRET_KEY', default='dev-secret-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+
+
 
 # Application definition
 INSTALLED_APPS = [
@@ -44,9 +46,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -116,12 +118,20 @@ CSRF_TRUSTED_ORIGINS = [
     'http://89.168.102.116',
     'http://localhost',
 ]
-# CORS 설정
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000'
-).split(',')
+# # CORS 설정 배표
+# CORS_ALLOWED_ORIGINS = config(
+#     'CORS_ALLOWED_ORIGINS',
+#     default='http://localhost:3000'
+# ).split(',')
 
+
+# CORS 설정 개발
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",    # Vite 개발 서버
+    "http://127.0.0.1:3000",    # 로컬호스트
+    "http://frontend:3000",     # Docker 내부
+    "http://localhost",         # 프로덕션
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # REST Framework 설정
