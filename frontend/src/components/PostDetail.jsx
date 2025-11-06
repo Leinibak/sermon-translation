@@ -1,102 +1,160 @@
-import { useEffect, useState } from "react";
-import { getPost, deletePost } from "../api/posts";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import axios from '../api/axios';
+import { useAuth } from '../contexts/AuthContext.jsx'; 
 
-export default function PostDetail({ id, onBack, onEdit }) {
+function PostDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();  // ⭐ 인증 상태 확인
+  
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // 게시글 불러오기
   useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        const res = await getPost(id);
-        // API 응답 구조에 따라 res.data 또는 res 사용
-        const data = res.data || res;
-        setPost(data);
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        alert("게시글을 불러오는 중 오류가 발생했습니다.");
-        onBack();
-      }
-    };
     fetchPost();
-  }, [id, onBack]);
+  }, [id]);
 
-  // 삭제 처리
+  const fetchPost = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/posts/${id}/`);
+      setPost(response.data);
+      setError(null);
+    } catch (err) {
+      setError('게시글을 불러오는데 실패했습니다.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
-    if (!post) return;
-    if (window.confirm("정말 삭제하시겠습니까?")) {
+    if (!isAuthenticated) {
+      alert('로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+
+    if (window.confirm('정말 삭제하시겠습니까?')) {
       try {
-        await deletePost(post.id);
-        alert("게시글이 삭제되었습니다.");
-        onBack();
+        await axios.delete(`/posts/${id}/`);
+        alert('게시글이 삭제되었습니다.');
+        navigate('/');
       } catch (err) {
+        if (err.response?.status === 401) {
+          alert('로그인이 필요합니다.');
+          navigate('/login');
+        } else {
+          alert('삭제에 실패했습니다.');
+        }
         console.error(err);
-        alert("삭제 중 오류가 발생했습니다.");
       }
     }
   };
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md text-center text-gray-500">
-        로딩 중...
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  // 실제 API 키 확인 후 필요 시 수정:
-  const title = post.title || "제목 없음";
-  const author = post.author || post.author_name || "작성자 없음";
-  const createdAt = post.created_at
-    ? new Date(post.created_at).toLocaleString()
-    : "날짜 없음";
-  const viewCount = post.view_count ?? 0;
-  const content = post.content || post.body || "내용 없음";
+  if (error) {
+    return (
+      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">게시글을 찾을 수 없습니다.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
-      {/* 상단 헤더 */}
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-        <div className="flex space-x-2">
-          <button
-            className="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-1 rounded shadow"
-            onClick={() => onEdit(post)}
-          >
-            수정
-          </button>
-          <button
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded shadow"
-            onClick={handleDelete}
-          >
-            삭제
-          </button>
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-gray-200">
+        <h2 className="text-3xl font-bold text-gray-900">{post.title}</h2>
+        <div className="mt-4 flex items-center space-x-6 text-sm text-gray-500">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span>{post.author}</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>조회수 {post.view_count}</span>
+          </div>
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{new Date(post.created_at).toLocaleString('ko-KR')}</span>
+          </div>
         </div>
       </div>
 
-      {/* 메타 정보 */}
-      <p className="text-sm text-gray-500 mb-4">
-        작성자: <span className="font-medium">{author}</span> | 작성일:{" "}
-        <span className="font-medium">{createdAt}</span> | 조회수:{" "}
-        <span className="font-medium">{viewCount}</span>
-      </p>
-
-      {/* 본문 */}
-      <div className="prose max-w-full mb-6 text-gray-700 whitespace-pre-wrap">
-        {content}
+      {/* Content */}
+      <div className="px-6 py-8">
+        <div className="prose max-w-none">
+          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+        </div>
       </div>
 
-      {/* 뒤로가기 버튼 */}
-      <div className="flex justify-end">
-        <button
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded shadow"
-          onClick={onBack}
+      {/* Actions */}
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between">
+        <Link
+          to="/"
+          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
         >
-          목록으로
-        </button>
+          <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          목록
+        </Link>
+        
+        {/* ⭐ 로그인한 경우에만 수정/삭제 버튼 표시 */}
+        {isAuthenticated ? (
+          <div className="flex space-x-3">
+            <Link
+              to={`/edit/${post.id}`}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              수정
+            </Link>
+            <button
+              onClick={handleDelete}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+            >
+              <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              삭제
+            </button>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">
+            수정/삭제는 로그인 후 가능합니다.
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+export default PostDetail;
