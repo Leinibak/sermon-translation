@@ -1,14 +1,16 @@
+
 // ============================================
 // frontend/src/api/axios.js (수정)
 // ============================================
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Base API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-console.log('🔗 API URL:', API_URL);
+console.log('🔗 API Base URL:', API_BASE_URL);
 
 const axiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,7 +24,7 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('📤 Request:', config.method?.toUpperCase(), config.url);
+    console.log('📤 Request:', config.method?.toUpperCase(), config.baseURL + config.url);
     return config;
   },
   (error) => {
@@ -49,7 +51,7 @@ axiosInstance.interceptors.response.use(
         if (refreshToken) {
           // 토큰 갱신 시도
           const response = await axios.post(
-            `${API_URL}/token/refresh/`,
+            `${API_BASE_URL}/auth/token/refresh/`,
             { refresh: refreshToken }
           );
 

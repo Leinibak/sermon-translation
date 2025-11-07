@@ -73,7 +73,7 @@ services:
     working_dir: /app
     command: npm run dev
     environment:
-      - VITE_API_URL=http://localhost:8000/api/board/posts/
+      - VITE_API_URL=http://localhost:8000/api
     volumes:
       - ./frontend:/app
       - /app/node_modules

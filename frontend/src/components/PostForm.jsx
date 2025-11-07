@@ -1,31 +1,125 @@
-import { useState, useEffect } from "react";
-import { createPost, updatePost, getPost } from "../api/posts";
+// ============================================ 
+// frontend/src/components/PostForm.jsx (수정 완료)
+// ============================================
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from '../api/axios';
+import API_ENDPOINTS from '../config/api';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function PostForm({ post, onSuccess, onCancel }) {
-  const [title, setTitle] = useState(post?.title || "");
-  const [content, setContent] = useState(post?.content || "");
-  const [author, setAuthor] = useState(post?.author || "");
+function PostForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const isEditMode = Boolean(id);
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    author: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = async () => {
-    if (!title || !content || !author) {
-      alert("모든 필드를 입력해주세요.");
+  // ✅ 로그인 확인
+  useEffect(() => {
+    if (!isAuthenticated) {
+      alert('로그인이 필요합니다.');
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // ✅ 게시글 불러오기 (수정 모드)
+  useEffect(() => {
+    if (isEditMode) {
+      fetchPost();
+    }
+  }, [id]);
+
+  const fetchPost = async () => {
+    try {
+      console.log('🔍 게시글 조회:', API_ENDPOINTS.board.detail(id));
+      const response = await axios.get(API_ENDPOINTS.board.detail(id));
+      console.log('✅ 게시글 조회 성공:', response.data);
+      setFormData({
+        title: response.data.title || '',
+        content: response.data.content || '',
+        author: response.data.author || '',
+      });
+    } catch (err) {
+      console.error('❌ 게시글 조회 실패:', err);
+      setError('게시글을 불러오는데 실패했습니다.');
+    }
+  };
+
+  // ✅ 입력 변경 핸들러
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+
+  // ✅ 제출 핸들러
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    console.log('📤 폼 제출 시도');
+    console.log('입력 데이터:', formData);
+
+    if (!formData.title.trim() || !formData.content.trim() || !formData.author.trim()) {
+      alert('모든 필드를 입력해주세요.');
       return;
     }
 
-    if (post) {
-      await updatePost(post.id, { title, content, author });
-    } else {
-      await createPost({ title, content, author });
-    }
+    try {
+      setLoading(true);
+      setError(null);
 
-    onSuccess();
+      if (isEditMode) {
+        console.log('🔄 수정 요청:', API_ENDPOINTS.board.detail(id));
+        const response = await axios.put(API_ENDPOINTS.board.detail(id), formData);
+        console.log('✅ 수정 성공:', response.data);
+        alert('게시글이 수정되었습니다.');
+        navigate(`/post/${id}`);
+      } else {
+        console.log('➕ 생성 요청:', API_ENDPOINTS.board.posts);
+        const response = await axios.post(API_ENDPOINTS.board.posts, formData);
+        console.log('✅ 생성 성공:', response.data);
+        alert('게시글이 작성되었습니다.');
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('❌ 요청 실패:', err);
+      
+      if (err.response?.status === 401) {
+        setError('로그인이 필요합니다.');
+        alert('로그인이 필요합니다.');
+        navigate('/login');
+      } else {
+        const errorMessage = err.response?.data?.detail 
+          || err.response?.data?.message
+          || '저장에 실패했습니다.';
+        setError(errorMessage);
+        alert(`저장 실패: ${errorMessage}`);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ✅ 취소 버튼 핸들러
+  const handleCancel = () => {
+    navigate(-1);
+  };
+
+  // ✅ JSX 반환
   return (
     <div className="max-w-3xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
       {/* 헤더 */}
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        {post ? "✏️ 게시글 수정" : "📝 게시글 작성"}
+        {isEditMode ? "✏️ 게시글 수정" : "📝 게시글 작성"}
       </h2>
 
       {/* 입력 폼 */}
@@ -34,8 +128,9 @@ export default function PostForm({ post, onSuccess, onCancel }) {
           <label className="block text-gray-700 mb-1">제목</label>
           <input
             type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             placeholder="제목을 입력하세요"
           />
@@ -44,9 +139,10 @@ export default function PostForm({ post, onSuccess, onCancel }) {
         <div>
           <label className="block text-gray-700 mb-1">내용</label>
           <textarea
+            name="content"
             rows={6}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+            value={formData.content}
+            onChange={handleChange}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             placeholder="내용을 입력하세요"
           />
@@ -56,8 +152,9 @@ export default function PostForm({ post, onSuccess, onCancel }) {
           <label className="block text-gray-700 mb-1">작성자</label>
           <input
             type="text"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
+            name="author"
+            value={formData.author}
+            onChange={handleChange}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             placeholder="작성자를 입력하세요"
           />
@@ -67,18 +164,23 @@ export default function PostForm({ post, onSuccess, onCancel }) {
       {/* 버튼 그룹 */}
       <div className="flex justify-end space-x-2 mt-6">
         <button
+          type="button"
           className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded shadow"
-          onClick={onCancel}
+          onClick={handleCancel}
         >
           취소
         </button>
         <button
+          type="submit"
+          disabled={loading}
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded shadow"
           onClick={handleSubmit}
         >
-          {post ? "수정 완료" : "등록"}
+          {isEditMode ? "수정 완료" : "등록"}
         </button>
       </div>
     </div>
   );
 }
+
+export default PostForm;

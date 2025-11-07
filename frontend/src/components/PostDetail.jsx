@@ -1,12 +1,16 @@
+// ============================================
+// frontend/src/components/PostDetail.jsx (수정)
+// ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
-import { useAuth } from '../contexts/AuthContext.jsx'; 
+import API_ENDPOINTS from '../config/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function PostDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();  // ⭐ 인증 상태 확인
+  const { isAuthenticated } = useAuth();
   
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +23,8 @@ function PostDetail() {
   const fetchPost = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/posts/${id}/`);
+      // ⭐ API_ENDPOINTS 사용
+      const response = await axios.get(API_ENDPOINTS.board.detail(id));
       setPost(response.data);
       setError(null);
     } catch (err) {
@@ -39,7 +44,8 @@ function PostDetail() {
 
     if (window.confirm('정말 삭제하시겠습니까?')) {
       try {
-        await axios.delete(`/posts/${id}/`);
+        // ⭐ API_ENDPOINTS 사용
+        await axios.delete(API_ENDPOINTS.board.detail(id));
         alert('게시글이 삭제되었습니다.');
         navigate('/');
       } catch (err) {
@@ -54,30 +60,13 @@ function PostDetail() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-        <p className="text-sm text-red-700">{error}</p>
-      </div>
-    );
-  }
-
-  if (!post) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">게시글을 찾을 수 없습니다.</p>
-      </div>
-    );
-  }
-
+// ✅ 로딩 중 표시 
+if (loading) return <p className="text-center mt-8">Loading...</p>; 
+// ✅ 오류 표시 
+if (error) return <p className="text-center text-red-500 mt-8">{error}</p>; 
+// ✅ post가 null이면 렌더링 중단 
+if (!post) return <p className="text-center mt-8">게시글이 존재하지 않습니다.</p>; 
+  
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {/* Header */}
