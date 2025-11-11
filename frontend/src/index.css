@@ -36,6 +36,16 @@ button {
   cursor: pointer;
 }
 
+.logo-wrapper {
+  transform: scale(0.45);
+  transform-origin: bottom center;
+  overflow: visible; /* 이미지 확장 부분이 잘리지 않도록 */
+}
+
+.logo-clip {
+  clip-path: inset(55% 0 0 0);
+}
+
 /* 전역 버튼 모양 클래스 */
 .btn {
   background-color: #4f46e5;

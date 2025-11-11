@@ -1,13 +1,15 @@
 // ============================================
 // frontend/src/components/PostList.jsx
+// (onSelect 제거, navigate 사용 버전)
 // ============================================
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 
-function PostList({ onSelect, onCreate }) {
+function PostList({ onCreate }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +38,7 @@ function PostList({ onSelect, onCreate }) {
     if (!window.confirm('정말 삭제하시겠습니까?')) return;
 
     try {
-      await axios.delete(API_ENDPOINTS.board.postDetail(id));
+      await axios.delete(API_ENDPOINTS.board.detail(id));
       alert('게시글이 삭제되었습니다.');
       setPosts(posts.filter((p) => p.id !== id));
     } catch (err) {
@@ -53,7 +55,7 @@ function PostList({ onSelect, onCreate }) {
 
         {isAuthenticated && (
           <button
-            onClick={onCreate}
+            onClick={() => navigate('/create')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded"
           >
             새 글 작성
@@ -66,13 +68,11 @@ function PostList({ onSelect, onCreate }) {
         {posts.map((post) => (
           <div
             key={post.id}
-            className="border border-gray-200 p-4 rounded-lg hover:bg-gray-50 transition"
+            className="border border-gray-200 p-4 rounded-lg hover:bg-gray-50 transition cursor-pointer"
+            onClick={() => navigate(`/post/${post.id}`)}
           >
             <div className="flex justify-between items-center">
-              <h3
-                className="text-lg font-semibold text-gray-900 cursor-pointer"
-                onClick={() => onSelect(post.id)}
-              >
+              <h3 className="text-lg font-semibold text-gray-900">
                 {post.title}
               </h3>
 
@@ -90,7 +90,7 @@ function PostList({ onSelect, onCreate }) {
             </div>
 
             <div className="mt-2 text-sm text-gray-500">
-              작성자: {post.author} | 조회수: {post.view_count} | 작성일:{" "}
+              작성자: {post.author} | 조회수: {post.view_count} | 작성일:{' '}
               {new Date(post.created_at).toLocaleDateString()}
             </div>
           </div>
