@@ -56,9 +56,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-      args:
-        - VITE_API_URL=/api/board/posts/
     container_name: webboard_frontend_prod
+    environment:
+      - VITE_API_URL=/api
     expose:
       - "80"
     depends_on:
