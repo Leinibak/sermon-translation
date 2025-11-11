@@ -77,6 +77,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    mem_limit: 8g
+    memswap_limit: 10g 
     depends_on:
       - backend
     restart: always
