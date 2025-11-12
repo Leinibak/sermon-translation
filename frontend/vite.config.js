@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  base: "/",  // ✅ 꼭 이 값이 '/' 이어야 합니다
   plugins: [react()],
   server: {
     port: 3000,
