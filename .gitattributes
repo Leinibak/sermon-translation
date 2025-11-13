@@ -1,3 +1,12 @@
-# .gitattributes
-* text eol=lf
-# 이 설정을 넣으면 Git이 자동으로 모든 텍스트 파일을 LF로 저장합니다.
+# 텍스트 파일
+*.txt text eol=lf
+*.md  text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+
+# 바이너리 파일
+*.png binary
+*.jpg binary
+*.gif binary
+
