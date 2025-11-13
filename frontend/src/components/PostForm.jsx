@@ -1,5 +1,5 @@
-// ============================================ 
-// frontend/src/components/PostForm.jsx (수정 완료)
+// ============================================
+// frontend/src/components/PostForm.jsx (수정)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -21,7 +21,6 @@ function PostForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ✅ 로그인 확인
   useEffect(() => {
     if (!isAuthenticated) {
       alert('로그인이 필요합니다.');
@@ -29,7 +28,6 @@ function PostForm() {
     }
   }, [isAuthenticated, navigate]);
 
-  // ✅ 게시글 불러오기 (수정 모드)
   useEffect(() => {
     if (isEditMode) {
       fetchPost();
@@ -52,7 +50,6 @@ function PostForm() {
     }
   };
 
-  // ✅ 입력 변경 핸들러
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -61,7 +58,6 @@ function PostForm() {
     });
   };
 
-  // ✅ 제출 핸들러
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -82,13 +78,13 @@ function PostForm() {
         const response = await axios.put(API_ENDPOINTS.board.detail(id), formData);
         console.log('✅ 수정 성공:', response.data);
         alert('게시글이 수정되었습니다.');
-        navigate(`/post/${id}`);
+        navigate('/blog'); // ✅ 게시글 목록으로 이동
       } else {
         console.log('➕ 생성 요청:', API_ENDPOINTS.board.posts);
         const response = await axios.post(API_ENDPOINTS.board.posts, formData);
         console.log('✅ 생성 성공:', response.data);
         alert('게시글이 작성되었습니다.');
-        navigate('/');
+        navigate('/blog'); // ✅ 게시글 목록으로 이동
       }
     } catch (err) {
       console.error('❌ 요청 실패:', err);
@@ -109,20 +105,16 @@ function PostForm() {
     }
   };
 
-  // ✅ 취소 버튼 핸들러
   const handleCancel = () => {
     navigate(-1);
   };
 
-  // ✅ JSX 반환
   return (
     <div className="max-w-3xl mx-auto mt-8 p-6 bg-white rounded-lg shadow-md">
-      {/* 헤더 */}
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
         {isEditMode ? "✏️ 게시글 수정" : "📝 게시글 작성"}
       </h2>
 
-      {/* 입력 폼 */}
       <div className="space-y-4">
         <div>
           <label className="block text-gray-700 mb-1">제목</label>
@@ -161,7 +153,6 @@ function PostForm() {
         </div>
       </div>
 
-      {/* 버튼 그룹 */}
       <div className="flex justify-end space-x-2 mt-6">
         <button
           type="button"

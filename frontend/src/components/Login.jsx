@@ -1,9 +1,8 @@
-
 // ============================================
-// frontend/src/components/Login.jsx (새 파일)
+// frontend/src/components/Login.jsx (수정)
 // ============================================
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import API_ENDPOINTS from '../config/api';
 
@@ -45,7 +44,7 @@ function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
               사용자명
@@ -77,7 +76,7 @@ function Login() {
           </div>
 
           <button
-            type="submit"
+            onClick={handleSubmit}
             disabled={loading}
             className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
               loading ? 'opacity-50 cursor-not-allowed' : ''
@@ -85,10 +84,15 @@ function Login() {
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>
-        </form>
+        </div>
 
-        <div className="mt-4 text-center text-sm text-gray-600">
-          <p>테스트 계정으로 로그인하세요</p>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            계정이 없으신가요?{' '}
+            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+              회원가입
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Menu, X } from "lucide-react";
-import logo from "../assets/archesosik_logo2.png";
+import logo from "@/assets/archesosik_logo2.png";
 
 
 function Navbar() {

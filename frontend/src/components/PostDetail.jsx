@@ -23,7 +23,6 @@ function PostDetail() {
   const fetchPost = async () => {
     try {
       setLoading(true);
-      // ⭐ API_ENDPOINTS 사용
       const response = await axios.get(API_ENDPOINTS.board.detail(id));
       setPost(response.data);
       setError(null);
@@ -44,10 +43,9 @@ function PostDetail() {
 
     if (window.confirm('정말 삭제하시겠습니까?')) {
       try {
-        // ⭐ API_ENDPOINTS 사용
         await axios.delete(API_ENDPOINTS.board.detail(id));
         alert('게시글이 삭제되었습니다.');
-        navigate('/');
+        navigate('/blog'); // ✅ 게시글 목록으로 이동
       } catch (err) {
         if (err.response?.status === 401) {
           alert('로그인이 필요합니다.');
@@ -60,12 +58,9 @@ function PostDetail() {
     }
   };
 
-// ✅ 로딩 중 표시 
-if (loading) return <p className="text-center mt-8">Loading...</p>; 
-// ✅ 오류 표시 
-if (error) return <p className="text-center text-red-500 mt-8">{error}</p>; 
-// ✅ post가 null이면 렌더링 중단 
-if (!post) return <p className="text-center mt-8">게시글이 존재하지 않습니다.</p>; 
+  if (loading) return <p className="text-center mt-8">Loading...</p>;
+  if (error) return <p className="text-center text-red-500 mt-8">{error}</p>;
+  if (!post) return <p className="text-center mt-8">게시글이 존재하지 않습니다.</p>;
   
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -105,7 +100,7 @@ if (!post) return <p className="text-center mt-8">게시글이 존재하지 않�
       {/* Actions */}
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between">
         <Link
-          to="/"
+          to="/blog"
           className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
         >
           <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -114,7 +109,6 @@ if (!post) return <p className="text-center mt-8">게시글이 존재하지 않�
           목록
         </Link>
         
-        {/* ⭐ 로그인한 경우에만 수정/삭제 버튼 표시 */}
         {isAuthenticated ? (
           <div className="flex space-x-3">
             <Link

@@ -4,13 +4,14 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Navbar from './components/Navbar';
+import Navbar from "./components/Navbar";
 import Home from "./pages/Home.jsx";
 import PostList from './components/PostList';
 import PostDetail from './components/PostDetail';
 import PostForm from './components/PostForm';
 import Login from './components/Login';
 import Footer from "./components/Footer";
+import Register from "./components/Register";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -127,9 +128,18 @@ function App() {
               <Route path="/sermons" element={<div className="p-10 text-center text-xl">Sermons Page</div>} />
               <Route path="/blog" element={<PostList />} />
               <Route path="/post/:id" element={<PostDetail />} />
-              <Route path="/edit/:id" element={<PostForm />} /> {/* 수정 */}
-              <Route path="/create" element={<PostForm />} />
+              <Route path="/edit/:id" element={
+                <PrivateRoute>
+                  <PostForm />
+                </PrivateRoute>
+              } />
+              <Route path="/create" element={
+                <PrivateRoute>
+                  <PostForm />
+                </PrivateRoute>
+              } />
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} /> {/* ✅ 추가 */}
             </Routes>
           </main>
           <Footer />
