@@ -57,8 +57,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     container_name: webboard_frontend_prod
-    environment:
-      - VITE_API_URL=/api
+    args:
+      VITE_API_URL: http://89.168.102.116/api
     expose:
       - "80"
     depends_on:
