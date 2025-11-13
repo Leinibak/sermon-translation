@@ -17,7 +17,7 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
 # 4️⃣ Vite 빌드
-RUN npm run build
+RUN npm run build -- --mode production
 
 # ================================================
 # Stage 2: Nginx — Serve static files
