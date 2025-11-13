@@ -129,13 +129,15 @@ CSRF_TRUSTED_ORIGINS = [
 # ).split(',')
 
 
-# CORS 설정 개발
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",    # Vite 개발 서버
-    "http://127.0.0.1:3000",    # 로컬호스트
-    "http://frontend:3000",     # Docker 내부
-    "http://localhost",         # 프로덕션
+# CSRF 신뢰할 수 있는 출처
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://89.168.102.116',  # 배포 서버
+    'https://89.168.102.116',  # HTTPS도 추가
 ]
+
 CORS_ALLOW_CREDENTIALS = True
 
 # REST Framework 설정 (기존 설정 수정)
@@ -144,7 +146,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',  # ⭐ JWT 인증
-        'rest_framework.authentication.SessionAuthentication',  # Admin용
+        # 'rest_framework.authentication.SessionAuthentication',  # Admin용
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',  # 기본은 모두 허용
