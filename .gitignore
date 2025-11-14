@@ -33,9 +33,12 @@ staticfiles/
 media/
 
 # Environment variables
-.env
+.env*
 .env.production
 .env.local
+
+*.ps1
+*_snapshot*
 
 # Node
 frontend/npm-debug.log*

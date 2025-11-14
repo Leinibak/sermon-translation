@@ -122,12 +122,16 @@ CSRF_TRUSTED_ORIGINS = [
     'http://89.168.102.116',
     'http://localhost',
 ]
-# # CORS 설정 배표
-# CORS_ALLOWED_ORIGINS = config(
-#     'CORS_ALLOWED_ORIGINS',
-#     default='http://localhost:3000'
-# ).split(',')
 
+# # CORS 설정 배표
+# CORS_ALLOWED_ORIGINS = [
+#     origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+# ]
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 # CSRF 신뢰할 수 있는 출처
 CSRF_TRUSTED_ORIGINS = [
