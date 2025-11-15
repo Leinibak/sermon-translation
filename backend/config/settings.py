@@ -117,10 +117,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CSRF 설정
+
+# CSRF 설정 (환경변수 기반)
 CSRF_TRUSTED_ORIGINS = [
-    'http://89.168.102.116',
-    'http://localhost',
+    origin.strip()
+    for origin in config(
+        'CSRF_TRUSTED_ORIGINS',
+        default='http://localhost'
+    ).split(',')
 ]
 
 # # CORS 설정 배표
@@ -133,14 +137,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
 
-# CSRF 신뢰할 수 있는 출처
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://89.168.102.116',  # 배포 서버
-    'https://89.168.102.116',  # HTTPS도 추가
-]
 
 CORS_ALLOW_CREDENTIALS = True
 
