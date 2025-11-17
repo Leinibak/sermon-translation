@@ -1,0 +1,185 @@
+/* frontend/src/components/SermonPlayer.css */
+
+/* 오디오 재생 바 커스텀 스타일 */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: opacity 0.2s;
+}
+
+.range-slider:hover {
+  opacity: 1;
+}
+
+/* 크롬, 사파리, 오페라 */
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  width: 20px;
+  height: 20px;
+  background: #1d4ed8;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.range-slider::-webkit-slider-thumb:active {
+  width: 22px;
+  height: 22px;
+  background: #1e40af;
+}
+
+/* 파이어폭스 */
+.range-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: #2563eb;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.range-slider::-moz-range-thumb:hover {
+  width: 20px;
+  height: 20px;
+  background: #1d4ed8;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.range-slider::-moz-range-thumb:active {
+  width: 22px;
+  height: 22px;
+  background: #1e40af;
+}
+
+/* IE/Edge */
+.range-slider::-ms-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: #2563eb;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.range-slider::-ms-thumb:hover {
+  width: 20px;
+  height: 20px;
+  background: #1d4ed8;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* 트랙 스타일 */
+.range-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.range-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #e5e7eb;
+}
+
+.range-slider::-ms-track {
+  height: 8px;
+  border-radius: 4px;
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+}
+
+/* 볼륨 슬라이더 */
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  background: #4b5563;
+  width: 16px;
+  height: 16px;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  background: #4b5563;
+  width: 16px;
+  height: 16px;
+}
+
+/* 재생 버튼 애니메이션 */
+.play-button {
+  transition: all 0.3s ease;
+}
+
+.play-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+}
+
+.play-button:active {
+  transform: scale(0.95);
+}
+
+/* PDF 링크 호버 효과 */
+.pdf-link {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.pdf-link::after {
+  content: '↗';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 14px;
+}
+
+.pdf-link:hover::after {
+  opacity: 1;
+}

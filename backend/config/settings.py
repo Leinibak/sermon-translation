@@ -43,10 +43,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'django_filters',
 
     # Local apps
     'board',
     'accounts',
+    'sermons', 
 ]
 
 MIDDLEWARE = [
@@ -117,6 +119,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# 파일 업로드 설정
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100MB
 
 # CSRF 설정 (환경변수 기반)
 CSRF_TRUSTED_ORIGINS = [
@@ -127,15 +132,15 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(',')
 ]
 
-# CORS 설정 배표
-CORS_ALLOWED_ORIGINS = [
-    origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='https://jounsori.org').split(',')
-]
-
-
+# # CORS 설정 배표
 # CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",
+#     origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='https://jounsori.org').split(',')
 # ]
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 
 CORS_ALLOW_CREDENTIALS = True
@@ -150,6 +155,12 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',  # 기본은 모두 허용
+    ],
+    
+    'DEFAULT_FILTER_BACKENDS': [  # 추가
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
     ],
 }
 

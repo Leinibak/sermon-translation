@@ -16,10 +16,15 @@ urlpatterns = [
     # 🔹 board 앱 API 라우팅
     path('api/board/', include('board.urls')),
 
+    # Sermons API (추가)
+    path('api/sermons/', include('sermons.urls')),
+
     # JWT 토큰 엔드포인트
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 
+# Static 및 Media 파일 서빙
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

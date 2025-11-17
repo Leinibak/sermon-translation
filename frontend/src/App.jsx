@@ -12,6 +12,9 @@ import PostForm from './components/PostForm';
 import Login from './components/Login';
 import Footer from "./components/Footer";
 import Register from "./components/Register";
+import SermonList from './components/SermonList';
+import SermonDetail from './components/SermonDetail';
+import SermonUpload from './components/SermonUpload';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -125,7 +128,22 @@ function App() {
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/sermons" element={<div className="p-10 text-center text-xl">Sermons Page</div>} />
+              
+              {/* Sermons 라우팅 */}
+              <Route path="/sermons" element={<SermonList />} />
+              <Route path="/sermons/:id" element={<SermonDetail />} />
+              <Route path="/sermons/upload" element={
+                <PrivateRoute>
+                  <SermonUpload />
+                </PrivateRoute>
+              } />
+              <Route path="/sermons/edit/:id" element={
+                <PrivateRoute>
+                  <SermonUpload />
+                </PrivateRoute>
+              } />
+              
+              {/* Blog 라우팅 */}
               <Route path="/blog" element={<PostList />} />
               <Route path="/post/:id" element={<PostDetail />} />
               <Route path="/edit/:id" element={
@@ -138,9 +156,11 @@ function App() {
                   <PostForm />
                 </PrivateRoute>
               } />
+              
+              {/* Auth 라우팅 */}
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} /> {/* ✅ 추가 */}
-            </Routes>
+              <Route path="/register" element={<Register />} />
+            </Routes> 
           </main>
           <Footer />
         </div>

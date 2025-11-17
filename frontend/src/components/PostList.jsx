@@ -38,7 +38,7 @@ function PostList({ onCreate }) {
       <div className="mb-8">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">게시글</h2>
+            <h3 className="text-2xl font-bold text-gray-900">게시글</h3>
             <p className="mt-2 text-sm text-gray-600">
               전체 {posts.length}개의 게시글
             </p>
