@@ -10,11 +10,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 console.log('🔗 API Base URL:', API_BASE_URL);
 
 const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL, 
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000,
+  withCredentials: true, // 추가
 });
 
 // 요청 인터셉터 - 토큰 자동 추가

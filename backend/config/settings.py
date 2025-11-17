@@ -127,15 +127,15 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(',')
 ]
 
-# # CORS 설정 배표
-# CORS_ALLOWED_ORIGINS = [
-#     origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
-# ]
-
-
+# CORS 설정 배표
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+    origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='https://jounsori.org').split(',')
 ]
+
+
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+# ]
 
 
 CORS_ALLOW_CREDENTIALS = True
