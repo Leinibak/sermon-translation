@@ -8,8 +8,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    
+    # path('admin/', admin.site.urls), 
+    path('wkdrh-rhksfl/', admin.site.urls),  # 원하는 경로로 변경
     # Auth endpoints (registration)
     path('api/auth/', include('accounts.urls')),  # ✅ 추가 This makes /api/auth/register/ available
 
