@@ -6,20 +6,25 @@ import os
 
 def sermon_audio_path(instance, filename):
     """통역 MP3 파일 저장 경로"""
-    return f'sermons/audio/{instance.id}/{filename}'
+    ext = filename.split('.')[-1]
+    # UUID를 사용하여 고유한 파일명 생성
+    filename = f'audio_{uuid.uuid4().hex[:8]}.{ext}'
+    date_path = instance.sermon_date.strftime('%Y/%m')
+    return f'sermons/{date_path}/audio/{filename}'
 
 def sermon_pdf_path(instance, filename):
-    """PDF 파일 저장 경로"""
-    file_type = 'original' if 'original' in filename.lower() else 'translated'
-    return f'sermons/pdf/{instance.id}/{file_type}/{filename}'
+    """번역 PDF 파일 저장 경로"""
+    ext = filename.split('.')[-1]
+    filename = f'translated_{uuid.uuid4().hex[:8]}.{ext}'
+    date_path = instance.sermon_date.strftime('%Y/%m')
+    return f'sermons/{date_path}/pdf/translated/{filename}'
 
 class Sermon(models.Model):
     CATEGORY_CHOICES = [
         ('sunday', '주일예배'),
-        ('wednesday', '수요예배'),
-        ('friday', '금요예배'),
+        ('youth', '청소년예배'),
         ('special', '특별예배'),
-        ('revival', '부흥회'),
+        ('conference', '컨퍼런스'),
         ('seminar', '세미나'),
         ('other', '기타'),
     ]

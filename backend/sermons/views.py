@@ -5,7 +5,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.http import FileResponse, HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+import mimetypes
 
 from .models import Sermon
 from .serializers import (
@@ -104,18 +106,26 @@ class SermonViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def download_audio(self, request, pk=None):
-        """오디오 파일 다운로드"""
-        sermon = self.get_object()
-        if not sermon.audio_file:
-            return Response(
-                {'detail': '오디오 파일이 없습니다.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        return Response({
-            'url': request.build_absolute_uri(sermon.audio_file.url),
-            'filename': sermon.audio_file.name.split('/')[-1]
-        })
+            """오디오 파일 다운로드"""
+            sermon = self.get_object()
+            if not sermon.audio_file:
+                return Response(
+                    {'detail': '오디오 파일이 없습니다.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            try:
+                # FileResponse로 직접 파일 전송
+                file_handle = sermon.audio_file.open('rb')
+                response = FileResponse(file_handle, content_type='audio/mpeg')
+                response['Content-Disposition'] = f'attachment; filename="{sermon.audio_file.name.split("/")[-1]}"'
+                response['Content-Length'] = sermon.audio_file.size
+                return response
+            except Exception as e:
+                return Response(
+                    {'detail': f'파일을 열 수 없습니다: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
     
     @action(detail=True, methods=['get'])
     def download_original_pdf(self, request, pk=None):
@@ -127,10 +137,21 @@ class SermonViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        return Response({
-            'url': request.build_absolute_uri(sermon.original_pdf.url),
-            'filename': sermon.original_pdf.name.split('/')[-1]
-        })
+        try:
+            # FileResponse로 직접 파일 전송 (PDF 명시)
+            file_handle = sermon.original_pdf.open('rb')
+            response = FileResponse(file_handle, content_type='application/pdf')
+            filename = sermon.original_pdf.name.split('/')[-1]
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            response['Content-Length'] = sermon.original_pdf.size
+            # 모바일에서 PDF 미리보기 지원
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
+        except Exception as e:
+            return Response(
+                {'detail': f'파일을 열 수 없습니다: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['get'])
     def download_translated_pdf(self, request, pk=None):
@@ -142,7 +163,18 @@ class SermonViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        return Response({
-            'url': request.build_absolute_uri(sermon.translated_pdf.url),
-            'filename': sermon.translated_pdf.name.split('/')[-1]
-        })
+        try:
+            # FileResponse로 직접 파일 전송 (PDF 명시)
+            file_handle = sermon.translated_pdf.open('rb')
+            response = FileResponse(file_handle, content_type='application/pdf')
+            filename = sermon.translated_pdf.name.split('/')[-1]
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            response['Content-Length'] = sermon.translated_pdf.size
+            # 모바일에서 PDF 미리보기 지원
+            response['X-Content-Type-Options'] = 'nosniff'
+            return response
+        except Exception as e:
+            return Response(
+                {'detail': f'파일을 열 수 없습니다: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
