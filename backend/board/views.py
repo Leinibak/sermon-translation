@@ -1,23 +1,21 @@
-# ============================================
-# backend/board/views.py (댓글 권한 수정)
-# ============================================
+# backend/board/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from django.shortcuts import get_object_or_404
 
 from .models import Post, Comment
 from .serializers import PostSerializer, CommentSerializer
-from .permissions import IsAuthorOrReadOnly
+from .permissions import IsAuthorOrReadOnly, IsApprovedUser
 
 
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     
-    # 🔥 GET은 모두 허용, POST/PUT/DELETE는 작성자만
-    permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
+    # 🔥 승인된 사용자만 작성 가능하도록 변경
+    permission_classes = [IsAuthenticatedOrReadOnly, IsApprovedUser, IsAuthorOrReadOnly]
 
     def retrieve(self, request, *args, **kwargs):
         """게시글 조회 시 조회수 증가"""
@@ -29,14 +27,35 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """게시글 생성 시 작성자 자동 저장"""
+        # 승인 여부 재확인
+        if not self._is_user_approved(self.request.user):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                detail="관리자 승인 후 게시글 작성이 가능합니다. 승인 요청은 관리자에게 문의하세요."
+            )
+        
         serializer.save(
             user=self.request.user,
             author=self.request.user.username
         )
 
     def perform_update(self, serializer):
-        """게시글 수정 시 작성자 검사 → permission_classes가 처리함"""
+        """게시글 수정 시 권한 검사"""
+        if not self._is_user_approved(self.request.user):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                detail="관리자 승인 후 게시글 수정이 가능합니다."
+            )
         serializer.save()
+
+    def perform_destroy(self, instance):
+        """게시글 삭제 시 권한 검사"""
+        if not self._is_user_approved(self.request.user):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                detail="관리자 승인 후 게시글 삭제가 가능합니다."
+            )
+        instance.delete()
 
     @action(detail=True, methods=['get', 'post'], url_path='comments')
     def comments(self, request, pk=None):
@@ -50,11 +69,18 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         elif request.method == 'POST':
-            # 🔥 댓글 작성은 로그인한 사용자만 가능 (게시글 작성자와 무관)
+            # 🔥 댓글 작성은 승인된 사용자만 가능
             if not request.user.is_authenticated:
                 return Response(
                     {'detail': '로그인이 필요합니다.'},
                     status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # 승인 여부 확인
+            if not self._is_user_approved(request.user):
+                return Response(
+                    {'detail': '관리자 승인 후 댓글 작성이 가능합니다. 승인 요청은 관리자에게 문의하세요.'},
+                    status=status.HTTP_403_FORBIDDEN
                 )
 
             serializer = CommentSerializer(data=request.data)
@@ -81,17 +107,38 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        # 승인 여부 확인
+        if not self._is_user_approved(request.user):
+            return Response(
+                {'detail': '관리자 승인 후 댓글 삭제가 가능합니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # 🔥 추가: 댓글 액션에 대한 권한 개별 설정
+    def _is_user_approved(self, user):
+        """사용자 승인 여부 확인 헬퍼 메서드"""
+        if not user or not user.is_authenticated:
+            return False
+        
+        # 관리자는 항상 승인된 것으로 간주
+        if user.is_staff or user.is_superuser:
+            return True
+        
+        # 일반 사용자는 프로필 승인 상태 확인
+        try:
+            return user.profile.is_approved
+        except:
+            return False
+
     def get_permissions(self):
         """액션별로 다른 권한 적용"""
         if self.action in ['comments', 'delete_comment']:
-            # 댓글 조회/작성/삭제는 IsAuthenticatedOrReadOnly만 적용
-            permission_classes = [IsAuthenticatedOrReadOnly]
+            # 댓글 관련은 기본 권한만
+            permission_classes = [IsAuthenticatedOrReadOnly, IsApprovedUser]
         else:
-            # 게시글 관련 액션은 기본 권한 적용
-            permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
+            # 게시글 관련은 모든 권한 적용
+            permission_classes = [IsAuthenticatedOrReadOnly, IsApprovedUser, IsAuthorOrReadOnly]
         
         return [permission() for permission in permission_classes]

@@ -1,6 +1,4 @@
-// ============================================
-// frontend/src/components/PostForm.jsx (개선 버전)
-// ============================================
+// frontend/src/components/PostForm.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
@@ -19,6 +17,7 @@ function PostForm() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [approvalError, setApprovalError] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -73,8 +72,8 @@ function PostForm() {
     try {
       setLoading(true);
       setError(null);
+      setApprovalError(false);
 
-      // 작성자를 로그인한 사용자로 자동 설정
       const submitData = {
         ...formData,
         author: user?.username
@@ -100,6 +99,17 @@ function PostForm() {
         setError('로그인이 필요합니다.');
         alert('로그인이 필요합니다.');
         navigate('/login');
+      } else if (err.response?.status === 403) {
+        // 승인 대기 상태 에러
+        const errorMessage = err.response?.data?.detail || '권한이 없습니다.';
+        setError(errorMessage);
+        setApprovalError(true);
+        
+        if (errorMessage.includes('승인')) {
+          alert('⚠️ ' + errorMessage);
+        } else {
+          alert('권한이 없습니다: ' + errorMessage);
+        }
       } else {
         const errorMessage = err.response?.data?.detail 
           || err.response?.data?.message
@@ -151,12 +161,17 @@ function PostForm() {
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="px-8 py-4 bg-red-50 border-b border-red-100">
-            <div className="flex items-center text-red-700">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          <div className={`px-8 py-4 ${approvalError ? 'bg-yellow-50 border-yellow-100' : 'bg-red-50 border-red-100'} border-b`}>
+            <div className={`flex items-start ${approvalError ? 'text-yellow-800' : 'text-red-700'}`}>
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-sm">{error}</span>
+              <div>
+                <p className="text-sm font-medium">{error}</p>
+                {approvalError && (
+                  <p className="text-xs mt-1">관리자에게 문의하여 계정 승인을 요청하세요.</p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -255,6 +270,7 @@ function PostForm() {
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 제목과 내용을 모두 입력해주세요.</li>
           <li>• 작성자는 로그인한 계정으로 자동 설정됩니다.</li>
+          <li>• <strong>관리자 승인 후</strong> 게시글 작성이 가능합니다.</li>
           <li>• 욕설이나 비방하는 내용은 삼가주세요.</li>
         </ul>
       </div>

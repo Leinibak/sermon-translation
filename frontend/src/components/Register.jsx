@@ -1,4 +1,4 @@
-// frontend/src/components/Register.jsx (디버깅 버전)
+// frontend/src/components/Register.jsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
@@ -9,10 +9,11 @@ function Register() {
     username: '',
     password: '',
     password2: '',
-    email: '',
+    email: '',  // ✅ 필수
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   const navigate = useNavigate();
 
@@ -26,6 +27,13 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
+
+    // ✅ 이메일 필수 체크
+    if (!formData.email.trim()) {
+      setError('이메일은 필수 항목입니다.');
+      return;
+    }
 
     // 비밀번호 확인
     if (formData.password !== formData.password2) {
@@ -42,44 +50,44 @@ function Register() {
     setLoading(true);
 
     try {
-      // 📤 전송할 데이터 준비 (빈 이메일 필드 제거)
       const payload = {
         username: formData.username.trim(),
+        email: formData.email.trim(),
         password: formData.password,
         password2: formData.password2,
       };
       
-      // 이메일이 있을 때만 포함
-      if (formData.email && formData.email.trim()) {
-        payload.email = formData.email.trim();
-      }
-      
       console.log('📤 전송 데이터:', payload);
-      console.log('📍 요청 URL:', API_ENDPOINTS.auth.register);
 
       const response = await axios.post(API_ENDPOINTS.auth.register, payload);
       
       console.log('✅ 회원가입 성공:', response.data);
-      alert('회원가입이 완료되었습니다. 로그인해주세요.');
-      navigate('/login');
+      
+      // ✅ 승인 대기 메시지 표시
+      setSuccessMessage(
+        response.data.message || 
+        '회원가입이 완료되었습니다. 관리자 승인 후 게시글 작성이 가능합니다.'
+      );
+      
+      // 3초 후 로그인 페이지로 이동
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+
     } catch (err) {
       console.error('❌ Registration failed:', err);
-      console.error('❌ Response:', err.response);
-      console.error('❌ Response data:', err.response?.data);
       
-      // 🔍 상세한 에러 메시지 표시
       let errorMessage = '회원가입에 실패했습니다.';
       
       if (err.response?.data) {
-        // Django에서 반환하는 에러 형식 처리
         const errorData = err.response.data;
         
         if (errorData.username) {
           errorMessage = `사용자명: ${errorData.username.join(', ')}`;
-        } else if (errorData.password) {
-          errorMessage = `비밀번호: ${errorData.password.join(', ')}`;
         } else if (errorData.email) {
           errorMessage = `이메일: ${errorData.email.join(', ')}`;
+        } else if (errorData.password) {
+          errorMessage = `비밀번호: ${errorData.password.join(', ')}`;
         } else if (errorData.detail) {
           errorMessage = errorData.detail;
         } else if (errorData.non_field_errors) {
@@ -90,7 +98,6 @@ function Register() {
       }
       
       setError(errorMessage);
-      alert(`회원가입 실패: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -103,9 +110,24 @@ function Register() {
           회원가입
         </h2>
 
+        {/* ✅ 승인 안내 */}
+        <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+          <p className="text-sm text-blue-700">
+            ℹ️ 회원가입 후 관리자 승인이 필요합니다.<br/>
+            승인 완료 후 게시글 작성이 가능합니다.
+          </p>
+        </div>
+
         {error && (
           <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded">
             <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-4 rounded">
+            <p className="text-sm text-green-700 whitespace-pre-wrap">{successMessage}</p>
+            <p className="text-xs text-green-600 mt-2">잠시 후 로그인 페이지로 이동합니다...</p>
           </div>
         )}
 
@@ -121,14 +143,15 @@ function Register() {
               value={formData.username}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading || successMessage}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
               placeholder="사용자명을 입력하세요"
             />
           </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              이메일
+              이메일 * {/* ✅ 필수 표시 */}
             </label>
             <input
               type="email"
@@ -136,8 +159,10 @@ function Register() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="이메일을 입력하세요 (선택)"
+              required
+              disabled={loading || successMessage}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+              placeholder="example@email.com"
             />
           </div>
 
@@ -152,7 +177,8 @@ function Register() {
               value={formData.password}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading || successMessage}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
               placeholder="8자 이상 입력하세요"
             />
           </div>
@@ -168,19 +194,20 @@ function Register() {
               value={formData.password2}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading || successMessage}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
               placeholder="비밀번호를 다시 입력하세요"
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || successMessage}
             className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
+              (loading || successMessage) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {loading ? '가입 중...' : '회원가입'}
+            {loading ? '가입 중...' : successMessage ? '가입 완료!' : '회원가입'}
           </button>
         </form>
 
