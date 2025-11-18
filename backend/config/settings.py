@@ -119,7 +119,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
 # ✅ 파일 업로드 설정
 FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100MB
@@ -135,54 +134,98 @@ FILE_UPLOAD_HANDLERS = [
 FILE_UPLOAD_PERMISSIONS = 0o644
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 
+# ============================================
+# ⭐ HTTPS 및 프록시 설정 (Mixed Content 해결)
+# ============================================
 
-# CSRF 설정 (환경변수 기반)
+# Nginx 프록시 뒤에서 HTTPS 감지
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# 프록시 헤더를 신뢰하여 올바른 호스트와 포트 사용
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+# ============================================
+# 프로덕션 환경 보안 설정
+# ============================================
+
+if ENVIRONMENT == "prod":
+    # HTTPS 강제 리다이렉트 (Nginx에서 처리하므로 False)
+    SECURE_SSL_REDIRECT = False
+    
+    # HSTS (HTTP Strict Transport Security)
+    SECURE_HSTS_SECONDS = 31536000  # 1년
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # 쿠키 보안
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    
+    # 추가 보안 헤더
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+
+# ============================================
+# CSRF 설정
+# ============================================
+
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in config(
         'CSRF_TRUSTED_ORIGINS',
-        default='http://localhost'
+        default='http://localhost,https://jounsori.org,https://www.jounsori.org'
     ).split(',')
 ]
 
-# # CORS 설정 배표
-# CORS_ALLOWED_ORIGINS = [
-#     origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='https://jounsori.org').split(',')
-# ]
+# ============================================
+# CORS 설정
+# ============================================
 
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
-
+if ENVIRONMENT == "prod":
+    CORS_ALLOWED_ORIGINS = [
+        "https://jounsori.org",
+        "https://www.jounsori.org",
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 
-# REST Framework 설정 (기존 설정 수정)
+# ============================================
+# REST Framework 설정
+# ============================================
+
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # ⭐ JWT 인증
-        # 'rest_framework.authentication.SessionAuthentication',  # Admin용
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # 기본은 모두 허용
+        'rest_framework.permissions.AllowAny',
     ],
-    
-    'DEFAULT_FILTER_BACKENDS': [  # 추가
+    'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
 }
 
+# ============================================
 # JWT 설정
+# ============================================
+
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # 액세스 토큰 1시간
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # 리프레시 토큰 7일
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
