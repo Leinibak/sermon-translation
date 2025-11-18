@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   Play, Pause, Volume2, VolumeX, Download, 
   Calendar, User, BookOpen, Eye, ArrowLeft,
-  FileText, Edit, Trash2, SkipBack, SkipForward
+  FileText, Edit, Trash2, SkipBack, SkipForward,
+  ExternalLink 
 } from 'lucide-react';
 
 function SermonDetail() {
