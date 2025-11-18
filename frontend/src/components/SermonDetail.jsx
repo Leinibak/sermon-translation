@@ -76,6 +76,17 @@ function SermonDetail() {
     }
   };
 
+    // ⭐ PDF 다운로드 핸들러 (새 탭에서 열기)
+  const handlePdfView = (url, type) => {
+    if (!url) {
+      alert(`${type} PDF 파일이 없습니다.`);
+      return;
+    }
+    
+    // 새 탭에서 PDF 열기 (모바일에서도 작동)
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('정말 삭제하시겠습니까?')) return;
 
@@ -351,50 +362,47 @@ function SermonDetail() {
             </div>
           )}
 
-          {/* 다운로드 섹션 */}
-          <div className="border-t pt-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="w-1 h-6 bg-indigo-600 rounded-full mr-3"></span>
-              자료 다운로드
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {sermon.audio_url && (
-                <a
-                  href={sermon.audio_url}
-                  download
-                  className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-all shadow-sm hover:shadow-md"
-                >
-                  <Download className="w-5 h-5 mr-2 group-hover:animate-bounce" />
-                  <span className="font-medium">오디오 다운로드</span>
-                </a>
-              )}
-              
-              {sermon.original_pdf_url && (
-                <a
-                  href={sermon.original_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-gray-50 to-gray-100 text-gray-700 rounded-xl hover:from-gray-100 hover:to-gray-200 transition-all shadow-sm hover:shadow-md"
-                >
-                  <FileText className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">원본 PDF 보기</span>
-                </a>
-              )}
-              
-              {sermon.translated_pdf_url && (
-                <a
-                  href={sermon.translated_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-green-50 to-green-100 text-green-700 rounded-xl hover:from-green-100 hover:to-green-200 transition-all shadow-sm hover:shadow-md"
-                >
-                  <FileText className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">번역 PDF 보기</span>
-                </a>
-              )}
-            </div>
+        {/* ⭐ 다운로드 섹션 (수정) */}
+        <div className="border-t pt-8">
+          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <span className="w-1 h-6 bg-indigo-600 rounded-full mr-3"></span>
+            자료 다운로드
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {sermon.audio_url && (
+              <a
+                href={sermon.audio_url}
+                download
+                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-all shadow-sm hover:shadow-md"
+              >
+                <Download className="w-5 h-5 mr-2 group-hover:animate-bounce" />
+                <span className="font-medium">오디오 다운로드</span>
+              </a>
+            )}
+            
+            {sermon.original_pdf_url && (
+              <button
+                onClick={() => handlePdfView(sermon.original_pdf_url, '원본')}
+                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-gray-50 to-gray-100 text-gray-700 rounded-xl hover:from-gray-100 hover:to-gray-200 transition-all shadow-sm hover:shadow-md"
+              >
+                <ExternalLink className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                <span className="font-medium">원본 PDF 보기</span>
+              </button>
+            )}
+            
+            {sermon.translated_pdf_url && (
+              <button
+                onClick={() => handlePdfView(sermon.translated_pdf_url, '번역')}
+                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-green-50 to-green-100 text-green-700 rounded-xl hover:from-green-100 hover:to-green-200 transition-all shadow-sm hover:shadow-md"
+              >
+                <ExternalLink className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+                <span className="font-medium">번역 PDF 보기</span>
+              </button>
+            )}
           </div>
         </div>
+
+      </div>
       </div>
 
       {/* CSS 스타일 */}
