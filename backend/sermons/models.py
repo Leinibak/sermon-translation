@@ -1,23 +1,36 @@
 # backend/sermons/models.py
+import uuid  # ✅ 추가!
+import os
+from datetime import datetime
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
-import os
 
 def sermon_audio_path(instance, filename):
     """통역 MP3 파일 저장 경로"""
     ext = filename.split('.')[-1]
-    # UUID를 사용하여 고유한 파일명 생성
     filename = f'audio_{uuid.uuid4().hex[:8]}.{ext}'
-    date_path = instance.sermon_date.strftime('%Y/%m')
+    
+    # sermon_date 안전하게 처리
+    if instance.sermon_date:
+        date_path = instance.sermon_date.strftime('%Y/%m')
+    else:
+        date_path = datetime.now().strftime('%Y/%m')
+    
     return f'sermons/{date_path}/audio/{filename}'
 
 def sermon_pdf_path(instance, filename):
-    """번역 PDF 파일 저장 경로"""
+    """PDF 파일 저장 경로"""
     ext = filename.split('.')[-1]
-    filename = f'translated_{uuid.uuid4().hex[:8]}.{ext}'
-    date_path = instance.sermon_date.strftime('%Y/%m')
-    return f'sermons/{date_path}/pdf/translated/{filename}'
+    filename = f'pdf_{uuid.uuid4().hex[:8]}.{ext}'
+    
+    # sermon_date 안전하게 처리
+    if instance.sermon_date:
+        date_path = instance.sermon_date.strftime('%Y/%m')
+    else:
+        date_path = datetime.now().strftime('%Y/%m')
+    
+    return f'sermons/{date_path}/pdf/{filename}'
 
 class Sermon(models.Model):
     CATEGORY_CHOICES = [
