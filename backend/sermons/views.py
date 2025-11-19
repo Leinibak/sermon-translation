@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse, HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
 import mimetypes
 
 from .models import Sermon
@@ -25,12 +26,35 @@ class SermonViewSet(viewsets.ModelViewSet):
     # 필터링 필드
     filterset_fields = ['category', 'preacher', 'bible_book']
     
-    # 검색 필드
+    # 검색 필드 (bible_book은 커스텀 로직으로 처리)
     search_fields = ['title', 'preacher', 'description']
     
     # 정렬 필드
     ordering_fields = ['sermon_date', 'created_at', 'view_count', 'title']
     ordering = ['-sermon_date']
+    
+    def get_queryset(self):
+        """성경책 한글 이름 검색 지원"""
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search', '')
+        
+        if search:
+            # 성경책 한글 이름 → 영문 코드 매칭
+            bible_books_dict = dict(Sermon.BIBLE_BOOKS)
+            matching_codes = [
+                code for code, name in bible_books_dict.items()
+                if search in name  # "창세기", "마태" 등 부분 검색
+            ]
+            
+            # 기본 검색(제목, 설교자, 설명) + 성경책 코드 검색
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(preacher__icontains=search) |
+                Q(description__icontains=search) |
+                Q(bible_book__in=matching_codes)
+            )
+        
+        return queryset
     
     def get_serializer_class(self):
         """액션에 따라 다른 Serializer 사용"""
@@ -106,26 +130,26 @@ class SermonViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def download_audio(self, request, pk=None):
-            """오디오 파일 다운로드"""
-            sermon = self.get_object()
-            if not sermon.audio_file:
-                return Response(
-                    {'detail': '오디오 파일이 없습니다.'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            try:
-                # FileResponse로 직접 파일 전송
-                file_handle = sermon.audio_file.open('rb')
-                response = FileResponse(file_handle, content_type='audio/mpeg')
-                response['Content-Disposition'] = f'attachment; filename="{sermon.audio_file.name.split("/")[-1]}"'
-                response['Content-Length'] = sermon.audio_file.size
-                return response
-            except Exception as e:
-                return Response(
-                    {'detail': f'파일을 열 수 없습니다: {str(e)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        """오디오 파일 다운로드"""
+        sermon = self.get_object()
+        if not sermon.audio_file:
+            return Response(
+                {'detail': '오디오 파일이 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            # FileResponse로 직접 파일 전송
+            file_handle = sermon.audio_file.open('rb')
+            response = FileResponse(file_handle, content_type='audio/mpeg')
+            response['Content-Disposition'] = f'attachment; filename="{sermon.audio_file.name.split("/")[-1]}"'
+            response['Content-Length'] = sermon.audio_file.size
+            return response
+        except Exception as e:
+            return Response(
+                {'detail': f'파일을 열 수 없습니다: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['get'])
     def download_original_pdf(self, request, pk=None):

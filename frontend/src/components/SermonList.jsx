@@ -89,7 +89,7 @@ function SermonList() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="설교 제목, 설교자로 검색..."
+                placeholder="성경책, 설교 제목, 설교자로 검색..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
