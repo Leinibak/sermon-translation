@@ -10,6 +10,10 @@ class SermonAdmin(admin.ModelAdmin):
         'has_audio', 'has_original_pdf', 'has_translated_pdf',
         'created_at'
     ]
+
+    # ✅ 이 부분 추가!
+    list_display_links = ['id', 'title']  # id와 title을 클릭 가능하게 만듦
+    
     list_filter = ['category', 'sermon_date', 'preacher', 'bible_book']
     search_fields = ['title', 'preacher', 'description']
     readonly_fields = ['view_count', 'created_at', 'updated_at', 'bible_reference']
