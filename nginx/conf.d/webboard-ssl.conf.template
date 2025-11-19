@@ -1,4 +1,4 @@
-# nginx/conf.d/webboard-ssl.conf
+# nginx/conf.d/webboard-ssl.conf.template
 
 # HTTPS 서버
 server {
@@ -74,7 +74,7 @@ server {
     }
 
     # Django Admin
-    location /admin/ {
+    location //${ADMIN_URL}// {
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
