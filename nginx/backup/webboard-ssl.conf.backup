@@ -1,0 +1,176 @@
+# nginx/conf.d/webboard-ssl.conf
+
+# HTTPS 서버
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name jounsori.org www.jounsori.org;
+
+    # SSL 인증서
+    ssl_certificate /etc/letsencrypt/live/jounsori.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jounsori.org/privkey.pem;
+    
+    # SSL 프로토콜 및 암호화
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH;
+    ssl_ecdh_curve secp384r1;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    
+    # 파일 업로드 크기 제한
+    client_max_body_size 100M;
+    
+    # ⭐ Mixed Content 해결을 위한 보안 헤더
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Content-Security-Policy "upgrade-insecure-requests;" always;
+
+    # 프론트엔드
+    location / {
+        proxy_pass http://frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Connection "";
+        
+        # HTTP를 HTTPS로 자동 변환
+        proxy_redirect http:// https://;
+    }
+
+    # 백엔드 API
+    location /api/ {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Connection "";
+        
+        # HTTP를 HTTPS로 자동 변환
+        proxy_redirect http:// https://;
+        
+        # 타임아웃 설정
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # 버퍼링 설정
+        proxy_buffering off;
+        proxy_request_buffering off;
+        
+        # 업로드 파일 크기
+        client_max_body_size 100M;
+        client_body_timeout 60s;
+    }
+
+    # Django Admin
+    location /admin/ {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+        proxy_set_header Connection "";
+        
+        # HTTP를 HTTPS로 자동 변환
+        proxy_redirect http:// https://;
+        
+        # Admin 타임아웃 (파일 업로드용)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        
+        client_max_body_size 100M;
+        client_body_timeout 300s;
+    }
+
+    # 정적 파일
+    location /static/ {
+        alias /static/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        add_header Content-Security-Policy "upgrade-insecure-requests;" always;
+        access_log off;
+    }
+
+    # ⭐ 미디어 파일 (핵심 수정!)
+    location /media/ {
+        alias /media/;
+        
+        # ⭐ PDF 파일에 대한 MIME 타입 명시
+        location ~ \.pdf$ {
+            add_header Content-Type application/pdf always;
+            add_header Content-Disposition "inline" always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header Content-Security-Policy "upgrade-insecure-requests;" always;
+            
+            # CORS 헤더
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            
+            expires 7d;
+            add_header Cache-Control "public";
+        }
+        
+        # ⭐ 오디오 파일에 대한 MIME 타입 명시
+        location ~ \.(mp3|m4a|wav)$ {
+            add_header Content-Type audio/mpeg always;
+            add_header Accept-Ranges bytes always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header Content-Security-Policy "upgrade-insecure-requests;" always;
+            
+            # CORS 헤더
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Range" always;
+            
+            expires 7d;
+            add_header Cache-Control "public";
+        }
+        
+        # 기타 미디어 파일
+        expires 7d;
+        add_header Cache-Control "public";
+        add_header Content-Security-Policy "upgrade-insecure-requests;" always;
+        add_header X-Content-Type-Options nosniff always;
+        
+        # CORS 헤더
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+        
+        # OPTIONS 요청 처리
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Range" always;
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 204;
+        }
+    }
+
+    # 파비콘
+    location = /favicon.ico {
+        access_log off;
+        log_not_found off;
+    }
+
+    # robots.txt
+    location = /robots.txt {
+        access_log off;
+        log_not_found off;
+    }
+}

@@ -7,9 +7,19 @@ from rest_framework_simplejwt.views import (
 from django.conf import settings
 from django.conf.urls.static import static
 
+
+# 환경변수에서 Admin URL 가져오기
+ADMIN_URL = os.getenv('ADMIN_URL', 'admin')
+
+# Admin 사이트 커스터마이징
+admin.site.site_header = "설교 번역 관리자"
+admin.site.site_title = "설교 번역 Admin"
+admin.site.index_title = "관리 대시보드"
+
 urlpatterns = [
-    # path('admin/', admin.site.urls), 
-    path('wkdrh-rhksfl/', admin.site.urls),  # 원하는 경로로 변경
+    # 환경변수를 사용한 동적 Admin URL
+    path(f'{ADMIN_URL}/', admin.site.urls),
+    
     # Auth endpoints (registration)
     path('api/auth/', include('accounts.urls')),  # ✅ 추가 This makes /api/auth/register/ available
 
