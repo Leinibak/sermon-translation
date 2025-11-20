@@ -1,6 +1,3 @@
-// ============================================
-// frontend/src/components/Navbar.jsx
-// ============================================
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,7 +20,7 @@ function Navbar() {
 
 
   return (
-    <nav className="bg-white shadow-md fixed w-full top-0 z-50">
+    <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           {/* 로고 */}
@@ -85,31 +82,32 @@ function Navbar() {
 
       {/* 모바일 메뉴 */}
       {isOpen && (
-        <div className="md:hidden bg-white shadow-md px-4 pb-4 space-y-3">
-          <Link to="/" className="block font-medium" onClick={() => setIsOpen(false)}>
+        <div className="md:hidden bg-white shadow-md px-4 pb-4 space-y-1 transition-all duration-300">
+
+          <Link to="/" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
             HOME
           </Link>
-          <Link to="/sermons" className="block font-medium" onClick={() => setIsOpen(false)}>
+
+          <Link to="/sermons" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
             SERMONS
           </Link>
-          <Link to="/blog" className="block font-medium" onClick={() => setIsOpen(false)}>
+
+          <Link to="/blog" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
             BLOG
           </Link>
-          <div className="mt-4">
+
+          <div className="mt-4 pt-3 border-t border-gray-200">
            {isAuthenticated ? (
-              <div className="flex items-center space-x-6">
-                <span 
-                  className={`text-sm ${
-                    isScrolled ? 'text-blue-500' : 'text-blue-700'
-                  }`}
-                >
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-blue-700">
                   {user?.username}
                 </span>
                 <button
-                  onClick={logout}
-                  className={`text-sm uppercase tracking-wider font-light hover:opacity-70 transition ${
-                    isScrolled ? 'text-pink-500' : 'text-pink-700'
-                  }`}
+                  onClick={() => {
+                    logout();
+                    setIsOpen(false);
+                  }}
+                  className="text-sm uppercase tracking-wider font-light text-pink-700 hover:opacity-70 transition"
                 >
                   Logout
                 </button>
@@ -117,9 +115,8 @@ function Navbar() {
             ) : (
               <Link
                 to="/login"
-                className={`text-sm uppercase tracking-wider font-light hover:opacity-70 transition ${
-                  isScrolled ? 'text-blue-500' : 'text-blue-700'
-                }`}
+                className="block text-sm uppercase tracking-wider font-light text-blue-700 hover:opacity-70 transition py-2"
+                onClick={() => setIsOpen(false)}
               >
                 Log In
               </Link>

@@ -4,6 +4,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ScrollToTop from './components/ScrollToTop';
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home.jsx";
 import PostList from './components/PostList';
@@ -123,6 +124,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <ScrollToTop /> {/* 이 컴포넌트를 Router 안에 추가 */}
         <Navbar />
         <div className="pt-16 min-h-screen flex flex-col justify-between">
           <main className="flex-grow">

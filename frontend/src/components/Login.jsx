@@ -1,10 +1,10 @@
-// ============================================
-// frontend/src/components/Login.jsx (수정)
-// ============================================
+// ==============================
+// sermon-translation\frontend\src\components\Login.jsx
+// ==============================
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import API_ENDPOINTS from '../config/api';
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -32,14 +32,14 @@ function Login() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 px-4 pt-6">
+      <div className="bg-white p-6 md:p-8 rounded-lg shadow-sm border border-gray-200 w-full max-w-md">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 text-center">
           로그인
         </h2>
 
         {error && (
-          <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded">
+          <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 rounded">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
@@ -55,7 +55,7 @@ function Login() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
               placeholder="사용자명을 입력하세요"
             />
           </div>
@@ -70,7 +70,7 @@ function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
               placeholder="비밀번호를 입력하세요"
             />
           </div>
@@ -78,7 +78,7 @@ function Login() {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+            className={`w-full py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 ${
               loading ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
@@ -89,7 +89,7 @@ function Login() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             계정이 없으신가요?{' '}
-            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/register" className="text-slate-700 hover:text-slate-900 font-medium">
               회원가입
             </Link>
           </p>
