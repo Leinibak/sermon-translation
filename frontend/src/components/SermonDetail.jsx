@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   Play, Pause, Volume2, VolumeX, Download, 
   Calendar, User, BookOpen, Eye, ArrowLeft,
-  FileText, Edit, Trash2, SkipBack, SkipForward,
+  Edit, Trash2, SkipBack, SkipForward,
   ExternalLink 
 } from 'lucide-react';
 
@@ -36,7 +36,6 @@ function SermonDetail() {
   // 키보드 이벤트 리스너
   useEffect(() => {
     const handleKeyPress = (e) => {
-      // input이나 textarea에서는 동작하지 않도록
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         return;
       }
@@ -77,14 +76,11 @@ function SermonDetail() {
     }
   };
 
-    // ⭐ PDF 다운로드 핸들러 (새 탭에서 열기)
   const handlePdfView = (url, type) => {
     if (!url) {
       alert(`${type} PDF 파일이 없습니다.`);
       return;
     }
-    
-    // 새 탭에서 PDF 열기 (모바일에서도 작동)
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -173,7 +169,7 @@ function SermonDetail() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
       </div>
     );
   }
@@ -189,22 +185,22 @@ function SermonDetail() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-6">
       {/* 뒤로가기 */}
       <Link 
         to="/sermons" 
-        className="inline-flex items-center text-gray-600 hover:text-indigo-600 mb-6 transition-colors group"
+        className="inline-flex items-center text-gray-600 hover:text-slate-700 mb-4 transition-colors group text-sm"
       >
-        <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+        <ArrowLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
         <span className="font-medium">목록으로</span>
       </Link>
 
       {/* 설교 정보 */}
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-        {/* 헤더 */}
-        <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-slate-700 p-8 text-white">
-          <div className="flex justify-between items-start mb-6">
-            <span className="inline-block bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+        {/* 헤더 - 크기 축소 및 색상 변경 */}
+        <div className="bg-gradient-to-r from-slate-700 to-slate-800 p-5 text-white">
+          <div className="flex justify-between items-start mb-3">
+            <span className="inline-block bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
               {sermon.category_display}
             </span>
             
@@ -212,33 +208,33 @@ function SermonDetail() {
               <div className="flex space-x-2">
                 <button
                   onClick={() => navigate(`/sermons/edit/${id}`)}
-                  className="p-2.5 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all"
+                  className="p-1.5 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all"
                 >
-                  <Edit className="w-5 h-5" />
+                  <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="p-2.5 bg-red-500/80 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-all"
+                  className="p-1.5 bg-red-500/80 backdrop-blur-sm rounded-lg hover:bg-red-600 transition-all"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             )}
           </div>
 
-          <h3 className="text-2xl text-yellow-200 font-bold mb-6 leading-tight">{sermon.title}</h3>
+          <h3 className="text-xl font-bold mb-4 leading-tight">{sermon.title}</h3>
 
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-              <User className="w-5 h-5 mr-2" />
+          <div className="flex flex-wrap gap-3 text-xs">
+            <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <User className="w-4 h-4 mr-1.5" />
               <span className="font-medium">{sermon.preacher}</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-              <BookOpen className="w-5 h-5 mr-2" />
+            <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <BookOpen className="w-4 h-4 mr-1.5" />
               <span className="font-semibold">{sermon.bible_reference}</span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-              <Calendar className="w-5 h-5 mr-2" />
+            <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <Calendar className="w-4 h-4 mr-1.5" />
               <span>
                 {new Date(sermon.sermon_date).toLocaleDateString('ko-KR', {
                   year: 'numeric',
@@ -247,16 +243,16 @@ function SermonDetail() {
                 })}
               </span>
             </div>
-            <div className="flex items-center bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
-              <Eye className="w-5 h-5 mr-2" />
+            <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <Eye className="w-4 h-4 mr-1.5" />
               <span>{sermon.view_count} 조회</span>
             </div>
           </div>
         </div>
 
-        {/* 오디오 플레이어 */}
+        {/* 오디오 플레이어 - 크기 축소 */}
         {sermon.audio_url && (
-          <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 border-b border-gray-200">
+          <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 border-b border-gray-200">
             <audio
               ref={audioRef}
               src={sermon.audio_url}
@@ -265,40 +261,40 @@ function SermonDetail() {
               onEnded={() => setIsPlaying(false)}
             />
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* 재생 컨트롤 */}
-              <div className="flex items-center justify-center space-x-6">
+              <div className="flex items-center justify-center space-x-4">
                 <button
                   onClick={() => skipTime(-5)}
-                  className="p-3 bg-white rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all text-gray-700"
+                  className="p-2 bg-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all text-gray-700"
                   title="5초 뒤로 (←)"
                 >
-                  <SkipBack className="w-5 h-5" />
+                  <SkipBack className="w-4 h-4" />
                 </button>
 
                 <button
                   onClick={togglePlay}
-                  className="w-20 h-20 bg-gradient-to-br from-sky-700 to-cyan-800 hover:from-sky-800 hover:to-blue-800 rounded-full flex items-center justify-center text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
+                  className="w-14 h-14 bg-gradient-to-br from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all"
                   title="재생/일시정지 (Space)"
                 >
                   {isPlaying ? (
-                    <Pause className="w-10 h-10" />
+                    <Pause className="w-7 h-7" />
                   ) : (
-                    <Play className="w-10 h-10 ml-1" />
+                    <Play className="w-7 h-7 ml-0.5" />
                   )}
                 </button>
 
                 <button
                   onClick={() => skipTime(5)}
-                  className="p-3 bg-white rounded-full shadow-md hover:shadow-lg hover:scale-105 transition-all text-gray-700"
+                  className="p-2 bg-white rounded-full shadow-sm hover:shadow-md hover:scale-105 transition-all text-gray-700"
                   title="5초 앞으로 (→)"
                 >
-                  <SkipForward className="w-5 h-5" />
+                  <SkipForward className="w-4 h-4" />
                 </button>
               </div>
 
               {/* 진행 바 */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="relative">
                   <input
                     type="range"
@@ -311,22 +307,22 @@ function SermonDetail() {
                     onMouseUp={handleSeekEnd}
                     onTouchStart={handleSeekStart}
                     onTouchEnd={handleSeekEnd}
-                    className="w-full h-3 bg-gray-300 rounded-full appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-gray-300 rounded-full appearance-none cursor-pointer slider"
                     style={{
-                      background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${(currentTime / duration) * 100}%, #d1d5db ${(currentTime / duration) * 100}%, #d1d5db 100%)`
+                      background: `linear-gradient(to right, #475569 0%, #475569 ${(currentTime / duration) * 100}%, #d1d5db ${(currentTime / duration) * 100}%, #d1d5db 100%)`
                     }}
                   />
                 </div>
-                <div className="flex justify-between text-sm text-gray-600 font-medium">
+                <div className="flex justify-between text-xs text-gray-600 font-medium">
                   <span>{formatTime(currentTime)}</span>
                   <span>{formatTime(duration)}</span>
                 </div>
               </div>
 
               {/* 볼륨 컨트롤 */}
-              <div className="flex items-center justify-center space-x-4 bg-white rounded-xl p-4 shadow-sm">
-                <button onClick={toggleMute} className="text-gray-600 hover:text-indigo-600 transition-colors">
-                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              <div className="flex items-center justify-center space-x-3 bg-white rounded-lg p-3 shadow-sm">
+                <button onClick={toggleMute} className="text-gray-600 hover:text-slate-700 transition-colors">
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
                 <input
                   type="range"
@@ -334,76 +330,75 @@ function SermonDetail() {
                   max="100"
                   value={isMuted ? 0 : volume * 100}
                   onChange={handleVolumeChange}
-                  className="w-32 h-2 bg-gray-200 rounded-full appearance-none cursor-pointer"
+                  className="w-24 h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer"
                 />
               </div>
 
               {/* 키보드 단축키 안내 */}
-              <div className="text-center text-sm text-gray-500 bg-white/50 rounded-lg p-3">
+              <div className="text-center text-xs text-gray-500 bg-white/50 rounded-lg p-2">
                 <span className="font-medium">키보드 단축키:</span> 
-                <span className="mx-2">Space (재생/정지)</span>
-                <span className="mx-2">← (5초 뒤로)</span>
-                <span className="mx-2">→ (5초 앞으로)</span>
+                <span className="mx-1">Space (재생/정지)</span>
+                <span className="mx-1">← (5초 뒤로)</span>
+                <span className="mx-1">→ (5초 앞으로)</span>
               </div>
             </div>
           </div>
         )}
 
         {/* 설교 내용 */}
-        <div className="p-8">
+        <div className="p-6">
           {sermon.description && (
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-1 h-6 bg-indigo-600 rounded-full mr-3"></span>
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center">
+                <span className="w-1 h-5 bg-slate-600 rounded-full mr-2"></span>
                 설교 요약
               </h2>
-              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-lg">
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-sm">
                 {sermon.description}
               </p>
             </div>
           )}
 
-        {/* ⭐ 다운로드 섹션 (수정) */}
-        <div className="border-t pt-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="w-1 h-6 bg-indigo-600 rounded-full mr-3"></span>
-            자료 다운로드
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {sermon.audio_url && (
-              <a
-                href={sermon.audio_url}
-                download
-                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-indigo-50 to-indigo-100 text-indigo-700 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-all shadow-sm hover:shadow-md"
-              >
-                <Download className="w-5 h-5 mr-2 group-hover:animate-bounce" />
-                <span className="font-medium">오디오 다운로드</span>
-              </a>
-            )}
-            
-            {sermon.original_pdf_url && (
-              <button
-                onClick={() => handlePdfView(sermon.original_pdf_url, '원본')}
-                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-gray-50 to-gray-100 text-gray-700 rounded-xl hover:from-gray-100 hover:to-gray-200 transition-all shadow-sm hover:shadow-md"
-              >
-                <ExternalLink className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                <span className="font-medium">원본 PDF 보기</span>
-              </button>
-            )}
-            
-            {sermon.translated_pdf_url && (
-              <button
-                onClick={() => handlePdfView(sermon.translated_pdf_url, '번역')}
-                className="group flex items-center justify-center px-6 py-4 bg-gradient-to-br from-green-50 to-green-100 text-green-700 rounded-xl hover:from-green-100 hover:to-green-200 transition-all shadow-sm hover:shadow-md"
-              >
-                <ExternalLink className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                <span className="font-medium">번역 PDF 보기</span>
-              </button>
-            )}
+          {/* 다운로드 섹션 */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+              <span className="w-1 h-5 bg-slate-600 rounded-full mr-2"></span>
+              자료 다운로드
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {sermon.audio_url && (
+                <a
+                  href={sermon.audio_url}
+                  download
+                  className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 rounded-lg hover:from-slate-100 hover:to-slate-200 transition-all shadow-sm hover:shadow-md text-sm border border-slate-200"
+                >
+                  <Download className="w-4 h-4 mr-2 group-hover:animate-bounce" />
+                  <span className="font-medium">오디오 다운로드</span>
+                </a>
+              )}
+              
+              {sermon.original_pdf_url && (
+                <button
+                  onClick={() => handlePdfView(sermon.original_pdf_url, '원본')}
+                  className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all shadow-sm hover:shadow-md text-sm border border-blue-200"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">원본 PDF 보기</span>
+                </button>
+              )}
+              
+              {sermon.translated_pdf_url && (
+                <button
+                  onClick={() => handlePdfView(sermon.translated_pdf_url, '번역')}
+                  className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all shadow-sm hover:shadow-md text-sm border border-green-200"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">번역 PDF 보기</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
-
-      </div>
       </div>
 
       {/* CSS 스타일 */}
@@ -411,38 +406,38 @@ function SermonDetail() {
         .slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 20px;
-          height: 20px;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
-          background: #4f46e5;
+          background: #475569;
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
           transition: all 0.2s ease;
         }
 
         .slider::-webkit-slider-thumb:hover {
-          width: 24px;
-          height: 24px;
-          background: #4338ca;
-          box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4);
+          width: 18px;
+          height: 18px;
+          background: #334155;
+          box-shadow: 0 4px 8px rgba(71, 85, 105, 0.4);
         }
 
         .slider::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
+          width: 16px;
+          height: 16px;
           border: none;
           border-radius: 50%;
-          background: #4f46e5;
+          background: #475569;
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
           transition: all 0.2s ease;
         }
 
         .slider::-moz-range-thumb:hover {
-          width: 24px;
-          height: 24px;
-          background: #4338ca;
-          box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4);
+          width: 18px;
+          height: 18px;
+          background: #334155;
+          box-shadow: 0 4px 8px rgba(71, 85, 105, 0.4);
         }
       `}</style>
     </div>
@@ -450,6 +445,3 @@ function SermonDetail() {
 }
 
 export default SermonDetail;
-
-
-

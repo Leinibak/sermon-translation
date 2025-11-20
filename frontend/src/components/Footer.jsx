@@ -3,34 +3,78 @@
 // ============================================
 import React from "react";
 import { Link } from "react-router-dom";
+import { Facebook, Instagram, Youtube, Music } from 'lucide-react';
+import logo from "@/assets/jounsori_logo.png";
 
 function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-300 py-8 mt-16">
-      <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-        <div>
-          <h3 className="text-lg font-semibold mb-2 text-white">Archesosik</h3>
-          <p className="text-sm">The Truth Will Set You Free</p>
+    <footer className="bg-gradient-to-b from-[#1a4d5d] to-[#0d2a36] text-white py-12">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Social Media Icons */}
+        <div className="flex justify-center space-x-6 mb-12">
+          <a 
+            href="https://facebook.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-14 h-14 rounded-full border-2 border-white/50 flex items-center justify-center hover:bg-white/10 hover:border-white transition-all"
+          >
+            <Facebook className="w-6 h-6" />
+          </a>
+          <a 
+            href="https://instagram.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-14 h-14 rounded-full border-2 border-white/50 flex items-center justify-center hover:bg-white/10 hover:border-white transition-all"
+          >
+            <Instagram className="w-6 h-6" />
+          </a>
+          <a 
+            href="https://youtube.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-14 h-14 rounded-full border-2 border-white/50 flex items-center justify-center hover:bg-white/10 hover:border-white transition-all"
+          >
+            <Youtube className="w-6 h-6" />
+          </a>
+          <a 
+            href="https://spotify.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-14 h-14 rounded-full border-2 border-white/50 flex items-center justify-center hover:bg-white/10 hover:border-white transition-all"
+          >
+            <Music className="w-6 h-6" />
+          </a>
         </div>
 
-        <div>
-          <h3 className="text-lg font-semibold mb-2 text-white">Quick Links</h3>
-          <div className="flex flex-col space-y-1">
-            <Link to="/" className="hover:text-white">Home</Link>
-            <Link to="/sermons" className="hover:text-white">Sermons</Link>
-            <Link to="/blog" className="hover:text-white">Blog</Link>
-            <Link to="/login" className="hover:text-white">Login</Link>
-          </div>
+        {/* Navigation Links */}
+        <div className="flex justify-center space-x-8 mb-12 text-sm uppercase tracking-wider">
+          <Link to="/contact" className="hover:text-gray-300 transition">
+            KONTAKT
+          </Link>
+          <Link to="/privacy" className="hover:text-gray-300 transition">
+            DATENSCHUTZ
+          </Link>
+          <Link to="/impressum" className="hover:text-gray-300 transition">
+            IMPRESSUM
+          </Link>
+          <Link to="/newsletter" className="hover:text-gray-300 transition">
+            NEWSLETTER
+          </Link>
         </div>
 
-        <div>
-          <h3 className="text-lg font-semibold mb-2 text-white">Contact</h3>
-          <p>Email: contact@archesosik</p>
-          <p>Phone: +49 10-1234-5678</p>
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <img 
+            src={logo} 
+            alt="Jounsori Logo" 
+            className="h-14 w-auto opacity-90 filter brightness-0 invert"
+          />
         </div>
-      </div>
-      <div className="text-center text-sm text-gray-500 mt-6 border-t border-gray-700 pt-4">
-        © 2025 Archesosik. All rights reserved.
+
+        {/* Copyright */}
+        <div className="text-center text-sm text-white/70">
+          © 2025 Jounsori 좋은소리
+        </div>
       </div>
     </footer>
   );

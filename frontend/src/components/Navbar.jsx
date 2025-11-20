@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Menu, X } from "lucide-react";
-import logo from "@/assets/archesosik_logo2.png";
+import logo from "@/assets/jounsori_logo.png";
 
 
 function Navbar() {
@@ -25,10 +25,10 @@ function Navbar() {
   return (
     <nav className="bg-white shadow-md fixed w-full top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20">
           {/* 로고 */}
           <Link to="/">
-            <img src={logo} alt="Logo" className="h-16  w-auto object-contain select-none border-none outline-none focus:outline-none focus:ring-0" />
+            <img src={logo} alt="Logo" className="h-12  w-auto object-contain select-none border-none outline-none focus:outline-none focus:ring-0" />
           </Link>
 
           {/* 데스크탑 메뉴 */}
