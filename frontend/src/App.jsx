@@ -126,7 +126,7 @@ function App() {
       <AuthProvider>
         <ScrollToTop /> {/* 이 컴포넌트를 Router 안에 추가 */}
         <Navbar />
-        <div className="pt-16 min-h-screen flex flex-col justify-between">
+        <div className="pt-8 min-h-screen flex flex-col justify-between">
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
