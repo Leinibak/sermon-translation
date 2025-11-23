@@ -1,12 +1,12 @@
 // ============================================
-// frontend/src/components/PostList.jsx (Sermon 스타일 적용)
+// frontend/src/components/PostList.jsx
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Upload, Calendar, User, Eye, MessageSquare, FileText } from 'lucide-react';
+import { Search, Upload, Calendar, User, Eye, FileText, Image as ImageIcon } from 'lucide-react';
 
 function PostList() {
   const [posts, setPosts] = useState([]);
@@ -140,9 +140,24 @@ function PostList() {
                 onClick={() => navigate(`/post/${post.id}`)}
                 className="bg-white rounded-lg shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden border border-gray-200"
               >
-                {/* 카드 헤더 */}
-                <div className="bg-gradient-to-r from-sky-100/40 to-cyan-100/40 p-4 h-28 flex flex-col justify-between border-b border-gray-100">
-                  <div className="flex items-center justify-between text-xs">
+                {/* 이미지 섹션 */}
+                <div className="h-48 bg-gradient-to-r from-sky-100/40 to-cyan-100/40 overflow-hidden">
+                  {post.image_url ? (
+                    <img 
+                      src={post.image_url} 
+                      alt={post.title}
+                      className="w-full h-full object-cover hover:scale-105 transition duration-300"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <FileText className="w-12 h-12 text-gray-400 opacity-40" />
+                    </div>
+                  )}
+                </div>
+
+                {/* 카드 본문 */}
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs mb-2">
                     <span className="bg-white border border-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs font-medium shadow-sm">
                       게시글
                     </span>
@@ -151,13 +166,11 @@ function PostList() {
                       {post.view_count}
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-gray-900 line-clamp-2">
+
+                  <h3 className="text-base font-bold text-gray-900 line-clamp-2 min-h-[3rem]">
                     {post.title}
                   </h3>
-                </div>
 
-                {/* 카드 본문 */}
-                <div className="p-4 space-y-2">
                   <div className="flex items-center text-gray-600 text-xs">
                     <User className="w-3 h-3 mr-2 text-gray-400 flex-shrink-0" />
                     <span className="truncate">{post.author}</span>

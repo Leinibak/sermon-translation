@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.parsers import MultiPartParser, FormParser  # ✅ 추가
 from django.shortcuts import get_object_or_404
 
 from .models import Post, Comment
@@ -13,6 +14,7 @@ from .permissions import IsAuthorOrReadOnly, IsApprovedUser
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
+    parser_classes = [MultiPartParser, FormParser]  # ✅ 추가
     
     # 🔥 승인된 사용자만 작성 가능하도록 변경
     permission_classes = [IsAuthenticatedOrReadOnly, IsApprovedUser, IsAuthorOrReadOnly]

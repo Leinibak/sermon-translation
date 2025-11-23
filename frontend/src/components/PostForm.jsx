@@ -1,12 +1,12 @@
 // ============================================
-// frontend/src/components/PostForm.jsx (Sermon 스타일 적용)
+// frontend/src/components/PostForm.jsx (이미지 업로드 추가)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Save, AlertCircle, User, FileText } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, User, FileText, Upload, X, Image as ImageIcon } from 'lucide-react';
 
 function PostForm() {
   const { id } = useParams();
@@ -18,6 +18,9 @@ function PostForm() {
     title: '',
     content: '',
   });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [existingImage, setExistingImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [approvalError, setApprovalError] = useState(false);
@@ -45,6 +48,9 @@ function PostForm() {
         title: response.data.title || '',
         content: response.data.content || '',
       });
+      if (response.data.image_url) {
+        setExistingImage(response.data.image_url);
+      }
     } catch (err) {
       console.error('❌ 게시글 조회 실패:', err);
       setError('게시글을 불러오는데 실패했습니다.');
@@ -59,6 +65,39 @@ function PostForm() {
       ...formData,
       [name]: value,
     });
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // 파일 크기 체크 (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('이미지 파일은 5MB 이하만 업로드 가능합니다.');
+        return;
+      }
+
+      // 파일 형식 체크
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        alert('JPG, PNG, GIF, WebP 형식의 이미지만 업로드 가능합니다.');
+        return;
+      }
+
+      setImageFile(file);
+      
+      // 미리보기 생성
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setExistingImage(null);
   };
 
   const handleSubmit = async (e) => {
@@ -77,20 +116,32 @@ function PostForm() {
       setError(null);
       setApprovalError(false);
 
-      const submitData = {
-        ...formData,
-        author: user?.username
-      };
+      const submitData = new FormData();
+      submitData.append('title', formData.title);
+      submitData.append('content', formData.content);
+      
+      // 이미지 파일이 있으면 추가
+      if (imageFile) {
+        submitData.append('image', imageFile);
+      }
 
       if (isEditMode) {
-        console.log('🔄 수정 요청:', API_ENDPOINTS.board.detail(id));
-        const response = await axios.put(API_ENDPOINTS.board.detail(id), submitData);
+        console.log('📝 수정 요청:', API_ENDPOINTS.board.detail(id));
+        const response = await axios.put(API_ENDPOINTS.board.detail(id), submitData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
         console.log('✅ 수정 성공:', response.data);
         alert('게시글이 수정되었습니다.');
         navigate(`/post/${id}`);
       } else {
         console.log('➕ 생성 요청:', API_ENDPOINTS.board.posts);
-        const response = await axios.post(API_ENDPOINTS.board.posts, submitData);
+        const response = await axios.post(API_ENDPOINTS.board.posts, submitData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
         console.log('✅ 생성 성공:', response.data);
         alert('게시글이 작성되었습니다.');
         navigate(`/post/${response.data.id}`);
@@ -150,7 +201,7 @@ function PostForm() {
             </span>
           </div>
           
-          <h1 className="text-xl font-bold  text-gray-100 mb-4">
+          <h1 className="text-xl font-bold text-gray-100 mb-4">
             {isEditMode ? '게시글 수정하기' : '새 게시글 작성'}
           </h1>
           
@@ -195,6 +246,67 @@ function PostForm() {
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
               />
+            </div>
+
+            {/* 이미지 업로드 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                대표 이미지 (선택사항)
+              </label>
+              
+              {!imagePreview && !existingImage ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition">
+                  <input
+                    type="file"
+                    id="image"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                  <label 
+                    htmlFor="image" 
+                    className="cursor-pointer flex flex-col items-center"
+                  >
+                    <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                    <span className="text-sm text-gray-600 mb-1">
+                      클릭하여 이미지 업로드
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      JPG, PNG, GIF, WebP (최대 5MB)
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="relative">
+                  <img 
+                    src={imagePreview || existingImage} 
+                    alt="미리보기" 
+                    className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition shadow-lg"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-gray-600">
+                      {imageFile ? imageFile.name : '기존 이미지'}
+                    </span>
+                    <label htmlFor="image" className="text-xs text-indigo-600 hover:text-indigo-700 cursor-pointer font-medium">
+                      이미지 변경
+                    </label>
+                    <input
+                      type="file"
+                      id="image"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 내용 */}
@@ -243,7 +355,7 @@ function PostForm() {
               <button
                 type="submit"
                 disabled={loading || !formData.title.trim() || !formData.content.trim()}
-                className="px-5 py-2.5    bg-cyan-800 text-white  rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center text-sm font-medium"
+                className="px-5 py-2.5 bg-cyan-800 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center text-sm font-medium"
               >
                 {loading ? (
                   <>
@@ -273,6 +385,7 @@ function PostForm() {
         </h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 제목과 내용을 모두 입력해주세요.</li>
+          <li>• 대표 이미지는 선택사항입니다 (JPG, PNG, GIF, WebP, 최대 5MB).</li>
           <li>• 작성자는 로그인한 계정으로 자동 설정됩니다.</li>
           <li>• <strong>관리자 승인 후</strong> 게시글 작성이 가능합니다.</li>
           <li>• 욕설이나 비방하는 내용은 삼가주세요.</li>

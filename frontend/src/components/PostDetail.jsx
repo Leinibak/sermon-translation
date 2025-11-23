@@ -1,12 +1,12 @@
 // ============================================
-// frontend/src/components/PostDetail.jsx (개선)
+// frontend/src/components/PostDetail.jsx
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Calendar, User, Eye, Edit, Trash2, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Eye, Edit, Trash2, MessageSquare, Image as ImageIcon } from 'lucide-react';
 
 function PostDetail() {
   const { id } = useParams();
@@ -160,7 +160,7 @@ function PostDetail() {
       {/* 게시글 본문 */}
       <article className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 mb-6">
         {/* 헤더 - Blog 스타일 적용 */}
-        <div className="bg-gradient-to-r  from-cyan-700 to-neutral-800 p-5 text-white">
+        <div className="bg-gradient-to-r from-cyan-700 to-neutral-800 p-5 text-white">
           <div className="flex justify-between items-start mb-3">
             <span className="inline-block bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
               게시글
@@ -184,7 +184,7 @@ function PostDetail() {
             )}
           </div>
 
-          <h1 className="text-xl font-bold mb-4 text-gray-100  leading-tight">{post.title}</h1>
+          <h1 className="text-xl font-bold mb-4 text-gray-100 leading-tight">{post.title}</h1>
 
           <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
@@ -210,6 +210,17 @@ function PostDetail() {
 
         {/* 본문 */}
         <div className="p-6">
+          {/* 이미지 표시 */}
+          {post.image_url && (
+            <div className="mb-6">
+              <img 
+                src={post.image_url} 
+                alt={post.title}
+                className="w-full max-h-[500px] object-cover rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
+          
           <div className="prose max-w-none">
             <p className="text-gray-800 whitespace-pre-wrap leading-relaxed text-sm">
               {post.content}
@@ -218,12 +229,12 @@ function PostDetail() {
         </div>
       </article>
 
-      {/* 댓글 섹션 - Sermon 스타일 적용 */}
+      {/* 댓글 섹션 */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900 flex items-center">
             <MessageSquare className="w-5 h-5 mr-2 text-neutral-800" />
-            댓글 <span className=" text-neutral-800 ml-2">{comments.length}</span>
+            댓글 <span className="text-neutral-800 ml-2">{comments.length}</span>
           </h2>
         </div>
 
@@ -253,7 +264,7 @@ function PostDetail() {
                   <button
                     type="submit"
                     disabled={commentLoading || !commentContent.trim()}
-                    className="px-5 py-2 bg-cyan-800 text-white  rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+                    className="px-5 py-2 bg-cyan-800 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
                   >
                     {commentLoading ? '작성 중...' : '댓글 작성'}
                   </button>
@@ -266,7 +277,7 @@ function PostDetail() {
             <div className="flex items-center justify-center py-3">
               <p className="text-sm text-gray-600">
                 댓글을 작성하려면{' '}
-                <Link to="/login" className=" text-neutral-600 hover:text-neutral-700 font-medium underline">
+                <Link to="/login" className="text-neutral-600 hover:text-neutral-700 font-medium underline">
                   로그인
                 </Link>
                 해주세요.
