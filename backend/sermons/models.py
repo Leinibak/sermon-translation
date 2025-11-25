@@ -104,6 +104,8 @@ class Sermon(models.Model):
     # 파일 필드
     audio_file = models.FileField(
         upload_to=sermon_audio_path,
+        null=True,      # 데이터베이스에서 NULL 허용
+        blank=True,     # 폼에서 빈 값 허용
         verbose_name='통역 MP3 파일',
         help_text='통역된 설교 오디오 파일'
     )
@@ -118,8 +120,8 @@ class Sermon(models.Model):
         upload_to=sermon_pdf_path,
         verbose_name='번역 PDF',
         help_text='번역된 설교 자료',
-        blank=True,
-        null=True
+        # blank=True,
+        # null=True
     )
     
     # 추가 정보
