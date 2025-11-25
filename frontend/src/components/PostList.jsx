@@ -1,5 +1,5 @@
 // ============================================
-// frontend/src/components/PostList.jsx
+// frontend/src/components/PostList.jsx (검색 기능 수정)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -25,10 +25,16 @@ function PostList() {
     try {
       setLoading(true);
       const response = await axios.get(API_ENDPOINTS.board.posts);
-      setPosts(response.data.results || response.data);
+      console.log('📥 전체 게시글 응답:', response.data);
+      
+      // ✅ 응답 구조 확인 및 안전한 데이터 추출
+      const postsData = response.data?.results || response.data || [];
+      console.log('📋 게시글 데이터:', postsData);
+      
+      setPosts(postsData);
       setError(null);
     } catch (err) {
-      console.error(err);
+      console.error('❌ 게시글 로딩 실패:', err);
       setError('게시글을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -37,6 +43,8 @@ function PostList() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    
+    // ✅ 검색어가 비어있으면 전체 목록 다시 불러오기
     if (!searchTerm.trim()) {
       fetchPosts();
       return;
@@ -44,16 +52,34 @@ function PostList() {
 
     try {
       setLoading(true);
+      console.log('🔍 검색어:', searchTerm);
+      
+      // ✅ search 파라미터 전달
       const response = await axios.get(API_ENDPOINTS.board.posts, {
         params: { search: searchTerm }
       });
-      setPosts(response.data.results || response.data);
+      
+      console.log('🔍 검색 결과 응답:', response.data);
+      
+      // ✅ 응답 구조 확인 및 안전한 데이터 추출
+      const postsData = response.data?.results || response.data || [];
+      console.log('📋 검색된 게시글:', postsData);
+      
+      setPosts(postsData);
+      setError(null);
     } catch (err) {
-      console.error(err);
+      console.error('❌ 검색 실패:', err);
+      console.error('응답 데이터:', err.response?.data);
       setError('검색에 실패했습니다.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ 검색어 초기화
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    fetchPosts();
   };
 
   if (loading) {
@@ -101,8 +127,17 @@ function PostList() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="제목, 작성자로 검색..."
-                className="w-full pl-11 pr-20 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+                className="w-full pl-11 pr-32 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-24 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                >
+                  초기화
+                </button>
+              )}
               <button
                 type="submit"
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-cyan-700 text-white rounded-md hover:bg-indigo-700 transition text-sm"
@@ -117,7 +152,16 @@ function PostList() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">
-              전체 게시글 <span className="text-sky-800">{posts.length}</span>
+              {searchTerm ? (
+                <>
+                  '<span className="text-sky-800">{searchTerm}</span>' 검색 결과{' '}
+                  <span className="text-sky-800">{posts.length}</span>건
+                </>
+              ) : (
+                <>
+                  전체 게시글 <span className="text-sky-800">{posts.length}</span>
+                </>
+              )}
             </h2>
           </div>
         </div>
@@ -125,12 +169,33 @@ function PostList() {
         {error ? (
           <div className="text-center py-20">
             <p className="text-red-500 text-lg">{error}</p>
+            <button
+              onClick={fetchPosts}
+              className="mt-4 px-4 py-2 bg-cyan-700 text-white rounded-lg hover:bg-indigo-700 transition text-sm"
+            >
+              다시 시도
+            </button>
           </div>
         ) : posts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
             <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-500 text-lg">게시글이 없습니다</p>
-            <p className="text-gray-400 text-sm mt-2">첫 번째 게시글을 작성해보세요</p>
+            {searchTerm ? (
+              <>
+                <p className="text-gray-500 text-lg mb-2">검색 결과가 없습니다</p>
+                <p className="text-gray-400 text-sm mb-4">다른 검색어로 시도해보세요</p>
+                <button
+                  onClick={handleClearSearch}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
+                >
+                  전체 목록 보기
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 text-lg">게시글이 없습니다</p>
+                <p className="text-gray-400 text-sm mt-2">첫 번째 게시글을 작성해보세요</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-16">

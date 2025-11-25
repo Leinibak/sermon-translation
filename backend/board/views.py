@@ -1,10 +1,11 @@
-# backend/board/views.py
+# backend/board/views.py (검색 기능 개선)
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.parsers import MultiPartParser, FormParser  # ✅ 추가
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 from .models import Post, Comment
 from .serializers import PostSerializer, CommentSerializer
@@ -14,10 +15,48 @@ from .permissions import IsAuthorOrReadOnly, IsApprovedUser
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    parser_classes = [MultiPartParser, FormParser]  # ✅ 추가
+    parser_classes = [MultiPartParser, FormParser]
     
-    # 🔥 승인된 사용자만 작성 가능하도록 변경
     permission_classes = [IsAuthenticatedOrReadOnly, IsApprovedUser, IsAuthorOrReadOnly]
+
+    def get_queryset(self):
+        """
+        검색 기능 강화
+        - 제목, 내용, 작성자로 검색
+        - 대소문자 구분 없음
+        """
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search', '').strip()
+        
+        if search:
+            print(f"🔍 검색어: '{search}'")
+            
+            # Q 객체로 OR 조건 검색
+            query = Q(title__icontains=search)  # 제목에서 검색
+            query |= Q(content__icontains=search)  # 내용에서 검색
+            query |= Q(author__icontains=search)  # 작성자에서 검색
+            
+            queryset = queryset.filter(query)
+            print(f"📊 검색 결과 개수: {queryset.count()}")
+        
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        """목록 조회 - 검색어 디버깅"""
+        search = request.query_params.get('search', '')
+        if search:
+            print(f"🔍 검색 요청 받음: '{search}'")
+        
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # ✅ 페이지네이션이 설정되어 있으면 사용, 아니면 전체 결과 반환
+        if hasattr(self, 'paginate_queryset') and self.paginate_queryset(queryset) is not None:
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
         """게시글 조회 시 조회수 증가"""
@@ -29,7 +68,6 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """게시글 생성 시 작성자 자동 저장"""
-        # 승인 여부 재확인
         if not self._is_user_approved(self.request.user):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied(
@@ -65,13 +103,11 @@ class PostViewSet(viewsets.ModelViewSet):
         post = self.get_object()
 
         if request.method == 'GET':
-            # 🔥 댓글 조회는 권한 체크 불필요
             comments = Comment.objects.filter(post=post)
             serializer = CommentSerializer(comments, many=True)
             return Response(serializer.data)
 
         elif request.method == 'POST':
-            # 🔥 댓글 작성은 승인된 사용자만 가능
             if not request.user.is_authenticated:
                 return Response(
                     {'detail': '로그인이 필요합니다.'},
@@ -102,7 +138,7 @@ class PostViewSet(viewsets.ModelViewSet):
         post = self.get_object()
         comment = get_object_or_404(Comment, pk=comment_id, post=post)
 
-        # 🔥 댓글 작성자만 삭제 가능
+        # 댓글 작성자만 삭제 가능
         if comment.user != request.user:
             return Response(
                 {'detail': '댓글 삭제 권한이 없습니다.'},
