@@ -9,19 +9,32 @@ import { Search, ChevronLeft, ChevronRight, Calendar, User, BookOpen, Play, Uplo
 function SermonCarousel({ sermons, title, navigate }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const checkScroll = () => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      setCanScrollLeft(scrollLeft > 5); // 약간의 여유값
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
     }
   };
 
+  // ✅ 초기 렌더링 후와 sermons 변경 시 체크
   useEffect(() => {
-    checkScroll();
+    // DOM이 완전히 렌더링된 후 체크
+    const timer = setTimeout(() => {
+      checkScroll();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [sermons]);
+
+  // ✅ 윈도우 리사이즈 시에도 체크
+  useEffect(() => {
+    const handleResize = () => checkScroll();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const scroll = (direction) => {
     if (scrollRef.current) {
@@ -30,7 +43,8 @@ function SermonCarousel({ sermons, title, navigate }) {
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
       });
-      setTimeout(checkScroll, 300);
+      // 스크롤 애니메이션 후 상태 업데이트
+      setTimeout(checkScroll, 350);
     }
   };
 
@@ -44,22 +58,22 @@ function SermonCarousel({ sermons, title, navigate }) {
           <button
             onClick={() => scroll('left')}
             disabled={!canScrollLeft}
-            className={`p-1.5 rounded-full ${
+            className={`p-1.5 rounded-full transition ${
               canScrollLeft 
-                ? 'bg-slate-700 text-white hover:bg-slate-800' 
+                ? 'bg-slate-700 text-white hover:bg-slate-800 cursor-pointer' 
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            } transition`}
+            }`}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => scroll('right')}
             disabled={!canScrollRight}
-            className={`p-1.5 rounded-full ${
+            className={`p-1.5 rounded-full transition ${
               canScrollRight 
-                ? 'bg-slate-700 text-white hover:bg-slate-800' 
+                ? 'bg-slate-700 text-white hover:bg-slate-800 cursor-pointer' 
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            } transition`}
+            }`}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -70,13 +84,18 @@ function SermonCarousel({ sermons, title, navigate }) {
         ref={scrollRef}
         onScroll={checkScroll}
         className="flex overflow-x-auto space-x-4 pb-4 scrollbar-hide"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        style={{ 
+          scrollbarWidth: 'none', 
+          msOverflowStyle: 'none',
+          scrollSnapType: 'x proximity'
+        }}
       >
         {sermons.map((sermon) => (
           <div
             key={sermon.id}
             onClick={() => navigate(`/sermons/${sermon.id}`)}
             className="flex-shrink-0 w-72 bg-white rounded-lg shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden border border-gray-200"
+            style={{ scrollSnapAlign: 'start' }}
           >
             {/* 카드 헤더 - 매우 연한 파스텔 톤 */}
             <div className="bg-gradient-to-r from-blue-100/30 to-gray-50 p-3 h-24 flex flex-col justify-between border-b border-gray-100">
@@ -146,6 +165,12 @@ function SermonList() {
       setLoading(true);
       const response = await axios.get('/sermons/');
       const sermons = response.data.results || response.data;
+      
+      console.log('전체 설교:', sermons);
+      console.log('주일예배:', sermons.filter(s => s.category === 'sunday'));
+      console.log('컨퍼런스:', sermons.filter(s => s.category === 'conference'));
+      console.log('세미나:', sermons.filter(s => s.category === 'seminar'));
+      
       setAllSermons(sermons);
       
       // 가장 최근 주일예배 설교 찾기
@@ -297,7 +322,7 @@ function SermonList() {
           </div>
         )}
 
-        {/* 검색 바 - 크기 축소 */}
+        {/* 검색바 - 크기 축소 */}
         <div className="mb-8">
           <form onSubmit={handleSearch} className="max-w-xl mx-auto">
             <div className="relative">
