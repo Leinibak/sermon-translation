@@ -23,6 +23,9 @@ class SermonViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
+    # ✅ 페이지네이션 비활성화 - 모든 설교를 한 번에 가져옴
+    pagination_class = None
+    
     # 필터링 필드
     filterset_fields = ['category', 'preacher', 'bible_book']
     
