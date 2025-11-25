@@ -1,5 +1,5 @@
 // ============================================
-// frontend/src/components/PostDetail.jsx
+// frontend/src/components/PostDetail.jsx (Gowun Batang 폰트 적용)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -147,7 +147,7 @@ function PostDetail() {
   }
   
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 pb-16">
       {/* 뒤로가기 */}
       <Link 
         to="/blog" 
@@ -221,8 +221,9 @@ function PostDetail() {
             </div>
           )}
           
-          <div className="prose max-w-none">
-            <p className="text-gray-800 whitespace-pre-wrap leading-relaxed text-sm">
+          {/* ✅ Gowun Batang 폰트 적용 */}
+          <div className="blog-content max-w-none">
+            <p className="whitespace-pre-wrap leading-relaxed">
               {post.content}
             </p>
           </div>
@@ -255,7 +256,8 @@ function PostDetail() {
                   onChange={(e) => setCommentContent(e.target.value)}
                   placeholder="댓글을 작성하세요..."
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm blog-content"
+                  style={{ fontSize: '12pt' }}
                 />
                 <div className="mt-3 flex justify-between items-center">
                   <span className="text-xs text-gray-500">
@@ -327,7 +329,8 @@ function PostDetail() {
                         </button>
                       )}
                     </div>
-                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-sm">
+                    {/* ✅ 댓글에도 Gowun Batang 폰트 적용 */}
+                    <p className="blog-content whitespace-pre-wrap leading-relaxed">
                       {comment.content}
                     </p>
                   </div>

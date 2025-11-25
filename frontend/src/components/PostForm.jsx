@@ -1,5 +1,5 @@
 // ============================================
-// frontend/src/components/PostForm.jsx (이미지 업로드 추가)
+// frontend/src/components/PostForm.jsx (Gowun Batang 폰트 적용)
 // ============================================
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -309,7 +309,7 @@ function PostForm() {
               )}
             </div>
 
-            {/* 내용 */}
+            {/* 내용 - ✅ Gowun Batang 폰트 적용 */}
             <div>
               <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-2">
                 내용 <span className="text-red-500">*</span>
@@ -322,11 +322,15 @@ function PostForm() {
                 placeholder="게시글 내용을 입력하세요"
                 rows={12}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition text-sm"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition text-sm blog-content"
+                style={{ fontSize: '12pt' }}
               />
               <div className="mt-2 flex justify-between items-center">
                 <p className="text-xs text-gray-500">
                   {formData.content.length} / 5000자
+                </p>
+                <p className="text-xs text-gray-500">
+                  한글 폰트: Gowun Batang 12pt
                 </p>
               </div>
             </div>
@@ -386,6 +390,7 @@ function PostForm() {
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 제목과 내용을 모두 입력해주세요.</li>
           <li>• 대표 이미지는 선택사항입니다 (JPG, PNG, GIF, WebP, 최대 5MB).</li>
+          <li>• 본문은 <strong>Gowun Batang 12pt</strong> 폰트로 표시됩니다.</li>
           <li>• 작성자는 로그인한 계정으로 자동 설정됩니다.</li>
           <li>• <strong>관리자 승인 후</strong> 게시글 작성이 가능합니다.</li>
           <li>• 욕설이나 비방하는 내용은 삼가주세요.</li>

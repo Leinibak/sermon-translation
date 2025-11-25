@@ -3,12 +3,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ✅ Google Fonts - Gowun Batang */
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap');
+
 /* 공통 */
 body {
   font-family: 'Arial', sans-serif;
   background-color: #f4f6f8;
   margin: 0;
   padding: 0;
+}
+
+/* ✅ 블로그 본문용 한글 폰트 클래스 */
+.blog-content {
+  font-family: 'Gowun Batang', serif;
+  font-size: 13pt; /* 12pt = 약 16px */
+  line-height: 1.8;
+  color: #333;
+}
+
+/* ✅ 블로그 본문 단락 스타일 */
+.blog-content p {
+  margin-bottom: 1em;
 }
 
 /* 컨테이너 */
@@ -39,7 +55,7 @@ button {
 .logo-wrapper {
   transform: scale(0.45);
   transform-origin: bottom center;
-  overflow: visible; /* 이미지 확장 부분이 잘리지 않도록 */
+  overflow: visible;
 }
 
 .logo-clip {
@@ -53,7 +69,7 @@ button {
   padding: 8px 14px;
   border-radius: 6px;
   transition: background-color 0.2s;
-  display: inline-flex;       /* ⬅️ 중요: inline → flex 정렬 지원 */
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
