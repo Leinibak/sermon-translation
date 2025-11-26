@@ -32,7 +32,7 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center bg-gray-50 px-4 pt-6">
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 px-4 pt-2">
       <div className="bg-white p-6 md:p-8 rounded-lg shadow-sm border border-gray-200 w-full max-w-md">
         <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 text-center">
           로그인

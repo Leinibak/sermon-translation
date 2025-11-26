@@ -19,6 +19,9 @@ urlpatterns = [
     # Sermons API (추가)
     path('api/sermons/', include('sermons.urls')),
 
+    # ✅ Bible Verses API 추가
+    path('api/bible-verses/', include('bible_verses.urls')),
+
     # JWT 토큰 엔드포인트
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

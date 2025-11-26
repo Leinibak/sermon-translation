@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'board',
     'accounts',
     'sermons', 
+    'bible_verses',  # ✅ 추가
 ]
 
 MIDDLEWARE = [
