@@ -2,7 +2,7 @@
 // frontend/src/App.jsx (수정)
 // ============================================
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from "./components/Navbar";
@@ -16,6 +16,8 @@ import Register from "./components/Register";
 import SermonList from './components/SermonList';
 import SermonDetail from './components/SermonDetail';
 import SermonUpload from './components/SermonUpload';
+import PastoralLetterList from './components/PastoralLetterList';
+import PastoralLetterDetail from './components/PastoralLetterDetail';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -124,7 +126,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ScrollToTop /> {/* 이 컴포넌트를 Router 안에 추가 */}
+        <ScrollToTop />
         <Navbar />
         <div className="pt-8 min-h-screen flex flex-col justify-between">
           <main className="flex-grow">
@@ -142,6 +144,18 @@ function App() {
               <Route path="/sermons/edit/:id" element={
                 <PrivateRoute>
                   <SermonUpload />
+                </PrivateRoute>
+              } />
+              
+              {/* ✅ Pastoral Letters 라우팅 */}
+              <Route path="/pastoral-letters" element={
+                <PrivateRoute>
+                  <PastoralLetterList />
+                </PrivateRoute>
+              } />
+              <Route path="/pastoral-letters/:id" element={
+                <PrivateRoute>
+                  <PastoralLetterDetail />
                 </PrivateRoute>
               } />
               

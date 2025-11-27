@@ -1,4 +1,4 @@
-# backend/accounts/models.py
+# backend/accounts/models.py (수정된 부분만)
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -18,6 +18,14 @@ class UserProfile(models.Model):
         on_delete=models.CASCADE, 
         related_name='profile'
     )
+    
+    # ✅ 교인 여부 필드 추가
+    is_member = models.BooleanField(
+        default=False,
+        verbose_name='Arche 교인 여부',
+        help_text='Arche 교회 등록 교인인 경우 체크'
+    )
+    
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS,
@@ -49,7 +57,8 @@ class UserProfile(models.Model):
         verbose_name_plural = '사용자 프로필 목록'
     
     def __str__(self):
-        return f'{self.user.username} - {self.get_approval_status_display()}'
+        member_status = " (교인)" if self.is_member else ""
+        return f'{self.user.username} - {self.get_approval_status_display()}{member_status}'
     
     @property
     def is_approved(self):
@@ -60,6 +69,11 @@ class UserProfile(models.Model):
     def can_write_post(self):
         """게시글 작성 가능 여부"""
         return self.is_approved
+    
+    @property
+    def can_view_pastoral_letters(self):
+        """목회서신 열람 가능 여부"""
+        return self.is_approved and self.is_member
 
 
 # Signal: User 생성 시 자동으로 UserProfile 생성

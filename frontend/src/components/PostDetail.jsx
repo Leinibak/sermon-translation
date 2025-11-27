@@ -222,7 +222,7 @@ function PostDetail() {
           )}
           
           {/* ✅ Gowun Batang 폰트 적용 */}
-          <div className="blog-content max-w-none px-8 py-4">
+          <div className="blog-content max-w-none px-4 py-4">
             <p className="whitespace-pre-wrap leading-relaxed">
               {post.content}
             </p>

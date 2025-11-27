@@ -1,7 +1,9 @@
+// frontend/src/components/Register.jsx (수정)
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
+import { Info, Check } from 'lucide-react';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -9,6 +11,7 @@ function Register() {
     password: '',
     password2: '',
     email: '',
+    is_member: false, // ✅ 교인 여부 필드 추가
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,9 +20,10 @@ function Register() {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
@@ -51,14 +55,20 @@ function Register() {
         email: formData.email.trim(),
         password: formData.password,
         password2: formData.password2,
+        is_member: formData.is_member, // ✅ 교인 여부 전송
       };
       
       const response = await axios.post(API_ENDPOINTS.auth.register, payload);
       
-      setSuccessMessage(
-        response.data.message || 
-        '회원가입이 완료되었습니다. 관리자 승인 후 게시글 작성이 가능합니다.'
-      );
+      let message = '회원가입이 완료되었습니다.';
+      
+      if (formData.is_member) {
+        message += '\n관리자 승인 후 목회서신을 포함한 모든 서비스를 이용하실 수 있습니다.';
+      } else {
+        message += '\n관리자 승인 후 게시글 작성이 가능합니다.';
+      }
+      
+      setSuccessMessage(message);
       
       setTimeout(() => {
         navigate('/login');
@@ -102,9 +112,12 @@ function Register() {
 
         {/* 승인 안내 */}
         <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
-          <p className="text-sm text-blue-700">
-            ℹ️ 회원가입 후 관리자 승인이 필요합니다.<br/>
-            승인 완료 후 게시글 작성이 가능합니다.
+          <p className="text-sm text-blue-700 flex items-start">
+            <Info className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+            <span>
+              회원가입 후 관리자 승인이 필요합니다.<br/>
+              승인 완료 후 게시글 작성이 가능합니다.
+            </span>
           </p>
         </div>
 
@@ -188,6 +201,32 @@ function Register() {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent disabled:bg-gray-100 text-sm"
               placeholder="비밀번호를 다시 입력하세요"
             />
+          </div>
+
+          {/* ✅ 교인 여부 체크박스 */}
+          <div className="pt-2">
+            <label className="flex items-start cursor-pointer group">
+              <div className="relative flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_member"
+                  name="is_member"
+                  checked={formData.is_member}
+                  onChange={handleChange}
+                  disabled={loading || successMessage}
+                  className="w-5 h-5 text-slate-600 border-gray-300 rounded focus:ring-slate-500 focus:ring-2 disabled:opacity-50 cursor-pointer"
+                />
+                {formData.is_member && (
+                  <Check className="w-3 h-3 text-white absolute left-1 top-1 pointer-events-none" />
+                )}
+              </div>
+              <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition">
+                <strong className="font-semibold">Arche 공동체에 속합니다</strong>
+                <span className="block text-xs text-gray-500 mt-1">
+                  체크하시면 승인 후 목회서신을 열람하실 수 있습니다
+                </span>
+              </span>
+            </label>
           </div>
 
           <button
