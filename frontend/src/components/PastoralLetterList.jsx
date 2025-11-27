@@ -35,7 +35,7 @@ function PastoralLetterList() {
       
       if (err.response?.status === 403) {
         setAccessDenied(true);
-        setError(err.response?.data?.detail || '목회서신은 Arche 교회 등록 교인만 열람할 수 있습니다.');
+        setError(err.response?.data?.detail || '목회서신은 Arche 공동체가 열람할 수 있습니다.');
       } else if (err.response?.status === 401) {
         setError('로그인이 필요합니다.');
       } else {
