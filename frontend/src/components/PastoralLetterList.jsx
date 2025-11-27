@@ -123,7 +123,7 @@ function PastoralLetterList() {
                 <ul className="text-sm text-blue-800 space-y-2 text-left max-w-md mx-auto">
                   <li className="flex items-start">
                     <span className="mr-2">1.</span>
-                    <span>회원가입 시 "Arche 교회 등록 교인" 항목을 체크하세요</span>
+                    <span>회원가입 시 Arche 교회 등록 교인인 경우 해당항목을 체크하세요</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-2">2.</span>
@@ -160,7 +160,7 @@ function PastoralLetterList() {
             <div>
               <h1 className="text-2xl text-gray-200 font-bold mb-1">목회서신</h1>
               <p className="text-slate-300 text-sm">
-                Arche 교회 교인을 위한 목회서신
+                Arche 목회서신을 한국어로 번역하여 제공합니다.
               </p>
             </div>
             

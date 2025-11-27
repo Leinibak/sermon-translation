@@ -52,7 +52,7 @@ class IsMemberUser(BasePermission):
             
             # 교인이 아닌 사용자
             if not profile.is_member:
-                self.message = '목회서신은 Arche 교회 등록 교인만 열람할 수 있습니다.'
+                self.message = '목회서신은 Arche 공동체가 열람할 수 있습니다.'
                 return False
             
             return True
