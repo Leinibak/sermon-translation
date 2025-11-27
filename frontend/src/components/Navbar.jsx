@@ -32,7 +32,8 @@ function Navbar() {
           </Link>
 
           {/* 데스크톱 메뉴 */}
-          <div className="hidden md:flex space-x-8 items-center font-semibold" style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+          <div className="hidden md:flex space-x-8 items-center font-bold font-dodum text-lg" 
+          // style={{ fontFamily: "'Gowun Batang', sans-serif" }}
 >
             <Link to="/" className="hover:text-blue-600 font-medium">
               홈
@@ -60,7 +61,7 @@ function Navbar() {
                 </span>
                 <button
                   onClick={logout}
-                  className={`text-sm uppercase tracking-wider font-light hover:opacity-70 transition ${
+                  className={`text-lg uppercase tracking-wider font-light hover:opacity-70 transition ${
                     isScrolled ? 'text-pink-500' : 'text-pink-700'
                   }`}
                 >
@@ -69,11 +70,11 @@ function Navbar() {
               </div>
             ) : (
               <Link
-                to="/login"
-                className={`text-sm uppercase tracking-wider font-light hover:opacity-70 transition ${
-                  isScrolled ? 'text-blue-500' : 'text-blue-700'
-                }`}
-              >
+                to="/login"
+                className={`text-lg uppercase tracking-wider font-light hover:opacity-70 transition ${
+                  isScrolled ? 'text-blue-500' : 'text-blue-700'
+                }`} // 👈 text-xl로 변경
+              >
                 로그인
               </Link>
             )}

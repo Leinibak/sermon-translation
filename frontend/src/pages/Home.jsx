@@ -48,10 +48,10 @@ function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 
-              className="text-4xl font-light mb-4"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-4xl font-light mb-4 font-dodum"
+              // style={{ fontFamily: "'Gowun Dotum', sans-serif" }}
             >
-              Latest Sermons
+              최근설교
             </h2>
             <div className="w-16 h-px bg-gray-400 mx-auto mb-6" />
             <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
@@ -140,12 +140,12 @@ function Home() {
           <blockquote>
             <p 
               className="text-3xl md:text-4xl font-light text-gray-800 mb-8 leading-relaxed"
-              style={{ fontFamily: 'Georgia, serif' }}
+              style={{ fontFamily: "'Gowun Batang', serif" }}
             >
               "진리를 알지니 진리가 너희를 자유롭게 하리라"
             </p>
             <footer className="text-gray-600 text-sm uppercase tracking-wider">
-              — 요한복음 8:32
+              요한복음 8:32
             </footer>
           </blockquote>
         </div>
@@ -156,10 +156,10 @@ function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-12">
             <h2 
-              className="text-4xl font-light"
-              style={{ fontFamily: 'Georgia, serif' }}
+              className="text-4xl font-light font-dodum"
+              // style={{ fontFamily: "'Gowun Dotum', sans-serif" }}
             >
-              From the Blog
+              블로그 소식
             </h2>
             <Link
               to="/blog"
