@@ -16,6 +16,9 @@ COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
+# public 폴더 없으면 생성
+RUN mkdir -p public
+
 # 📌 pdf.worker.mjs를 public로 복사
 RUN cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.mjs
 
