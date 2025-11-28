@@ -1,11 +1,10 @@
-// ============================================
 // frontend/src/pages/Home.jsx
-// ============================================
 import React, { useState, useEffect } from "react";
 import HeroSection from "../components/HeroSection";
 import { Link } from 'react-router-dom';
 import axios from '../api/axios';
 import { Calendar, User, BookOpen, Play, FileText } from 'lucide-react';
+import predigerImage from '../assets/prediger.png'; // ✅ 이미지 import
 
 function Home() {
   const [latestSermons, setLatestSermons] = useState([]);
@@ -20,13 +19,11 @@ function Home() {
     try {
       setLoading(true);
       
-      // 최신 설교 2개 가져오기
       const sermonsResponse = await axios.get('/sermons/', {
         params: { ordering: '-sermon_date', limit: 2 }
       });
       setLatestSermons(sermonsResponse.data.results?.slice(0, 2) || sermonsResponse.data.slice(0, 2) || []);
       
-      // 최신 블로그 포스트 3개 가져오기
       const postsResponse = await axios.get('/board/posts/', {
         params: { ordering: '-created_at', limit: 3 }
       });
@@ -47,10 +44,7 @@ function Home() {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 
-              className="text-4xl font-light mb-4 font-dodum"
-              // style={{ fontFamily: "'Gowun Dotum', sans-serif" }}
-            >
+            <h2 className="text-4xl font-light mb-4 font-dodum">
               최근설교
             </h2>
             <div className="w-16 h-px bg-gray-400 mx-auto mb-6" />
@@ -69,41 +63,75 @@ function Home() {
                 <Link 
                   key={sermon.id}
                   to={`/sermons/${sermon.id}`}
-                  className="group relative overflow-hidden rounded-lg shadow-lg hover:shadow-2xl transition duration-300"
+                  className="group relative overflow-hidden rounded-xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1"
                 >
-                  <div 
-                    className={`h-80 ${index === 0 
-                      ? 'bg-gradient-to-br from-purple-400 to-pink-400' 
-                      : 'bg-gradient-to-br from-blue-400 to-purple-400'
-                    }`}
-                    style={{ 
-                      backgroundImage: index === 0 
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                        : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-40 transition" />
-                    <div className="absolute inset-0 flex items-end p-8">
-                      <div className="text-white w-full">
-                        <p className="text-sm uppercase tracking-wider mb-2 flex items-center">
-                          <Play className="w-4 h-4 mr-2" />
+                  {/* 배경 이미지 + 그라데이션 오버레이 */}
+                  <div className="relative h-96 overflow-hidden rounded-xl">
+                    {/* 배경 이미지 */}
+                    <div 
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+                      style={{ 
+                        backgroundImage: `url(${predigerImage})`,
+                      }}
+                    />
+                    
+                    {/* 그라데이션 오버레이 */}
+                    <div 
+                      className="absolute inset-0 transition-opacity duration-300"
+                      style={{ 
+                        background: index === 0 
+                          ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.90) 100%)' 
+                          : 'linear-gradient(135deg, rgba(59, 130, 246, 0.85) 0%, rgba(37, 99, 235, 0.90) 100%)'
+                      }}
+                    />
+                    
+                    {/* 호버 시 어두워지는 효과 */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300" />
+                    
+                    {/* 콘텐츠 */}
+                    <div className="absolute inset-0 flex flex-col justify-between p-8">
+                      {/* 상단 레이블 */}
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs uppercase tracking-wider font-semibold border border-white/30">
+                          <Play className="w-3 h-3 mr-2" />
                           {index === 0 ? 'Latest Message' : 'Previous Message'}
-                        </p>
-                        <h3 className="text-2xl font-light mb-3 line-clamp-2">
+                        </span>
+                      </div>
+                      
+                      {/* 하단 정보 */}
+                      <div className="text-white space-y-4">
+                        <h3 className="text-3xl font-bold leading-tight line-clamp-2 drop-shadow-lg">
                           {sermon.title}
                         </h3>
-                        <div className="flex flex-wrap gap-3 text-sm text-white text-opacity-90">
-                          <span className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            {new Date(sermon.sermon_date).toLocaleDateString('ko-KR')}
-                          </span>
-                          <span className="flex items-center">
-                            <User className="w-4 h-4 mr-1" />
-                            {sermon.preacher}
-                          </span>
-                          <span className="flex items-center">
-                            <BookOpen className="w-4 h-4 mr-1" />
-                            {sermon.bible_reference}
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center text-sm">
+                            <Calendar className="w-4 h-4 mr-2 opacity-90" />
+                            <span className="font-medium">
+                              {new Date(sermon.sermon_date).toLocaleDateString('ko-KR', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center text-sm">
+                            <User className="w-4 h-4 mr-2 opacity-90" />
+                            <span className="font-medium">{sermon.preacher}</span>
+                          </div>
+                          
+                          <div className="flex items-center text-sm">
+                            <BookOpen className="w-4 h-4 mr-2 opacity-90" />
+                            <span className="font-bold text-base">{sermon.bible_reference}</span>
+                          </div>
+                        </div>
+                        
+                        {/* 재생 버튼 */}
+                        <div className="pt-4">
+                          <span className="inline-flex items-center px-6 py-2 bg-white/90 text-gray-800 rounded-full text-sm font-semibold group-hover:bg-white transition-all duration-300 shadow-lg">
+                            <Play className="w-4 h-4 mr-2" />
+                            설교 듣기
                           </span>
                         </div>
                       </div>
@@ -151,14 +179,11 @@ function Home() {
         </div>
       </section>
 
-      {/* Blog Preview */}
+      {/* Blog Preview - 기존 코드 유지 */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-12">
-            <h2 
-              className="text-4xl font-light font-dodum"
-              // style={{ fontFamily: "'Gowun Dotum', sans-serif" }}
-            >
+            <h2 className="text-4xl font-light font-dodum">
               블로그 소식
             </h2>
             <Link
