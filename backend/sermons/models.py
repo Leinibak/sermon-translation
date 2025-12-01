@@ -1,5 +1,5 @@
 # backend/sermons/models.py
-import uuid  # ✅ 추가!
+import uuid
 import os
 from datetime import datetime
 from django.db import models
@@ -11,7 +11,6 @@ def sermon_audio_path(instance, filename):
     ext = filename.split('.')[-1]
     filename = f'audio_{uuid.uuid4().hex[:8]}.{ext}'
     
-    # sermon_date 안전하게 처리
     if instance.sermon_date:
         date_path = instance.sermon_date.strftime('%Y/%m')
     else:
@@ -19,12 +18,23 @@ def sermon_audio_path(instance, filename):
     
     return f'sermons/{date_path}/audio/{filename}'
 
+def sermon_original_audio_path(instance, filename):
+    """✅ 원본 오디오 파일 저장 경로"""
+    ext = filename.split('.')[-1]
+    filename = f'original_audio_{uuid.uuid4().hex[:8]}.{ext}'
+    
+    if instance.sermon_date:
+        date_path = instance.sermon_date.strftime('%Y/%m')
+    else:
+        date_path = datetime.now().strftime('%Y/%m')
+    
+    return f'sermons/{date_path}/audio_original/{filename}'
+
 def sermon_pdf_path(instance, filename):
     """PDF 파일 저장 경로"""
     ext = filename.split('.')[-1]
     filename = f'pdf_{uuid.uuid4().hex[:8]}.{ext}'
     
-    # sermon_date 안전하게 처리
     if instance.sermon_date:
         date_path = instance.sermon_date.strftime('%Y/%m')
     else:
@@ -102,26 +112,37 @@ class Sermon(models.Model):
     )
     
     # 파일 필드
+    # ✅ 원본 설교 오디오 추가
+    original_audio_file = models.FileField(
+        upload_to=sermon_original_audio_path,
+        null=True,
+        blank=True,
+        verbose_name='원본 설교 오디오',
+        help_text='설교자의 원본 설교 음성 파일 (독일어)'
+    )
+    
     audio_file = models.FileField(
         upload_to=sermon_audio_path,
-        null=True,      # 데이터베이스에서 NULL 허용
-        blank=True,     # 폼에서 빈 값 허용
+        null=True,
+        blank=True,
         verbose_name='통역 MP3 파일',
-        help_text='통역된 설교 오디오 파일'
+        help_text='통역된 설교 오디오 파일 (한국어)'
     )
+    
     original_pdf = models.FileField(
         upload_to=sermon_pdf_path,
         verbose_name='원본 PDF',
-        help_text='원본 설교 자료',
+        help_text='원본 설교 자료 (독일어)',
         blank=True,
         null=True
     )
+    
     translated_pdf = models.FileField(
         upload_to=sermon_pdf_path,
         verbose_name='번역 PDF',
-        help_text='번역된 설교 자료',
-        # blank=True,
-        # null=True
+        help_text='번역된 설교 자료 (한국어)',
+        blank=True,
+        null=True
     )
     
     # 추가 정보
@@ -171,6 +192,11 @@ class Sermon(models.Model):
     
     def delete(self, *args, **kwargs):
         """모델 삭제 시 파일도 함께 삭제"""
+        # ✅ 원본 오디오 삭제 추가
+        if self.original_audio_file:
+            if os.path.isfile(self.original_audio_file.path):
+                os.remove(self.original_audio_file.path)
+        
         if self.audio_file:
             if os.path.isfile(self.audio_file.path):
                 os.remove(self.audio_file.path)

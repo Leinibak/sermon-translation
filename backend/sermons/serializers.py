@@ -1,7 +1,6 @@
 # backend/sermons/serializers.py
 from rest_framework import serializers
 from .models import Sermon
-from django.contrib.auth.models import User
 
 class SermonListSerializer(serializers.ModelSerializer):
     """설교 목록용 간단한 Serializer"""
@@ -25,6 +24,7 @@ class SermonDetailSerializer(serializers.ModelSerializer):
     uploaded_by_username = serializers.CharField(source='uploaded_by.username', read_only=True)
     
     # 파일 URL
+    original_audio_url = serializers.SerializerMethodField()  # ✅ 추가
     audio_url = serializers.SerializerMethodField()
     original_pdf_url = serializers.SerializerMethodField()
     translated_pdf_url = serializers.SerializerMethodField()
@@ -37,9 +37,17 @@ class SermonDetailSerializer(serializers.ModelSerializer):
             'bible_book', 'bible_book_display', 'chapter', 
             'verse_start', 'verse_end', 'bible_reference',
             'description', 'duration', 'view_count',
+            'original_audio_url',  # ✅ 추가
             'audio_url', 'original_pdf_url', 'translated_pdf_url',
             'uploaded_by_username', 'created_at', 'updated_at'
         ]
+    
+    def get_original_audio_url(self, obj):  # ✅ 추가
+        if obj.original_audio_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.original_audio_file.url)
+        return None
     
     def get_audio_url(self, obj):
         if obj.audio_file:
@@ -70,6 +78,7 @@ class SermonCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'title', 'preacher', 'sermon_date', 'category',
             'bible_book', 'chapter', 'verse_start', 'verse_end',
+            'original_audio_file',  # ✅ 추가
             'audio_file', 'original_pdf', 'translated_pdf',
             'description', 'duration'
         ]
@@ -87,8 +96,22 @@ class SermonCreateUpdateSerializer(serializers.ModelSerializer):
         
         return data
     
+    def validate_original_audio_file(self, value):  # ✅ 추가
+        """원본 오디오 파일 유효성 검사"""
+        if value:
+            # 파일 크기 제한 (100MB)
+            if value.size > 100 * 1024 * 1024:
+                raise serializers.ValidationError('오디오 파일은 100MB를 초과할 수 없습니다.')
+            
+            # 파일 확장자 검사
+            ext = value.name.split('.')[-1].lower()
+            if ext not in ['mp3', 'wav', 'm4a']:
+                raise serializers.ValidationError('mp3, wav, m4a 파일만 업로드 가능합니다.')
+        
+        return value
+    
     def validate_audio_file(self, value):
-        """오디오 파일 유효성 검사"""
+        """통역 오디오 파일 유효성 검사"""
         if value:
             # 파일 크기 제한 (100MB)
             if value.size > 100 * 1024 * 1024:

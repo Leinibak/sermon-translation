@@ -22,42 +22,30 @@ class SermonViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
-    # ✅ 페이지네이션 비활성화
     pagination_class = None
     
-    # 필터링 필드
     filterset_fields = ['category', 'preacher', 'bible_book']
-    
-    # ⚠️ 주의: search_fields는 get_queryset에서 커스텀 처리하므로 여기서는 비워둠
     search_fields = []
     
-    # 정렬 필드
     ordering_fields = ['sermon_date', 'created_at', 'view_count', 'title']
     ordering = ['-sermon_date']
     
     def get_queryset(self):
-        """
-        성경책 한글 이름 검색 지원
-        예: '로마서', '창세기', '마태복음' 등으로 검색 가능
-        """
+        """성경책 한글 이름 검색 지원"""
         queryset = super().get_queryset()
         search = self.request.query_params.get('search', '').strip()
         
         if search:
-            # 성경책 한글 이름 → 영문 코드 매칭
             bible_books_dict = dict(Sermon.BIBLE_BOOKS)
             matching_codes = [
                 code for code, name in bible_books_dict.items()
                 if search.lower() in name.lower() or search.lower() in code.lower()
             ]
             
-            # Q 객체로 OR 조건 검색
-            # 제목, 설교자, 설명, 성경책 코드에서 검색
             query = Q(title__icontains=search)
             query |= Q(preacher__icontains=search)
             query |= Q(description__icontains=search)
             
-            # 성경책 한글 이름으로 검색된 코드가 있으면 추가
             if matching_codes:
                 query |= Q(bible_book__in=matching_codes)
             
@@ -66,14 +54,11 @@ class SermonViewSet(viewsets.ModelViewSet):
         return queryset
     
     def list(self, request, *args, **kwargs):
-        """
-        목록 조회 - 검색어 디버깅 로그 추가
-        """
+        """목록 조회 - 검색어 디버깅 로그 추가"""
         search = request.query_params.get('search', '')
         if search:
             print(f"🔍 검색어: '{search}'")
             
-            # 디버깅: 매칭되는 성경책 코드 출력
             bible_books_dict = dict(Sermon.BIBLE_BOOKS)
             matching_codes = [
                 (code, name) for code, name in bible_books_dict.items()
@@ -153,13 +138,36 @@ class SermonViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
     
+    # ✅ 원본 오디오 다운로드 액션 추가
+    @action(detail=True, methods=['get'])
+    def download_original_audio(self, request, pk=None):
+        """원본 설교 오디오 다운로드"""
+        sermon = self.get_object()
+        if not sermon.original_audio_file:
+            return Response(
+                {'detail': '원본 오디오 파일이 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            file_handle = sermon.original_audio_file.open('rb')
+            response = FileResponse(file_handle, content_type='audio/mpeg')
+            response['Content-Disposition'] = f'attachment; filename="{sermon.original_audio_file.name.split("/")[-1]}"'
+            response['Content-Length'] = sermon.original_audio_file.size
+            return response
+        except Exception as e:
+            return Response(
+                {'detail': f'파일을 열 수 없습니다: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=True, methods=['get'])
     def download_audio(self, request, pk=None):
-        """오디오 파일 다운로드"""
+        """통역 오디오 다운로드"""
         sermon = self.get_object()
         if not sermon.audio_file:
             return Response(
-                {'detail': '오디오 파일이 없습니다.'},
+                {'detail': '통역 오디오 파일이 없습니다.'},
                 status=status.HTTP_404_NOT_FOUND
             )
         

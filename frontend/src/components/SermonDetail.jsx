@@ -7,7 +7,7 @@ import {
   Play, Pause, Volume2, VolumeX, Download, 
   Calendar, User, BookOpen, Eye, ArrowLeft,
   Edit, Trash2, SkipBack, SkipForward,
-  ExternalLink 
+  ExternalLink, Music, Languages
 } from 'lucide-react';
 
 function SermonDetail() {
@@ -19,6 +19,9 @@ function SermonDetail() {
   const [sermon, setSermon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // ✅ 현재 재생 중인 오디오 타입 상태 추가 ('original' 또는 'translation')
+  const [currentAudioType, setCurrentAudioType] = useState('translation');
 
   // 오디오 플레이어 상태
   const audioRef = useRef(null);
@@ -32,6 +35,23 @@ function SermonDetail() {
   useEffect(() => {
     fetchSermon();
   }, [id]);
+
+  // ✅ 오디오 소스가 변경될 때 처리
+  useEffect(() => {
+    if (audioRef.current && sermon) {
+      const audioUrl = currentAudioType === 'original' 
+        ? sermon.original_audio_url 
+        : sermon.audio_url;
+      
+      if (audioUrl) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.load();
+        if (isPlaying) {
+          audioRef.current.play();
+        }
+      }
+    }
+  }, [currentAudioType, sermon]);
 
   // 키보드 이벤트 리스너
   useEffect(() => {
@@ -94,6 +114,24 @@ function SermonDetail() {
     } catch (err) {
       console.error(err);
       alert('삭제에 실패했습니다.');
+    }
+  };
+
+  // ✅ 오디오 타입 전환
+  const switchAudioType = (type) => {
+    if (currentAudioType !== type) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setCurrentAudioType(type);
+      
+      // 잠시 후 자동 재생 (선택사항)
+      if (wasPlaying) {
+        setTimeout(() => {
+          audioRef.current?.play();
+          setIsPlaying(true);
+        }, 100);
+      }
     }
   };
 
@@ -184,6 +222,11 @@ function SermonDetail() {
     );
   }
 
+  // ✅ 현재 재생 중인 오디오 URL
+  const currentAudioUrl = currentAudioType === 'original' 
+    ? sermon.original_audio_url 
+    : sermon.audio_url;
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       {/* 뒤로가기 */}
@@ -197,7 +240,7 @@ function SermonDetail() {
 
       {/* 설교 정보 */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
-        {/* 헤더 - 크기 축소 및 색상 변경 */}
+        {/* 헤더 */}
         <div className="bg-gradient-to-r from-slate-700 to-slate-800 p-5 text-white">
           <div className="flex justify-between items-start mb-3">
             <span className="inline-block bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium">
@@ -250,16 +293,44 @@ function SermonDetail() {
           </div>
         </div>
 
-        {/* 오디오 플레이어 - 크기 축소 */}
-        {sermon.audio_url && (
+        {/* ✅ 오디오 플레이어 - 원본/통역 선택 추가 */}
+        {(sermon.original_audio_url || sermon.audio_url) && (
           <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 border-b border-gray-200">
             <audio
               ref={audioRef}
-              src={sermon.audio_url}
+              src={currentAudioUrl}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onEnded={() => setIsPlaying(false)}
             />
+
+            {/* ✅ 오디오 타입 선택 버튼 */}
+            {sermon.original_audio_url && sermon.audio_url && (
+              <div className="flex justify-center space-x-3 mb-4">
+                <button
+                  onClick={() => switchAudioType('original')}
+                  className={`flex items-center px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    currentAudioType === 'original'
+                      ? 'bg-slate-700 text-white shadow-md'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Music className="w-4 h-4 mr-2" />
+                  원본 설교 (독일어)
+                </button>
+                <button
+                  onClick={() => switchAudioType('translation')}
+                  className={`flex items-center px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    currentAudioType === 'translation'
+                      ? 'bg-slate-700 text-white shadow-md'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Languages className="w-4 h-4 mr-2" />
+                  통역 설교 (한국어)
+                </button>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* 재생 컨트롤 */}
@@ -359,13 +430,29 @@ function SermonDetail() {
             </div>
           )}
 
-          {/* 다운로드 섹션 */}
+          {/* ✅ 다운로드 섹션 - 버튼 이름 개선 */}
           <div className="border-t pt-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
               <span className="w-1 h-5 bg-slate-600 rounded-full mr-2"></span>
               자료 다운로드
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* ✅ 원본 설교 오디오 */}
+              {sermon.original_audio_url && (
+                <a
+                  href={sermon.original_audio_url}
+                  download
+                  className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-800 rounded-lg hover:from-amber-100 hover:to-amber-200 transition-all shadow-sm hover:shadow-md text-sm border border-amber-200"
+                >
+                  <Download className="w-4 h-4 mr-2 group-hover:animate-bounce" />
+                  <div className="text-left">
+                    <div className="font-semibold">원본 설교 오디오</div>
+                    <div className="text-xs opacity-75">(독일어)</div>
+                  </div>
+                </a>
+              )}
+              
+              {/* ✅ 통역 설교 오디오 */}
               {sermon.audio_url && (
                 <a
                   href={sermon.audio_url}
@@ -373,27 +460,38 @@ function SermonDetail() {
                   className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 rounded-lg hover:from-slate-100 hover:to-slate-200 transition-all shadow-sm hover:shadow-md text-sm border border-slate-200"
                 >
                   <Download className="w-4 h-4 mr-2 group-hover:animate-bounce" />
-                  <span className="font-medium">오디오 다운로드</span>
+                  <div className="text-left">
+                    <div className="font-semibold">통역 설교 오디오</div>
+                    <div className="text-xs opacity-75">(한국어)</div>
+                  </div>
                 </a>
               )}
               
+              {/* ✅ 원본 PDF */}
               {sermon.original_pdf_url && (
                 <button
                   onClick={() => handlePdfView(sermon.original_pdf_url, '원본')}
                   className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all shadow-sm hover:shadow-md text-sm border border-blue-200"
                 >
                   <ExternalLink className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">원본 PDF 보기</span>
+                  <div className="text-left">
+                    <div className="font-semibold">원본 설교자료</div>
+                    <div className="text-xs opacity-75">(독일어 PDF)</div>
+                  </div>
                 </button>
               )}
               
+              {/* ✅ 번역 PDF */}
               {sermon.translated_pdf_url && (
                 <button
                   onClick={() => handlePdfView(sermon.translated_pdf_url, '번역')}
                   className="group flex items-center justify-center px-4 py-3 bg-gradient-to-br from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all shadow-sm hover:shadow-md text-sm border border-green-200"
                 >
                   <ExternalLink className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">번역 PDF 보기</span>
+                  <div className="text-left">
+                    <div className="font-semibold">번역 설교자료</div>
+                    <div className="text-xs opacity-75">(한국어 PDF)</div>
+                  </div>
                 </button>
               )}
             </div>

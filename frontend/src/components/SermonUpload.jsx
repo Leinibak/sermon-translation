@@ -31,6 +31,7 @@ function SermonUpload() {
   });
 
   const [files, setFiles] = useState({
+    original_audio_file: null,  // ✅ 추가
     audio_file: null,
     original_pdf: null,
     translated_pdf: null,
@@ -114,9 +115,9 @@ function SermonUpload() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // 필수 파일 체크 (새로 생성할 때만)
+    // ✅ 필수 파일 체크 수정 - 통역 오디오는 필수, 원본은 선택
     if (!isEditMode && !files.audio_file) {
-      alert('오디오 파일은 필수입니다.');
+      alert('통역 오디오 파일은 필수입니다.');
       return;
     }
 
@@ -345,24 +346,49 @@ function SermonUpload() {
             </div>
           </div>
 
-          {/* 파일 업로드 */}
+          {/* ✅ 파일 업로드 - 원본 오디오 추가 */}
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-gray-900 border-b pb-2">
               파일 업로드
             </h2>
 
             <div className="space-y-4">
-              {/* 오디오 파일 */}
+              {/* ✅ 원본 설교 오디오 (선택사항) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  통역 MP3 파일 {!isEditMode && '*'}
+                  원본 설교 오디오 (독일어)
+                </label>
+                <div className="flex items-center space-x-3">
+                  <label className="flex-1 cursor-pointer">
+                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-amber-300 bg-amber-50 rounded-lg hover:border-amber-500 transition">
+                      <Upload className="w-5 h-5 mr-2 text-amber-600" />
+                      <span className="text-gray-700">
+                        {files.original_audio_file ? files.original_audio_file.name : '원본 오디오 파일 선택'}
+                      </span>
+                    </div>
+                    <input
+                      type="file"
+                      name="original_audio_file"
+                      onChange={handleFileChange}
+                      accept="audio/mp3,audio/wav,audio/m4a"
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <p className="mt-1 text-sm text-gray-500">설교자의 원본 설교 음성 (MP3, WAV, M4A, 최대 100MB)</p>
+              </div>
+
+              {/* 통역 오디오 파일 (필수) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  통역 설교 오디오 (한국어) {!isEditMode && '*'}
                 </label>
                 <div className="flex items-center space-x-3">
                   <label className="flex-1 cursor-pointer">
                     <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition">
                       <Upload className="w-5 h-5 mr-2 text-gray-400" />
                       <span className="text-gray-600">
-                        {files.audio_file ? files.audio_file.name : '오디오 파일 선택'}
+                        {files.audio_file ? files.audio_file.name : '통역 오디오 파일 선택'}
                       </span>
                     </div>
                     <input
@@ -375,19 +401,19 @@ function SermonUpload() {
                     />
                   </label>
                 </div>
-                <p className="mt-1 text-sm text-gray-500">MP3, WAV, M4A (최대 100MB)</p>
+                <p className="mt-1 text-sm text-gray-500">통역된 설교 음성 (MP3, WAV, M4A, 최대 100MB)</p>
               </div>
 
               {/* 원본 PDF */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  원본 PDF
+                  원본 설교자료 (독일어 PDF)
                 </label>
                 <div className="flex items-center space-x-3">
                   <label className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition">
-                      <Upload className="w-5 h-5 mr-2 text-gray-400" />
-                      <span className="text-gray-600">
+                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-blue-300 bg-blue-50 rounded-lg hover:border-blue-500 transition">
+                      <Upload className="w-5 h-5 mr-2 text-blue-600" />
+                      <span className="text-gray-700">
                         {files.original_pdf ? files.original_pdf.name : '원본 PDF 선택'}
                       </span>
                     </div>
@@ -406,13 +432,13 @@ function SermonUpload() {
               {/* 번역 PDF */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  번역 PDF
+                  번역 설교자료 (한국어 PDF)
                 </label>
                 <div className="flex items-center space-x-3">
                   <label className="flex-1 cursor-pointer">
-                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition">
-                      <Upload className="w-5 h-5 mr-2 text-gray-400" />
-                      <span className="text-gray-600">
+                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-green-300 bg-green-50 rounded-lg hover:border-green-500 transition">
+                      <Upload className="w-5 h-5 mr-2 text-green-600" />
+                      <span className="text-gray-700">
                         {files.translated_pdf ? files.translated_pdf.name : '번역 PDF 선택'}
                       </span>
                     </div>
