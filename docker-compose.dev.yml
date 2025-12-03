@@ -1,7 +1,7 @@
-# docker-compose.dev.yml
+# docker-compose.dev.yml (정정된 버전)
 
 services:
-  # PostgreSQL 데이터베이스
+  # PostgreSQL 데이터베이스 (변경 없음)
   db:
     image: postgres:15-alpine
     container_name: webboard_db_dev
@@ -19,7 +19,7 @@ services:
     networks:
       - webboard_network
 
-  # ✅ Redis (WebSocket 개발용)
+  # ✅ Redis (변경 없음)
   redis:
     image: redis:7-alpine
     container_name: webboard_redis_dev
@@ -42,9 +42,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: webboard_backend_dev
-    command: >
-      sh -c "python manage.py migrate &&
-            python manage.py runserver 0.0.0.0:8000"
+    # 🚨 수정 1: command를 제거하여 entrypoint.sh 실행
+    # entrypoint.sh이 DB/Redis 대기, 마이그레이션, 서버 실행을 모두 처리해야 함
+    # command: >
+    #   sh -c "python manage.py migrate &&
+    #         python manage.py runserver 0.0.0.0:8000" 
     env_file:
       - ./backend/.env
     environment:
@@ -78,8 +80,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://192.168.1.107:8000/api
-      - VITE_WS_URL=ws://192.168.1.107:8000/ws  # ✅ 개발용 WebSocket
+      # 🚨 수정 2: localhost 대신 Docker 서비스 이름 'backend' 사용
+      - VITE_API_URL=http://localhost:8000/api 
+      - VITE_WS_URL=ws://localhost:8000/ws
     env_file:
       - ./frontend/.env
     depends_on:
@@ -90,7 +93,7 @@ services:
 volumes:
   postgres_data_dev:
   redis_data_dev:
-  static_volume_dev:
+  # static_volume_dev: (사용하지 않음. backend volume에서 /app/staticfiles가 처리)
   media_volume_dev:
 
 networks:
