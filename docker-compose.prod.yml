@@ -1,4 +1,7 @@
+# docker-compose.prod.yml (프로덕션)
+
 services:
+  # PostgreSQL 데이터베이스
   db:
     image: postgres:15-alpine
     container_name: webboard_db_prod
@@ -17,6 +20,23 @@ services:
     networks:
       - webboard_network
 
+  # ✅ Redis (WebSocket 메시징 & 캐싱)
+  redis:
+    image: redis:7-alpine
+    container_name: webboard_redis_prod
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - webboard_network
+
+  # Django 백엔드 (Daphne ASGI)
   backend:
     build:
       context: ./backend
@@ -26,11 +46,12 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     environment:
-      # Django 환경변수 직접 전달
+      # Django 환경변수
       - DJANGO_ENV=prod
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      
       # 데이터베이스
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=${POSTGRES_DB}
@@ -38,29 +59,38 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
       - DB_PORT=5432
+      
       # CORS
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      
+      # ✅ Redis 설정
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: always
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
-    
     networks:
       - webboard_network
+    expose:
+      - "8000"
 
+  # React 프론트엔드
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_API_URL=https://jounsori.org/api 
+        - VITE_API_URL=https://jounsori.org/api
+        - VITE_WS_URL=wss://jounsori.org/ws  # ✅ WebSocket URL 추가
     container_name: webboard_frontend_prod
     environment:
       - VITE_API_URL=https://jounsori.org/api
+      - VITE_WS_URL=wss://jounsori.org/ws
     expose:
       - "80"
     depends_on:
@@ -69,6 +99,7 @@ services:
     networks:
       - webboard_network
 
+  # Nginx 리버스 프록시
   nginx:
     image: nginx:alpine
     container_name: webboard_nginx
@@ -76,8 +107,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # - ./nginx/nginx.prod.conf:/etc/nginx/nginx.prod.conf:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro 
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - static_volume:/static:ro
       - media_volume:/media:ro
@@ -90,6 +120,7 @@ services:
     networks:
       - webboard_network
 
+  # Certbot (SSL 인증서 갱신)
   certbot:
     image: certbot/certbot
     container_name: webboard_certbot
@@ -105,6 +136,7 @@ volumes:
   postgres_data:
   static_volume:
   media_volume:
+  redis_data:
 
 networks:
   webboard_network:

@@ -1,3 +1,4 @@
+# frontend/Dockerfile.prod
 # ================================================
 # Stage 1: Build React App with Vite
 # ================================================
@@ -12,9 +13,11 @@ RUN npm ci
 # 2️⃣ 소스 복사
 COPY . .
 
-# 3️⃣ 환경변수 (백엔드 API URL)
+# 3️⃣ 환경변수 (빌드 시점에 주입)
 ARG VITE_API_URL
+ARG VITE_WS_URL
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
 
 # 4️⃣ Vite 빌드
 RUN npm run build -- --mode production

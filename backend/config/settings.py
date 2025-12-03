@@ -32,6 +32,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(','
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,9 +50,21 @@ INSTALLED_APPS = [
     'board',
     'accounts',
     'sermons', 
-    'bible_verses',  # ✅ 추가
-    'pastoral_letters',  # ✅ 추가
+    'bible_verses',   
+    'pastoral_letters',   
+    'video_meetings',  # ✅ 추가
 ]
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('redis', 6379)],
+        },
+    },
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -195,6 +208,8 @@ if ENVIRONMENT == "prod":
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
+        # 예시: 노트북의 IP가 192.168.1.107일 경우
+        # "http://192.168.1.107:3000",
     ]
 
 CORS_ALLOW_CREDENTIALS = True

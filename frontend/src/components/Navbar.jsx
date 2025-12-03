@@ -48,6 +48,10 @@ function Navbar() {
             <Link to="/blog" className="hover:text-blue-600 font-medium">
               블로그
             </Link>
+
+            {/* <Link to="/video-meetings" className="hover:text-blue-600 font-medium">
+              화상회의
+            </Link> */}
             
             {/* User Menu */}
             {isAuthenticated ? (
@@ -94,7 +98,7 @@ function Navbar() {
 
       {/* 모바일 메뉴 (MD 미만에서만 표시) */}
       {isOpen && (
-        <div className="md:hidden bg-white shadow-md px-4 pb-4 space-y-1 transition-all duration-300">
+        <div className="md:hidden bg-white shadow-md px-4 pb-4 space-y-1 transition-all font-dodum duration-300">
           <Link to="/" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
             홈
           </Link>

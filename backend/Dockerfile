@@ -3,8 +3,11 @@ FROM python:3.14-slim
 WORKDIR /app
 
 # 시스템 패키지 설치
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client \
+        netcat-traditional \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 패키지 설치

@@ -23,8 +23,11 @@ urlpatterns = [
     # Bible Verses API
     path('api/bible-verses/', include('bible_verses.urls')),
 
-    # ✅ Pastoral Letters API
+    # Pastoral Letters API
     path('api/pastoral-letters/', include('pastoral_letters.urls')),
+
+    # ✅ Video Meetings API 추가
+    path('api/video-meetings/', include('video_meetings.urls')),  
 
     # JWT 토큰 엔드포인트
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

@@ -1,41 +1,38 @@
-#!/bin/bash
+#!/bin/sh
+# backend/entrypoint.sh
+
 set -e
 
-echo "⏳ Waiting for PostgreSQL..."
+echo "🔍 환경 확인: DJANGO_ENV=${DJANGO_ENV}"
 
-# dev 환경이면 /app, prod 환경이면 /app/backend
-if [ "$DJANGO_ENV" = "prod" ]; then
-    cd /app/backend
-else
-    cd /app
-fi
-
-# PostgreSQL 준비 대기
-while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do
-  echo "PostgreSQL is unavailable - sleeping"
-  sleep 1
+# DB가 준비될 때까지 대기
+echo "⏳ PostgreSQL 연결 대기 중..."
+while ! nc -z db 5432; do
+  sleep 0.5
 done
+echo "✅ PostgreSQL 연결 성공"
 
-echo "✅ PostgreSQL is up and running!"
+# Redis가 준비될 때까지 대기
+echo "⏳ Redis 연결 대기 중..."
+while ! nc -z redis 6379; do
+  sleep 0.5
+done
+echo "✅ Redis 연결 성공"
 
-# 필수 환경 변수 확인
-: "${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE is not set!}"
-
-echo "🔄 Running database migrations..."
+# 마이그레이션 실행
+echo "🔄 데이터베이스 마이그레이션 실행..."
 python manage.py migrate --noinput
 
-echo "📦 Collecting static files..."
+# 정적 파일 수집
+echo "📦 정적 파일 수집..."
 python manage.py collectstatic --noinput
 
-# 환경 구분 실행
+# 환경에 따라 서버 실행
 if [ "$DJANGO_ENV" = "prod" ]; then
-  echo "🚀 Starting Gunicorn (Production Mode)..."
-  exec gunicorn config.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 3 \
-    --access-logfile - \
-    --error-logfile -
+    echo "🚀 프로덕션 모드: Daphne ASGI 서버 시작..."
+    # ✅ Daphne로 ASGI 서버 실행 (WebSocket 지원)
+    exec daphne -b 0.0.0.0 -p 8000 config.asgi:application
 else
-  echo "🧩 Starting Django development server..."
-  exec python manage.py runserver 0.0.0.0:8000
+    echo "🛠️ 개발 모드: Django 개발 서버 시작..."
+    exec python manage.py runserver 0.0.0.0:8000
 fi

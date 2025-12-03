@@ -19,6 +19,9 @@ import SermonUpload from './components/SermonUpload';
 import PastoralLetterList from './components/PastoralLetterList';
 import PastoralLetterDetail from './components/PastoralLetterDetail';
 import "./pdfConfig";
+import VideoMeetingList from './components/VideoMeetingList';
+import VideoMeetingRoom from './components/VideoMeetingRoom';
+
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -173,7 +176,20 @@ function App() {
                   <PostForm />
                 </PrivateRoute>
               } />
-              
+
+
+              {/* Video Meetings 라우팅 */}
+              <Route path="/video-meetings" element={
+                <PrivateRoute>
+                  <VideoMeetingList />
+                </PrivateRoute>
+              } />
+              <Route path="/video-meetings/:id" element={
+                <PrivateRoute>
+                  <VideoMeetingRoom />
+                </PrivateRoute>
+              } />
+
               {/* Auth 라우팅 */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
