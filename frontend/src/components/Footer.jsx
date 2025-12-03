@@ -2,7 +2,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Cross, Bird, Heart } from 'lucide-react'; // ✅ lucide-react 아이콘 사용
-import logo from "@/assets/jounsori_logo.png";
+// import logo from "@/assets/jounsori_logo.png";
+import logo from '../assets/jounsori_logo.png'
 
 // 성경 아이콘만 커스텀 (십자가가 있는 책 모양)
 const BibleIcon = ({ className }) => (
