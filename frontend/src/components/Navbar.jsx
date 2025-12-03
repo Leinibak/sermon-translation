@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Menu, X } from "lucide-react";
-import logo from "@/assets/jounsori_logo.png";
+// import logo from "@/assets/jounsori_logo.png";
+import logo from '../assets/jounsori_logo.png'
 
 function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
