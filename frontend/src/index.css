@@ -109,3 +109,220 @@ button {
   justify-content: flex-end;
   margin-bottom: 12px;
 }
+
+
+
+/* ========================================
+   비디오 미팅 애니메이션
+   ======================================== */
+
+/* 반응 애니메이션 (떠오르기) */
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-200px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: float-up 3s ease-out forwards;
+}
+
+/* 팝오버 스케일 인 애니메이션 */
+@keyframes scale-in {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* 손들기 바운스 애니메이션 (이미 Tailwind에 있지만 커스텀) */
+@keyframes bounce-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 1s ease-in-out infinite;
+}
+
+/* 채팅 메시지 슬라이드 인 */
+@keyframes slide-in-right {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* 읽지 않음 배지 펄스 */
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-badge {
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+/* 화면 공유 표시 (글로우 효과) */
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 1);
+  }
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* 스크롤바 스타일 (채팅, 참가자 목록) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* 다크 모드 스크롤바 */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* 버튼 호버 효과 강화 */
+.control-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.control-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.control-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 비디오 프레임 호버 효과 */
+.video-frame {
+  transition: all 0.3s ease-in-out;
+}
+
+.video-frame:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+/* 토스트 알림 애니메이션 */
+@keyframes toast-slide-in {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-toast {
+  animation: toast-slide-in 0.3s ease-out;
+}
+
+/* 네트워크 품질 표시 펄스 */
+.network-indicator {
+  position: relative;
+}
+
+.network-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* 로딩 스피너 개선 */
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

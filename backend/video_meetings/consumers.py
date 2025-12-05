@@ -1,7 +1,6 @@
-# backend/video_meetings/consumers.py (개선 버전)
+# backend/video_meetings/consumers.py (확장 버전)
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
 
 class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -67,63 +66,33 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             )
     
     # =========================================================================
-    # 알림 핸들러
+    # 기존 알림 핸들러
     # =========================================================================
     
     async def join_request_notification(self, event):
-        """참가 요청 알림 (방장에게)"""
-        print(f"\n{'📢'*30}")
-        print(f"📢 참가 요청 알림 전송 중...")
-        print(f"   Participant: {event['username']}")
-        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
-        print(f"{'📢'*30}\n")
-        
+        """참가 요청 알림"""
         await self.send(text_data=json.dumps({
             'type': 'join_request',
             'participant_id': event['participant_id'],
             'username': event['username'],
             'message': event['message']
         }))
-        
-        print(f"✅ 참가 요청 알림 전송 완료: {event['username']}")
     
     async def approval_notification(self, event):
-        """승인 알림 (참가자에게)"""
-        print(f"\n{'✅'*30}")
-        print(f"✅ 승인 알림 전송 중...")
-        print(f"   Participant: {event['participant_username']}")
-        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
-        print(f"{'✅'*30}\n")
-        
-        # 해당 참가자에게만 전송
+        """승인 알림"""
         if self.user.is_authenticated and self.user.username == event['participant_username']:
             await self.send(text_data=json.dumps({
                 'type': 'approval',
                 'message': event['message']
             }))
-            print(f"✅ 승인 알림 전송 완료: {event['participant_username']}")
-        else:
-            print(f"⏭️ 다른 사용자 - 알림 전송 안 함")
     
     async def rejection_notification(self, event):
-        """거부 알림 (참가자에게)"""
-        print(f"\n{'❌'*30}")
-        print(f"❌ 거부 알림 전송 중...")
-        print(f"   Participant: {event['participant_username']}")
-        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
-        print(f"{'❌'*30}\n")
-        
-        # 해당 참가자에게만 전송
+        """거부 알림"""
         if self.user.is_authenticated and self.user.username == event['participant_username']:
             await self.send(text_data=json.dumps({
                 'type': 'rejection',
                 'message': event['message']
             }))
-            print(f"✅ 거부 알림 전송 완료: {event['participant_username']}")
-    
-    # =========================================================================
-    # 기존 핸들러
-    # =========================================================================
     
     async def user_joined(self, event):
         """참가 메시지 전송"""
@@ -155,3 +124,62 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                     'from_username': event['from_username'],
                     **event['data']
                 }))
+    
+    # =========================================================================
+    # ⭐⭐⭐ 새로 추가: 화면 공유 알림
+    # =========================================================================
+    
+    async def screen_share_notification(self, event):
+        """화면 공유 시작/종료 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'screen_share',
+            'action': event['action'],  # 'start' or 'stop'
+            'username': event['username'],
+            'message': event['message']
+        }))
+        
+        print(f"🖥️ 화면 공유 알림 전송: {event['action']} - {event['username']}")
+    
+    # =========================================================================
+    # ⭐⭐⭐ 새로 추가: 채팅 메시지 알림
+    # =========================================================================
+    
+    async def chat_message_notification(self, event):
+        """채팅 메시지 실시간 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'chat_message',
+            'message_id': event['message_id'],
+            'sender': event['sender'],
+            'content': event['content'],
+            'created_at': event['created_at']
+        }))
+        
+        print(f"💬 채팅 메시지 전송: {event['sender']} - {event['content'][:30]}...")
+    
+    # =========================================================================
+    # ⭐⭐⭐ 새로 추가: 반응 알림
+    # =========================================================================
+    
+    async def reaction_notification(self, event):
+        """반응 실시간 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'reaction',
+            'username': event['username'],
+            'reaction': event['reaction']
+        }))
+        
+        print(f"👍 반응 전송: {event['username']} - {event['reaction']}")
+    
+    # =========================================================================
+    # ⭐⭐⭐ 새로 추가: 손들기 알림
+    # =========================================================================
+    
+    async def hand_raise_notification(self, event):
+        """손들기/내리기 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'hand_raise',
+            'action': event['action'],  # 'raise' or 'lower'
+            'username': event['username']
+        }))
+        
+        print(f"✋ 손들기 알림: {event['action']} - {event['username']}")

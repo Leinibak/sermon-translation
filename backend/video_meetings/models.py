@@ -1,4 +1,4 @@
-# backend/video_meetings/models.py
+# backend/video_meetings/models.py (수정 버전)
 from django.db import models
 from django.contrib.auth.models import User
 import uuid
@@ -70,6 +70,16 @@ class VideoRoom(models.Model):
         null=True,
         blank=True,
         verbose_name='종료 시간'
+    )
+    
+    # ⭐ 새로 추가: 화면 공유 중인 사용자
+    screen_sharing_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sharing_screen_in',
+        verbose_name='화면 공유 중'
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -144,7 +154,12 @@ class SignalMessage(models.Model):
         ('offer', 'Offer'),
         ('answer', 'Answer'),
         ('candidate', 'ICE Candidate'),
-        ('approval', 'Approval'),  # ⭐ 추가
+        ('approval', 'Approval'),
+        ('screen_share_start', 'Screen Share Start'),  # ⭐ 추가
+        ('screen_share_stop', 'Screen Share Stop'),    # ⭐ 추가
+        ('reaction', 'Reaction'),                      # ⭐ 추가 (3번 기능)
+        ('raise_hand', 'Raise Hand'),                  # ⭐ 추가 (3번 기능)
+        ('chat_message', 'Chat Message'),              # ⭐ 추가 (2번 기능)
     ]
     
     room = models.ForeignKey(
@@ -168,7 +183,7 @@ class SignalMessage(models.Model):
     )
     
     message_type = models.CharField(
-        max_length=20,
+        max_length=30,  # ⭐ 길이 증가
         choices=MESSAGE_TYPES
     )
     
@@ -180,3 +195,120 @@ class SignalMessage(models.Model):
         ordering = ['created_at']
         verbose_name = '시그널 메시지'
         verbose_name_plural = '시그널 메시지 목록'
+
+
+# ⭐⭐⭐ 새로 추가: 채팅 메시지 모델 (2번 기능)
+class ChatMessage(models.Model):
+    """채팅 메시지"""
+    
+    MESSAGE_TYPES = [
+        ('text', '텍스트'),
+        ('file', '파일'),
+        ('system', '시스템'),
+    ]
+    
+    room = models.ForeignKey(
+        VideoRoom,
+        on_delete=models.CASCADE,
+        related_name='chat_messages'
+    )
+    
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_messages'
+    )
+    
+    message_type = models.CharField(
+        max_length=20,
+        choices=MESSAGE_TYPES,
+        default='text'
+    )
+    
+    content = models.TextField(verbose_name='메시지 내용')
+    
+    # 파일 메시지용
+    file = models.FileField(
+        upload_to='chat_files/',
+        null=True,
+        blank=True
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = '채팅 메시지'
+        verbose_name_plural = '채팅 메시지 목록'
+    
+    def __str__(self):
+        return f'{self.sender.username}: {self.content[:30]}'
+
+
+# ⭐⭐⭐ 새로 추가: 반응 모델 (3번 기능)
+class Reaction(models.Model):
+    """실시간 반응"""
+    
+    REACTION_TYPES = [
+        ('👍', '좋아요'),
+        ('👏', '박수'),
+        ('❤️', '하트'),
+        ('😂', '웃음'),
+        ('🎉', '축하'),
+        ('🤔', '생각중'),
+    ]
+    
+    room = models.ForeignKey(
+        VideoRoom,
+        on_delete=models.CASCADE,
+        related_name='reactions'
+    )
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='reactions'
+    )
+    
+    reaction_type = models.CharField(
+        max_length=10,
+        choices=REACTION_TYPES
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = '반응'
+        verbose_name_plural = '반응 목록'
+
+
+# ⭐⭐⭐ 새로 추가: 손들기 모델 (3번 기능)
+class RaisedHand(models.Model):
+    """손들기"""
+    
+    room = models.ForeignKey(
+        VideoRoom,
+        on_delete=models.CASCADE,
+        related_name='raised_hands'
+    )
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='raised_hands'
+    )
+    
+    is_active = models.BooleanField(default=True)
+    
+    raised_at = models.DateTimeField(auto_now_add=True)
+    lowered_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['raised_at']
+        unique_together = ['room', 'user']
+        verbose_name = '손들기'
+        verbose_name_plural = '손들기 목록'
+    
+    def __str__(self):
+        return f'{self.user.username} - {self.room.title}'

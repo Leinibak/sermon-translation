@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingRoom.jsx (최종 개선 버전)
+// frontend/src/components/VideoMeetingRoom.jsx (최종 통합 버전)
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
@@ -7,6 +7,10 @@ import { useAuth } from '../contexts/AuthContext';
 // Custom Hooks
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
+import { useScreenShare } from '../hooks/useScreenShare';
+import { useChat } from '../hooks/useChat';
+import { useReactions } from '../hooks/useReactions';
+import { useRaiseHand } from '../hooks/useRaiseHand';
 
 // UI Components
 import { RoomHeader } from './VideoMeeting/RoomHeader';
@@ -14,6 +18,12 @@ import { PendingRequestsPanel } from './VideoMeeting/PendingRequestsPanel';
 import { VideoGrid } from './VideoMeeting/VideoGrid';
 import { ControlBar } from './VideoMeeting/ControlBar';
 import { HostLeaveModal } from './VideoMeeting/HostLeaveModal';
+
+// 새로 추가된 컴포넌트들
+import { ScreenShareButton } from './VideoMeeting/ScreenShareButton';
+import { ChatPanel, ChatToggleButton } from './VideoMeeting/ChatPanel';
+import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel';
+import { RaiseHandButton, RaisedHandsPanel, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 
 function VideoMeetingRoom() {
   const { id } = useParams();
@@ -25,7 +35,8 @@ function VideoMeetingRoom() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false); // ⭐ 새로운 상태
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showRaisedHandsPanel, setShowRaisedHandsPanel] = useState(false);
   const [mediaReady, setMediaReady] = useState(false);
 
   // Refs
@@ -37,6 +48,12 @@ function VideoMeetingRoom() {
   // Custom Hooks
   const api = useVideoMeetingAPI(id);
   const webrtc = useWebRTC(id, user, isHost);
+  
+  // ⭐⭐⭐ 새로 추가된 기능 Hooks
+  const screenShare = useScreenShare(id, webrtc.localStreamRef, webrtc.peerConnections);
+  const chat = useChat(id, user);
+  const reactions = useReactions(id);
+  const raiseHand = useRaiseHand(id, user);
 
   const { room, participants, pendingRequests, loading, error } = api;
   const { 
@@ -50,25 +67,36 @@ function VideoMeetingRoom() {
   } = webrtc;
 
   // =========================================================================
+  // WebSocket 메시지 핸들러
+  // =========================================================================
+
+  useEffect(() => {
+    // WebSocket 연결 (실제로는 pollSignals를 통해 처리)
+    // 실시간 알림을 위해서는 WebSocket Consumer를 직접 연결해야 함
+    // 여기서는 폴링을 통해 간접적으로 처리
+    
+    return () => {
+      console.log('🔄 WebSocket 정리');
+    };
+  }, [id]);
+
+  // =========================================================================
   // Handlers
   // =========================================================================
 
-  // ⭐ 방장 퇴장 핸들러 (모달 표시)
   const handleLeaveClick = () => {
     if (isHost && remoteStreams.length > 0) {
-      // 방장이고 참가자가 있으면 모달 표시
       setShowLeaveModal(true);
     } else {
-      // 방장이 아니거나 참가자가 없으면 바로 나가기
       handleLeaveOnly();
     }
   };
 
-  // ⭐ 나만 나가기
   const handleLeaveOnly = async () => {
     console.log('👋 회의실 나가기...');
     
     cleanup();
+    screenShare.cleanup();
     
     try {
       await api.leaveRoom();
@@ -79,14 +107,13 @@ function VideoMeetingRoom() {
     }
   };
 
-  // ⭐ 회의 종료 (모든 참가자 퇴장)
   const handleEndMeeting = async () => {
     console.log('🛑 회의 종료...');
     
     cleanup();
+    screenShare.cleanup();
     
     try {
-      // 회의 종료 API 호출
       await api.endMeeting();
       alert('회의가 종료되었습니다. 모든 참가자가 퇴장됩니다.');
     } catch (error) {
@@ -150,10 +177,15 @@ function VideoMeetingRoom() {
     }
     
     if (signals && signals.length > 0) {
-      console.log(`📩 ${signals.length}개 시그널 수신`);
-      
       for (const signal of signals) {
         await handleSignal(signal, fetchRoomDetailsRef.current);
+        
+        // ⭐ 새로 추가: 시그널 타입별 처리
+        if (signal.message_type === 'screen_share_start') {
+          screenShare.handleScreenShareNotification('start', signal.sender_username);
+        } else if (signal.message_type === 'screen_share_stop') {
+          screenShare.handleScreenShareNotification('stop', signal.sender_username);
+        }
       }
     }
   };
@@ -163,14 +195,12 @@ function VideoMeetingRoom() {
     
     const pending = await api.fetchPendingRequests();
     
-    // ⭐ 새로운 대기 요청이 있으면 자동으로 패널 표시
     if (pending.length > 0) {
       if (!showPendingPanel) {
         console.log(`📢 ${pending.length}개 대기 요청 - 패널 자동 표시`);
         setShowPendingPanel(true);
       }
     } else if (pending.length === 0 && showPendingPanel) {
-      // 대기 요청이 없으면 패널 자동 닫기
       console.log('✅ 모든 요청 처리 완료 - 패널 닫기');
       setShowPendingPanel(false);
     }
@@ -180,7 +210,6 @@ function VideoMeetingRoom() {
   // Effects
   // =========================================================================
 
-  // Room Details 가져오기
   useEffect(() => {
     const fetchAndSetRoom = async () => {
       try {
@@ -217,10 +246,10 @@ function VideoMeetingRoom() {
     return () => {
       console.log('🔄 컴포넌트 언마운트');
       cleanup();
+      screenShare.cleanup();
     };
   }, []);
 
-  // WebRTC 초기화
   useEffect(() => {
     if (!room || mediaReady || !user) return;
     
@@ -230,15 +259,10 @@ function VideoMeetingRoom() {
       return;
     }
 
-    console.log(`\n${'='.repeat(60)}`);
     console.log('🚀 WebRTC 초기화');
-    console.log(`   User: ${user.username}`);
-    console.log(`   Is Host: ${isHost}`);
-    console.log(`${'='.repeat(60)}\n`);
     
     const initializeMedia = async () => {
       try {
-        console.log('🎥 미디어 획득 시작...');
         const stream = await getLocalMedia();
         
         if (!stream) {
@@ -248,52 +272,30 @@ function VideoMeetingRoom() {
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
-          console.log('✅ Local Video Element에 스트림 연결');
         }
 
         setMediaReady(true);
-        console.log('✅ 미디어 준비 완료');
         
-        // ⭐ 약간의 대기 후 폴링 시작 (안정화)
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // 시그널 폴링 시작
-        console.log('📡 시그널 폴링 시작 (1초 간격)');
         signalPollingIntervalRef.current = setInterval(pollSignals, 1000);
         
         if (isHost) {
-          console.log('👑 방장 모드 - 대기 요청 폴링 시작');
-          
-          // 즉시 한 번 실행
           pollPendingRequests();
-          
-          // 1초마다 체크
           pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 1000);
         } else {
-          console.log('👤 참가자 모드');
-          
-          // ⭐ 참가자는 승인된 상태에서만 Join Ready 전송
           if (room.host_username && room.participant_status === 'approved') {
-            console.log(`\n${'🎯'.repeat(30)}`);
-            console.log(`🎯 승인 완료 - Join Ready 전송`);
-            console.log(`   Host: ${room.host_username}`);
-            console.log(`   User: ${user.username}`);
-            console.log(`${'🎯'.repeat(30)}\n`);
-            
-            // ⭐ 여러 번 전송 (안전성 확보)
             const sendJoinReady = async () => {
               try {
                 await sendSignal(room.host_username, 'join_ready', {
                   username: user.username,
                   timestamp: Date.now()
                 });
-                console.log('✅ Join Ready 전송 완료');
               } catch (e) {
                 console.error('❌ Join Ready 전송 실패:', e);
               }
             };
             
-            // 1초, 3초, 5초에 전송 (재시도)
             setTimeout(sendJoinReady, 1000);
             setTimeout(sendJoinReady, 3000);
             setTimeout(sendJoinReady, 5000);
@@ -337,7 +339,6 @@ function VideoMeetingRoom() {
     );
   }
 
-  // ⭐ 승인 대기 중 화면
   if (!isHost && room.participant_status === 'pending') {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-900 text-white">
@@ -363,12 +364,16 @@ function VideoMeetingRoom() {
       isMuted: !isMicOn,
       isVideoOff: !isVideoOn,
       ref: localVideoRef,
+      isHandRaised: raiseHand.isHandRaised, // ⭐ 추가
     },
-    ...remoteStreams,
+    ...remoteStreams.map(rs => ({
+      ...rs,
+      isHandRaised: raiseHand.raisedHands.some(h => h.username === rs.username) // ⭐ 추가
+    })),
   ].filter(v => v.stream || v.isLocal);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-900 flex flex-col relative">
       
       {/* 헤더 */}
       <RoomHeader
@@ -378,6 +383,7 @@ function VideoMeetingRoom() {
         isHost={isHost}
         pendingCount={pendingRequests.length}
         onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
+        screenSharingUser={screenShare.screenSharingUser || room.screen_sharing_username} // ⭐ 추가
       />
 
       {/* 대기 요청 패널 */}
@@ -391,18 +397,106 @@ function VideoMeetingRoom() {
       )}
 
       {/* 비디오 그리드 */}
-      <VideoGrid videos={allVideos} />
+      <VideoGrid 
+        videos={allVideos}
+        HandRaisedBadge={HandRaisedBadge} // ⭐ 추가
+      />
+      
+      {/* ⭐⭐⭐ 반응 오버레이 */}
+      <ReactionsOverlay reactions={reactions.activeReactions} />
+      
+      {/* ⭐⭐⭐ 채팅 패널 */}
+      <ChatPanel
+        isOpen={chat.isChatOpen}
+        messages={chat.messages}
+        loading={chat.loading}
+        currentUser={user}
+        messagesEndRef={chat.messagesEndRef}
+        onSendMessage={chat.sendMessage}
+        onClose={chat.toggleChat}
+      />
       
       {/* 컨트롤 바 */}
-      <ControlBar
-        isMicOn={isMicOn}
-        isVideoOn={isVideoOn}
-        onToggleMic={toggleMic}
-        onToggleVideo={toggleVideo}
-        onLeave={handleLeaveClick} // ⭐ 변경
-      />
+      <div className="bg-gray-800 border-t border-gray-700 px-6 py-3 flex justify-center items-center gap-4">
+        
+        {/* 마이크 */}
+        <button
+          onClick={toggleMic}
+          className={`p-3 rounded-full transition ${
+            isMicOn 
+              ? 'bg-white text-gray-900 hover:bg-gray-200' 
+              : 'bg-red-600 text-white hover:bg-red-700'
+          }`}
+        >
+          {isMicOn ? <span>🎤</span> : <span>🔇</span>}
+        </button>
+        
+        {/* 비디오 */}
+        <button
+          onClick={toggleVideo}
+          className={`p-3 rounded-full transition ${
+            isVideoOn 
+              ? 'bg-white text-gray-900 hover:bg-gray-200' 
+              : 'bg-red-600 text-white hover:bg-red-700'
+          }`}
+        >
+          {isVideoOn ? <span>📹</span> : <span>📴</span>}
+        </button>
+        
+        {/* ⭐⭐⭐ 화면 공유 */}
+        <ScreenShareButton
+          isScreenSharing={screenShare.isScreenSharing}
+          onStart={screenShare.startScreenShare}
+          onStop={screenShare.stopScreenShare}
+          disabled={!!screenShare.screenSharingUser && !screenShare.isScreenSharing}
+        />
+        
+        {/* ⭐⭐⭐ 채팅 */}
+        <ChatToggleButton
+          onClick={chat.toggleChat}
+          unreadCount={chat.unreadCount}
+        />
+        
+        {/* ⭐⭐⭐ 반응 */}
+        <ReactionsButton
+          onSendReaction={reactions.sendReaction}
+        />
+        
+        {/* ⭐⭐⭐ 손들기 */}
+        <div className="relative">
+          <RaiseHandButton
+            isHandRaised={raiseHand.isHandRaised}
+            onRaise={raiseHand.raiseHand}
+            onLower={raiseHand.lowerHand}
+          />
+          
+          {/* 방장용: 손든 사용자 목록 */}
+          {isHost && raiseHand.raisedHands.length > 0 && (
+            <button
+              onClick={() => setShowRaisedHandsPanel(!showRaisedHandsPanel)}
+              className="absolute -top-2 -right-2 bg-yellow-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center"
+            >
+              {raiseHand.raisedHands.length}
+            </button>
+          )}
+          
+          <RaisedHandsPanel
+            raisedHands={raiseHand.raisedHands}
+            isOpen={showRaisedHandsPanel}
+            onClose={() => setShowRaisedHandsPanel(false)}
+          />
+        </div>
+        
+        {/* 나가기 */}
+        <button
+          onClick={handleLeaveClick}
+          className="p-3 bg-red-800 text-white rounded-full hover:bg-red-900 transition"
+        >
+          📞
+        </button>
+      </div>
 
-      {/* ⭐ 방장 퇴장 모달 */}
+      {/* 방장 퇴장 모달 */}
       <HostLeaveModal
         isOpen={showLeaveModal}
         onClose={() => setShowLeaveModal(false)}
