@@ -233,10 +233,14 @@ function VideoMeetingRoom() {
         } else {
           console.log('👤 참가자 모드');
           
+          // ⭐ 참가자는 승인된 상태에서만 Join Ready 전송
           if (room.host_username && room.participant_status === 'approved') {
-            setTimeout(() => {
-              console.log(`📢 Join Ready 전송 → ${room.host_username}`);
-              
+            console.log(`🎯 승인 완료 - Join Ready 전송 준비`);
+            console.log(`   Host: ${room.host_username}`);
+            console.log(`   User: ${user.username}`);
+            
+            // 여러 번 전송 (안전성 확보)
+            const sendJoinReady = () => {
               sendSignal(room.host_username, 'join_ready', {
                 username: user.username,
                 timestamp: Date.now()
@@ -245,7 +249,14 @@ function VideoMeetingRoom() {
               }).catch(e => {
                 console.error('❌ Join Ready 전송 실패:', e);
               });
-            }, 2000);
+            };
+            
+            // 1초 후 첫 전송
+            setTimeout(sendJoinReady, 1000);
+            // 3초 후 재전송
+            setTimeout(sendJoinReady, 3000);
+            // 5초 후 재전송
+            setTimeout(sendJoinReady, 5000);
           }
         }
       } catch (error) {

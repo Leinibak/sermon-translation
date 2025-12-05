@@ -1,4 +1,4 @@
-# backend/video_meetings/views.py (WebSocket 알림 추가)
+# backend/video_meetings/views.py (시그널 처리 개선)
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -7,8 +7,6 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 import json
 
 from .models import VideoRoom, RoomParticipant, SignalMessage
@@ -86,7 +84,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def join_request(self, request, pk=None):
-        """회의 참가 요청 - WebSocket 알림 추가"""
+        """회의 참가 요청"""
         room = self.get_object()
         user = request.user
         
@@ -133,25 +131,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             print(f"   Room: {participant.room.title}")
             print(f"{'='*60}\n")
             
-            # ⭐ WebSocket으로 방장에게 즉시 알림
-            if created:
-                try:
-                    channel_layer = get_channel_layer()
-                    room_group_name = f'video_room_{room.id}'
-                    
-                    async_to_sync(channel_layer.group_send)(
-                        room_group_name,
-                        {
-                            'type': 'join_request_notification',
-                            'participant_id': participant.id,
-                            'username': user.username,
-                            'message': f'{user.username}님이 참가를 요청했습니다.'
-                        }
-                    )
-                    print(f"📢 WebSocket 알림 전송 완료 → {room.host.username}")
-                except Exception as e:
-                    print(f"⚠️ WebSocket 알림 실패: {e}")
-            
             serializer = ParticipantSerializer(participant)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
@@ -166,10 +145,14 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """참가 승인 - WebSocket 알림 추가"""
+        """참가 승인"""
         room = self.get_object()
         
-        print(f"✅ 승인 요청: 방장={request.user.username}")
+        print(f"\n{'='*60}")
+        print(f"✅ 승인 요청")
+        print(f"   방장: {request.user.username}")
+        print(f"   방 ID: {room.id}")
+        print(f"{'='*60}\n")
         
         if room.host != request.user:
             return Response(
@@ -203,39 +186,25 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         
         print(f"✅ 승인 완료: {participant.user.username}")
         
-        # ⭐ 승인 알림 시그널 생성
+        # ⭐ 승인 알림 시그널 생성 (참가자에게 전달)
         try:
             approval_signal = SignalMessage.objects.create(
                 room=room,
-                sender=request.user,
-                receiver=participant.user,
+                sender=request.user,  # 방장
+                receiver=participant.user,  # 참가자
                 message_type='approval',
                 data={
                     'type': 'approval',
                     'approved': True,
-                    'message': 'Your request has been approved'
+                    'message': 'Your request has been approved',
+                    'host_username': request.user.username
                 }
             )
             print(f"📤 승인 시그널 생성: {approval_signal.id}")
+            print(f"   From: {request.user.username}")
+            print(f"   To: {participant.user.username}")
         except Exception as e:
             print(f"⚠️ 승인 시그널 생성 실패: {e}")
-        
-        # ⭐ WebSocket으로 참가자에게 즉시 알림
-        try:
-            channel_layer = get_channel_layer()
-            room_group_name = f'video_room_{room.id}'
-            
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'approval_notification',
-                    'participant_username': participant.user.username,
-                    'message': '참가 요청이 승인되었습니다.'
-                }
-            )
-            print(f"📢 승인 WebSocket 알림 전송 → {participant.user.username}")
-        except Exception as e:
-            print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
@@ -287,14 +256,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         """승인 대기중인 참가 요청 목록"""
         room = self.get_object()
         
-        print(f"\n{'='*60}")
-        print(f"📋 대기 요청 조회 시작")
-        print(f"   방 ID: {room.id}")
-        print(f"   방 제목: {room.title}")
-        print(f"   요청자: {request.user.username}")
-        print(f"   방장 여부: {room.host == request.user}")
-        print(f"{'='*60}\n")
-        
         if room.host != request.user:
             return Response(
                 {'detail': '방장만 조회할 수 있습니다.'},
@@ -302,12 +263,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             )
         
         pending = room.participants.filter(status='pending')
-        print(f"\n⏳ Pending 참가자 수: {pending.count()}")
-        for p in pending:
-            print(f"   - {p.user.username}: {p.status} (ID: {p.id}, Created: {p.created_at})")
-        
-        print(f"{'='*60}\n")
-        
         serializer = ParticipantSerializer(pending, many=True)
         return Response(serializer.data)
     
@@ -316,54 +271,82 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         """WebRTC 신호 전송"""
         room = self.get_object()
         
-        if not room.participants.filter(
-            user=request.user,
-            status='approved'
-        ).exists() and room.host != request.user:
+        # ⭐ 권한 체크 완화 (방장 또는 승인된 참가자)
+        is_authorized = (
+            room.host == request.user or
+            room.participants.filter(user=request.user, status='approved').exists()
+        )
+        
+        if not is_authorized:
             return Response(
                 {'detail': '참가자만 신호를 전송할 수 있습니다.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        serializer = SignalMessageSerializer(data=request.data)
-        if serializer.is_valid():
-            receiver_username = request.data.get('receiver_username')
-            receiver = None
-            if receiver_username:
-                from django.contrib.auth.models import User
-                try:
-                    receiver = User.objects.get(username=receiver_username)
-                except User.DoesNotExist:
-                    pass
-            
-            signal = serializer.save(
+        message_type = request.data.get('message_type')
+        payload = request.data.get('payload')
+        receiver_username = request.data.get('receiver_username')
+        
+        print(f"\n{'='*60}")
+        print(f"📤 시그널 전송 요청")
+        print(f"   Type: {message_type}")
+        print(f"   From: {request.user.username}")
+        print(f"   To: {receiver_username or 'all'}")
+        print(f"{'='*60}\n")
+        
+        # receiver_username으로 User 객체 찾기
+        receiver = None
+        if receiver_username:
+            from django.contrib.auth.models import User
+            try:
+                receiver = User.objects.get(username=receiver_username)
+                print(f"   ✅ Receiver 찾음: {receiver.username}")
+            except User.DoesNotExist:
+                print(f"   ⚠️ Receiver 없음: {receiver_username}")
+        
+        try:
+            signal = SignalMessage.objects.create(
                 room=room,
                 sender=request.user,
-                receiver=receiver
+                receiver=receiver,
+                message_type=message_type,
+                data=json.loads(payload) if isinstance(payload, str) else payload
             )
             
-            print(f"📤 시그널 저장: {signal.message_type} from {request.user.username} to {receiver_username or 'all'}")
+            print(f"✅ 시그널 저장 완료: ID={signal.id}")
             
+            serializer = SignalMessageSerializer(signal)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"❌ 시그널 저장 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'detail': f'시그널 전송 실패: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['get'])
     def get_signals(self, request, pk=None):
         """신호 메시지 조회"""
         room = self.get_object()
         
-        if not room.participants.filter(
-            user=request.user,
-            status='approved'
-        ).exists() and room.host != request.user:
+        # ⭐ 권한 체크 완화
+        is_authorized = (
+            room.host == request.user or
+            room.participants.filter(user=request.user, status='approved').exists()
+        )
+        
+        if not is_authorized:
             return Response(
                 {'detail': '참가자만 신호를 조회할 수 있습니다.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # ⭐ 최근 1시간 이내의 시그널 조회
         since = timezone.now() - timezone.timedelta(hours=1)
         
+        # ⭐ 나에게 직접 보낸 시그널 OR 브로드캐스트 시그널(receiver가 None)
         signals = room.signals.filter(
             Q(receiver=request.user) | Q(receiver__isnull=True),
             created_at__gte=since
@@ -371,9 +354,12 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         
         print(f"\n📩 시그널 조회: {request.user.username}")
         print(f"   총 {signals.count()}개 시그널")
-        for sig in signals[:5]:
-            print(f"   - {sig.message_type} from {sig.sender.username} (ID: {sig.id})")
-        print()
+        
+        # 시그널 타입별 카운트
+        from collections import Counter
+        type_counts = Counter(sig.message_type for sig in signals)
+        for msg_type, count in type_counts.items():
+            print(f"   - {msg_type}: {count}개")
         
         serializer = SignalMessageSerializer(signals, many=True)
         return Response(serializer.data)
