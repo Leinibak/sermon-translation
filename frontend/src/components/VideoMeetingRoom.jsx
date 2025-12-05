@@ -81,7 +81,14 @@ function VideoMeetingRoom() {
     console.log(`   Peer: ${peerId}`);
     console.log(`   Initiator: ${isInitiator}`);
     console.log(`   Current User: ${currentPeerId}`);
+    console.log(`   기존 연결 존재: ${!!peerConnections.current[peerId]}`);
     console.log(`${'='.repeat(60)}\n`);
+    
+    // ⭐ 이미 연결이 있으면 재사용
+    if (peerConnections.current[peerId]) {
+      console.log(`♻️ 기존 Peer Connection 재사용: ${peerId}`);
+      return peerConnections.current[peerId];
+    }
     
     try {
       const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -98,15 +105,35 @@ function VideoMeetingRoom() {
       pc.ontrack = (event) => {
         console.log(`🎥 Remote Track 수신 (${peerId})`, {
           kind: event.track.kind,
-          streamId: event.streams[0]?.id
+          streamId: event.streams[0]?.id,
+          trackId: event.track.id
         });
         
         const remoteStream = event.streams[0];
+        
+        if (!remoteStream) {
+          console.error(`❌ Remote Stream 없음 (${peerId})`);
+          return;
+        }
+        
+        console.log(`📺 Remote Stream 상태 (${peerId}):`, {
+          id: remoteStream.id,
+          active: remoteStream.active,
+          videoTracks: remoteStream.getVideoTracks().length,
+          audioTracks: remoteStream.getAudioTracks().length
+        });
+        
         setRemoteStreams(prev => {
-          const existingPeer = prev.find(p => p.peerId === peerId);
-          if (existingPeer) {
+          const existingIndex = prev.findIndex(p => p.peerId === peerId);
+          
+          if (existingIndex >= 0) {
             console.log(`♻️ 기존 Remote Stream 업데이트: ${peerId}`);
-            return prev.map(p => p.peerId === peerId ? { ...p, stream: remoteStream } : p);
+            const updated = [...prev];
+            updated[existingIndex] = { 
+              ...updated[existingIndex], 
+              stream: remoteStream 
+            };
+            return updated;
           }
           
           console.log(`🆕 새로운 Remote Stream 추가: ${peerId}`);
@@ -125,35 +152,48 @@ function VideoMeetingRoom() {
 
       pc.oniceconnectionstatechange = () => {
         console.log(`🔌 ICE Connection State (${peerId}): ${pc.iceConnectionState}`);
+        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+          console.error(`❌ ICE 연결 실패/끊김 (${peerId})`);
+        }
       };
 
       pc.onconnectionstatechange = () => {
         console.log(`🔗 Connection State (${peerId}): ${pc.connectionState}`);
+        if (pc.connectionState === 'failed') {
+          console.error(`❌ 연결 실패 (${peerId})`);
+        }
       };
 
+      // ⭐ 저장 먼저
       peerConnections.current[peerId] = pc;
-      console.log(`✅ Peer Connection 객체 생성 완료: ${peerId}`);
+      console.log(`✅ Peer Connection 객체 생성 및 저장 완료: ${peerId}`);
 
+      // ⭐ Local Tracks 추가
       if (localStreamRef.current) {
         const tracks = localStreamRef.current.getTracks();
-        console.log(`🎤 Local Tracks 추가 중 (${peerId}):`, tracks.map(t => t.kind));
+        console.log(`🎤 Local Tracks 추가 시작 (${peerId}):`, tracks.map(t => `${t.kind}(${t.id})`));
         
         tracks.forEach(track => {
-          pc.addTrack(track, localStreamRef.current);
-          console.log(`✅ Track 추가: ${track.kind} (${peerId})`);
+          try {
+            const sender = pc.addTrack(track, localStreamRef.current);
+            console.log(`✅ Track 추가 성공: ${track.kind} (${peerId})`, {
+              trackId: track.id,
+              enabled: track.enabled,
+              readyState: track.readyState
+            });
+          } catch (e) {
+            console.error(`❌ Track 추가 실패 (${peerId}):`, e);
+          }
         });
       } else {
-        console.warn(`⚠️ Local Stream 없음 (${peerId})`);
+        console.error(`❌ Local Stream 없음 (${peerId})`);
       }
 
       if (isInitiator) {
-        console.log(`🎬 Initiator 모드: negotiationneeded 이벤트 리스너 등록 (${peerId})`);
-        pc.onnegotiationneeded = async () => {
-          console.log(`\n${'='.repeat(60)}`);
-          console.log(`💬 Negotiation Needed (${peerId})`);
-          console.log(`   Signaling State: ${pc.signalingState}`);
-          console.log(`${'='.repeat(60)}\n`);
-          
+        console.log(`🎬 Initiator 모드: Offer 생성 예약 (${peerId})`);
+        
+        // ⭐ negotiationneeded 대신 직접 Offer 생성
+        setTimeout(async () => {
           if (pc.signalingState !== 'stable') {
             console.warn(`⚠️ Signaling state not stable: ${pc.signalingState}`);
             return;
@@ -161,8 +201,11 @@ function VideoMeetingRoom() {
           
           try {
             console.log(`📝 Offer 생성 중... (${peerId})`);
-            const offer = await pc.createOffer();
-            console.log(`✅ Offer 생성 완료 (${peerId}):`, offer.sdp?.substring(0, 100) + '...');
+            const offer = await pc.createOffer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true
+            });
+            console.log(`✅ Offer 생성 완료 (${peerId})`);
             
             await pc.setLocalDescription(offer);
             console.log(`✅ Local Description 설정 완료 (${peerId})`);
@@ -172,7 +215,7 @@ function VideoMeetingRoom() {
           } catch (e) {
             console.error(`❌ Offer 생성/전송 실패 (${peerId}):`, e);
           }
-        };
+        }, 500); // 0.5초 후 Offer 생성
       }
       
       return pc;
@@ -249,41 +292,76 @@ function VideoMeetingRoom() {
     try {
       switch (type) {
         case 'offer':
-          console.log(`📥 Offer 수신 (${peerId}):`, data);
+          console.log(`📥 Offer 수신 (${peerId})`);
+          console.log(`   Signaling State: ${pc.signalingState}`);
+          
+          if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer') {
+            console.warn(`⚠️ Offer 수신 시 비정상 상태: ${pc.signalingState}`);
+          }
+          
           await pc.setRemoteDescription(new RTCSessionDescription(data));
+          console.log(`✅ Remote Description 설정 완료 (${peerId})`);
+          
           const answer = await pc.createAnswer();
+          console.log(`✅ Answer 생성 완료 (${peerId})`);
+          
           await pc.setLocalDescription(answer);
-          console.log(`📤 Answer 생성 및 전송 (${peerId}):`, pc.localDescription.toJSON());
+          console.log(`✅ Local Description (Answer) 설정 완료 (${peerId})`);
+          
           await sendSignal(peerId, 'answer', pc.localDescription.toJSON());
           console.log(`✅ Answer 전송 완료: ${peerId}`);
           break;
           
         case 'answer':
-          console.log(`📥 Answer 수신 (${peerId}):`, data);
+          console.log(`📥 Answer 수신 (${peerId})`);
+          console.log(`   Signaling State: ${pc.signalingState}`);
+          
+          if (pc.signalingState !== 'have-local-offer') {
+            console.warn(`⚠️ Answer 수신 시 비정상 상태: ${pc.signalingState}`);
+          }
+          
           await pc.setRemoteDescription(new RTCSessionDescription(data));
-          console.log(`✅ Remote Description 설정 완료: ${peerId}`);
+          console.log(`✅ Remote Description (Answer) 설정 완료: ${peerId}`);
           break;
           
         case 'candidate':
-          console.log(`📥 ICE Candidate 수신 (${peerId}):`, data);
+          console.log(`📥 ICE Candidate 수신 (${peerId})`);
           if (data && data.candidate) {
-            await pc.addIceCandidate(new RTCIceCandidate(data));
-            console.log(`✅ ICE Candidate 추가 완료: ${peerId}`);
+            if (pc.remoteDescription) {
+              await pc.addIceCandidate(new RTCIceCandidate(data));
+              console.log(`✅ ICE Candidate 추가 완료: ${peerId}`);
+            } else {
+              console.warn(`⚠️ Remote Description 없어서 ICE Candidate 보류: ${peerId}`);
+              // ICE candidate는 무시해도 연결은 될 수 있음
+            }
           }
           break;
           
         case 'join_ready':
           console.log(`📢 Join Ready 수신 (${peerId})`);
           if (isHost) {
+            console.log(`🤝 방장이 Join Ready 수신 - 피어 연결 시작: ${peerId}`);
+            
             if (!peerConnections.current[peerId]) {
               console.log(`🆕 Join Ready에 대한 Peer Connection 생성: ${peerId}`);
-              const newPc = createPeerConnection(peerId, true);
-              if (newPc) {
-                console.log(`✅ Peer Connection 생성 완료, Offer 생성 대기: ${peerId}`);
-              }
+              createPeerConnection(peerId, true); // 방장이 Initiator
             } else {
-              console.log(`♻️ 기존 Peer Connection 재사용: ${peerId}`);
-              pc.dispatchEvent(new Event('negotiationneeded'));
+              console.log(`♻️ 기존 Peer Connection 존재, Offer 재전송: ${peerId}`);
+              const existingPc = peerConnections.current[peerId];
+              
+              if (existingPc.signalingState === 'stable') {
+                try {
+                  const offer = await existingPc.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                  });
+                  await existingPc.setLocalDescription(offer);
+                  await sendSignal(peerId, 'offer', existingPc.localDescription.toJSON());
+                  console.log(`✅ Offer 재전송 완료: ${peerId}`);
+                } catch (e) {
+                  console.error(`❌ Offer 재전송 실패: ${peerId}`, e);
+                }
+              }
             }
           }
           break;
@@ -393,6 +471,8 @@ function VideoMeetingRoom() {
       console.log(`   Participants: ${roomData.participants?.length || 0}`);
       console.log(`${'='.repeat(60)}\n`);
       
+      const previousStatus = room?.participant_status;
+      
       setRoom(roomData);
 
       const isCurrentUserHost = roomData.host_username === user.username;
@@ -408,16 +488,18 @@ function VideoMeetingRoom() {
       
       if (!isCurrentUserHost) {
         const status = roomData.participant_status;
+        
+        // ⭐ 승인 상태가 변경되었을 때만 처리
+        if (previousStatus !== 'approved' && status === 'approved') {
+          console.log('🎉 승인 완료! 미디어 초기화를 트리거합니다.');
+          // mediaReady를 false로 설정하여 useEffect 재실행
+          setMediaReady(false);
+        }
+        
         if (status === 'rejected') {
           alert('참가 요청이 거부되었습니다.');
           navigate('/video-meetings');
           return;
-        }
-        if (status !== 'approved') {
-          if (status === 'pending') {
-            console.log('⏳ 승인 대기 중...');
-          }
-          return; 
         }
       }
     } catch (error) {
@@ -430,7 +512,7 @@ function VideoMeetingRoom() {
     } finally {
       setLoading(false);
     }
-  }, [id, user, navigate]);
+  }, [id, user, navigate, room?.participant_status]);
 
   // ⭐ fetchRoomDetails를 ref에 저장
   useEffect(() => {
@@ -584,44 +666,59 @@ function VideoMeetingRoom() {
     console.log(`   Is Host: ${isHost}`);
     console.log(`   Room: ${room.title}`);
     console.log(`   Participant Status: ${room.participant_status}`);
+    console.log(`   Media Ready: ${mediaReady}`);
     console.log(`${'='.repeat(60)}\n`);
     
-    getLocalMedia().then(stream => {
+    const initializeMedia = async () => {
+      const stream = await getLocalMedia();
       if (!stream) {
         console.error('❌ 미디어 스트림 획득 실패');
         return;
       }
 
-      console.log('✅ 미디어 스트림 준비 완료, 시그널 폴링 시작');
-
+      console.log('✅ 미디어 스트림 준비 완료');
+      console.log(`   Video Tracks: ${stream.getVideoTracks().length}`);
+      console.log(`   Audio Tracks: ${stream.getAudioTracks().length}`);
+      
+      // 시그널 폴링 시작
+      console.log('📡 시그널 폴링 시작');
       signalPollingIntervalRef.current = setInterval(pollSignals, 1000);
       
       if (isHost) {
+        console.log('👑 방장 모드 초기화');
         pollPendingRequests();
         pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 2000);
         
         const approvedParticipants = room.participants.filter(p => p.status === 'approved');
-        console.log(`👥 이미 승인된 참가자 ${approvedParticipants.length}명과 연결 시작`);
+        console.log(`👥 이미 승인된 참가자 ${approvedParticipants.length}명과 연결 준비`);
         
-        approvedParticipants.forEach((participant, index) => {
-          if (participant.username && participant.username !== user.username) {
-            setTimeout(() => {
-              console.log(`🤝 기존 참가자와 연결 (${index + 1}/${approvedParticipants.length}): ${participant.username}`);
-              createPeerConnection(participant.username, true);
-            }, 500 * (index + 1));
-          }
+        // 이미 승인된 참가자들은 join_ready를 보낼 것이므로 대기
+        approvedParticipants.forEach(p => {
+          console.log(`   - 대기 중: ${p.username}`);
         });
+      } else {
+        // ⭐ 참가자는 미디어 준비 후 join_ready 전송
+        console.log('👤 참가자 모드 초기화');
+        console.log(`   Host: ${room.host_username}`);
+        
+        if (room.host_username && room.participant_status === 'approved') {
+          // 충분한 시간을 주고 join_ready 전송
+          setTimeout(() => {
+            console.log('\n📢 Join Ready 시그널 전송 시도');
+            console.log(`   To: ${room.host_username}`);
+            console.log(`   From: ${user.username}`);
+            sendSignal(room.host_username, 'join_ready', {
+              username: user.username,
+              timestamp: Date.now()
+            });
+            console.log('✅ Join Ready 전송 완료\n');
+          }, 2000); // 2초 후 전송
+        }
       }
-      
-      // ⭐ 참가자는 승인 후 join_ready 시그널 전송
-      if (!isHost && room.host_username && room.participant_status === 'approved') {
-        setTimeout(() => {
-          console.log('📢 Join Ready 시그널 전송 (Host에게)');
-          sendSignal(room.host_username, 'join_ready');
-        }, 1500); // 1.5초 후 전송 (미디어 준비 시간 확보)
-      }
-    });
-  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, pollPendingRequests, sendSignal, createPeerConnection]);
+    };
+    
+    initializeMedia();
+  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, pollPendingRequests, sendSignal]);
 
   // =========================================================================
   // 4. UI Rendering
