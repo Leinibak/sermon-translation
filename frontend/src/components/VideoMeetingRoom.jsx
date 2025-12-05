@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingRoom.jsx (리팩토링 버전)
+// frontend/src/components/VideoMeetingRoom.jsx (폴링 개선 버전)
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
@@ -88,6 +88,7 @@ function VideoMeetingRoom() {
   const handleApprove = async (participantId) => {
     try {
       await api.approveParticipant(participantId);
+      console.log('✅ 승인 완료, 패널 업데이트');
     } catch (error) {
       alert('참가 승인에 실패했습니다.');
     }
@@ -96,6 +97,7 @@ function VideoMeetingRoom() {
   const handleReject = async (participantId) => {
     try {
       await api.rejectParticipant(participantId);
+      console.log('✅ 거부 완료, 패널 업데이트');
     } catch (error) {
       alert('참가 거부에 실패했습니다.');
     }
@@ -109,7 +111,6 @@ function VideoMeetingRoom() {
     const signals = await api.pollSignals();
     
     if (signals === null) {
-      // 폴링 중단
       clearInterval(signalPollingIntervalRef.current);
       return;
     }
@@ -128,8 +129,17 @@ function VideoMeetingRoom() {
     
     const pending = await api.fetchPendingRequests();
     
-    if (pending.length > 0 && !showPendingPanel) {
-      setShowPendingPanel(true);
+    // ⭐ 새로운 대기 요청이 있으면 자동으로 패널 표시
+    if (pending.length > 0) {
+      console.log(`🔔 ${pending.length}개의 대기 요청 발견!`);
+      if (!showPendingPanel) {
+        console.log('📢 대기 패널 자동 표시');
+        setShowPendingPanel(true);
+      }
+    } else if (pending.length === 0 && showPendingPanel) {
+      // 대기 요청이 없으면 패널 자동 닫기 (선택사항)
+      console.log('✅ 모든 요청 처리 완료 - 패널 닫기');
+      setShowPendingPanel(false);
     }
   };
 
@@ -155,7 +165,6 @@ function VideoMeetingRoom() {
             return;
           }
           
-          // 승인 상태 변경 감지
           if (room && room.participant_status !== 'approved' && status === 'approved') {
             console.log('🎉 승인 완료! 미디어 초기화 트리거');
             setMediaReady(false);
@@ -202,7 +211,6 @@ function VideoMeetingRoom() {
           return;
         }
 
-        // 로컬 비디오에 연결
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
@@ -211,17 +219,20 @@ function VideoMeetingRoom() {
         console.log('✅ 미디어 준비 완료');
         
         // 시그널 폴링 시작
-        console.log('📡 시그널 폴링 시작');
+        console.log('📡 시그널 폴링 시작 (1초 간격)');
         signalPollingIntervalRef.current = setInterval(pollSignals, 1000);
         
         if (isHost) {
-          console.log('👑 방장 모드');
+          console.log('👑 방장 모드 - 대기 요청 폴링 시작 (1초 간격)');
+          
+          // ⭐ 즉시 한 번 실행
           pollPendingRequests();
-          pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 2000);
+          
+          // ⭐ 1초마다 체크 (더 빠르게)
+          pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 1000);
         } else {
           console.log('👤 참가자 모드');
           
-          // 참가자는 join_ready 전송
           if (room.host_username && room.participant_status === 'approved') {
             setTimeout(() => {
               console.log(`📢 Join Ready 전송 → ${room.host_username}`);
@@ -244,7 +255,6 @@ function VideoMeetingRoom() {
     
     initializeMedia();
     
-    // Cleanup
     return () => {
       if (signalPollingIntervalRef.current) {
         clearInterval(signalPollingIntervalRef.current);
@@ -275,7 +285,6 @@ function VideoMeetingRoom() {
     );
   }
 
-  // 비디오 목록 구성
   const allVideos = [
     {
       peerId: user?.username,
