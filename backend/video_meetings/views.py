@@ -1,4 +1,4 @@
-# backend/video_meetings/views.py (수정)
+# backend/video_meetings/views.py (수정 버전)
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -112,7 +112,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             elif existing.status == 'pending':
-                # 이미 대기중이면 기존 객체 반환
                 serializer = ParticipantSerializer(existing)
                 return Response(serializer.data, status=status.HTTP_200_OK)
         
@@ -264,7 +263,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # pending 상태만 필터링
         pending = room.participants.filter(status='pending')
         print(f"\n⏳ Pending 참가자 수: {pending.count()}")
         for p in pending:
@@ -301,18 +299,21 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 except User.DoesNotExist:
                     pass
             
-            serializer.save(
+            signal = serializer.save(
                 room=room,
                 sender=request.user,
                 receiver=receiver
             )
+            
+            print(f"📤 시그널 저장: {signal.message_type} from {request.user.username} to {receiver_username or 'all'}")
+            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['get'])
     def get_signals(self, request, pk=None):
-        """신호 메시지 조회"""
+        """신호 메시지 조회 - 최근 1시간 이내"""
         room = self.get_object()
         
         if not room.participants.filter(
@@ -324,12 +325,20 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 최근 1시간 이내의 시그널만 조회
+        # ⭐ 최근 1시간 이내의 시그널 조회
         since = timezone.now() - timezone.timedelta(hours=1)
+        
+        # ⭐ 나에게 직접 보낸 시그널 OR 브로드캐스트 시그널(receiver가 None)
         signals = room.signals.filter(
             Q(receiver=request.user) | Q(receiver__isnull=True),
             created_at__gte=since
         ).order_by('created_at')
+        
+        print(f"\n📩 시그널 조회: {request.user.username}")
+        print(f"   총 {signals.count()}개 시그널")
+        for sig in signals[:5]:  # 최근 5개만 출력
+            print(f"   - {sig.message_type} from {sig.sender.username} (ID: {sig.id})")
+        print()
         
         serializer = SignalMessageSerializer(signals, many=True)
         return Response(serializer.data)

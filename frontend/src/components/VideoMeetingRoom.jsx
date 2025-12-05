@@ -184,7 +184,7 @@ function VideoMeetingRoom() {
 
   // ⭐ handleSignalMessage에서 fetchRoomDetailsRef 사용
   const handleSignalMessage = useCallback(async (message) => {
-    const { id: signalId, sender_username: peerId, message_type: type, payload } = message;
+    const { id: signalId, sender_username: peerId, message_type: type, payload, receiver_username } = message;
     
     if (processedSignals.current.has(signalId)) {
       return;
@@ -192,12 +192,20 @@ function VideoMeetingRoom() {
     
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📨 시그널 수신: ${type} from ${peerId} (ID: ${signalId})`);
+    console.log(`   Receiver: ${receiver_username}`);
     console.log(`   Current User: ${currentPeerId}`);
     console.log(`   Is Host: ${isHost}`);
     console.log(`${'='.repeat(60)}\n`);
     
     if (peerId === currentPeerId) {
       console.log('⚠️ 자신의 시그널 무시');
+      processedSignals.current.add(signalId);
+      return;
+    }
+
+    // ⭐ 특정 수신자 지정된 시그널은 해당 수신자만 처리
+    if (receiver_username && receiver_username !== currentPeerId) {
+      console.log(`⚠️ 다른 사용자를 위한 시그널 무시 (to: ${receiver_username})`);
       processedSignals.current.add(signalId);
       return;
     }
@@ -217,7 +225,7 @@ function VideoMeetingRoom() {
       processedSignals.current.add(signalId);
       // ref를 통해 호출
       if (fetchRoomDetailsRef.current) {
-        fetchRoomDetailsRef.current();
+        await fetchRoomDetailsRef.current();
       }
       return;
     }
@@ -517,18 +525,15 @@ function VideoMeetingRoom() {
       setPendingRequests(prev => prev.filter(p => p.id !== participantId));
       setParticipants(prev => [...prev, approvedParticipant]);
       
-      fetchRoomDetails();
+      // ⭐ 회의실 정보 새로고침 (participant_count 업데이트)
+      await fetchRoomDetails();
       
+      // ⭐ 승인된 참가자와 피어 연결 시작 (방장이 Offer 생성)
       const participantUsername = approvedParticipant.username;
       if (participantUsername && !peerConnections.current[participantUsername]) {
-        console.log(`🤝 승인된 참가자와 피어 연결 시작: ${participantUsername}`);
-        
-        setTimeout(() => {
-          const pc = createPeerConnection(participantUsername, true);
-          if (pc) {
-            console.log(`📡 Peer Connection 생성 완료, Offer 대기 중: ${participantUsername}`);
-          }
-        }, 1000);
+        console.log(`🤝 승인된 참가자와 피어 연결 대기: ${participantUsername}`);
+        console.log(`   참가자가 join_ready를 보낼 때까지 대기합니다.`);
+        // join_ready 시그널을 받으면 자동으로 연결 시작됨
       }
     } catch (error) {
       console.error('❌ 참가 승인 실패:', error);
@@ -578,6 +583,7 @@ function VideoMeetingRoom() {
     console.log(`   User: ${user.username}`);
     console.log(`   Is Host: ${isHost}`);
     console.log(`   Room: ${room.title}`);
+    console.log(`   Participant Status: ${room.participant_status}`);
     console.log(`${'='.repeat(60)}\n`);
     
     getLocalMedia().then(stream => {
@@ -607,11 +613,12 @@ function VideoMeetingRoom() {
         });
       }
       
-      if (!isHost && room.host_username) {
+      // ⭐ 참가자는 승인 후 join_ready 시그널 전송
+      if (!isHost && room.host_username && room.participant_status === 'approved') {
         setTimeout(() => {
           console.log('📢 Join Ready 시그널 전송 (Host에게)');
           sendSignal(room.host_username, 'join_ready');
-        }, 1000);
+        }, 1500); // 1.5초 후 전송 (미디어 준비 시간 확보)
       }
     });
   }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, pollPendingRequests, sendSignal, createPeerConnection]);
@@ -659,7 +666,7 @@ function VideoMeetingRoom() {
             <h1 className="text-white text-xl font-bold">{room?.title}</h1>
             <div className="flex items-center gap-4 text-sm">
               <span className="text-gray-400">
-                {(isHost ? 1 : 0) + participants.length}명 참가 중
+                {allVideos.length}명 참가 중
               </span>
             </div>
           </div>
