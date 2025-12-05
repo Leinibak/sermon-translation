@@ -23,6 +23,7 @@ backend/static/
 backend/staticfiles/
 *.env.* 
 *copy*
+frontend/src/components/*old.jsx
 
 # Django
 *.log
