@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
+import json
 
 from .models import VideoRoom, RoomParticipant, SignalMessage
 from .serializers import (
@@ -131,18 +132,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             print(f"   Room: {participant.room.title}")
             print(f"{'='*60}\n")
             
-            # DB에 실제로 저장되었는지 확인
-            saved_participant = RoomParticipant.objects.filter(
-                room=room, 
-                user=user,
-                status='pending'
-            ).first()
-            
-            if saved_participant:
-                print(f"✅ DB 확인: 참가자가 정상적으로 저장됨 (ID: {saved_participant.id})")
-            else:
-                print(f"❌ DB 확인: 참가자를 찾을 수 없음!")
-            
             serializer = ParticipantSerializer(participant)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
@@ -160,7 +149,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         """참가 승인"""
         room = self.get_object()
         
-        print(f"✅ 승인 요청: 방장={request.user.username}")  # 디버깅
+        print(f"✅ 승인 요청: 방장={request.user.username}")
         
         if room.host != request.user:
             return Response(
@@ -192,7 +181,24 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.joined_at = timezone.now()
         participant.save()
         
-        print(f"✅ 승인 완료: {participant.user.username}")  # 디버깅
+        print(f"✅ 승인 완료: {participant.user.username}")
+        
+        # ⭐ 승인 알림 시그널 생성 (참가자에게 전달)
+        try:
+            approval_signal = SignalMessage.objects.create(
+                room=room,
+                sender=request.user,  # 방장
+                receiver=participant.user,  # 참가자
+                message_type='approval',
+                data={
+                    'type': 'approval',
+                    'approved': True,
+                    'message': 'Your request has been approved'
+                }
+            )
+            print(f"📤 승인 시그널 생성: {approval_signal.id}")
+        except Exception as e:
+            print(f"⚠️ 승인 시그널 생성 실패: {e}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
@@ -258,12 +264,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 전체 참가자 확인
-        all_participants = room.participants.all()
-        print(f"📊 전체 참가자 수: {all_participants.count()}")
-        for p in all_participants:
-            print(f"   - {p.user.username}: {p.status} (ID: {p.id})")
-        
         # pending 상태만 필터링
         pending = room.participants.filter(status='pending')
         print(f"\n⏳ Pending 참가자 수: {pending.count()}")
@@ -291,9 +291,20 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         
         serializer = SignalMessageSerializer(data=request.data)
         if serializer.is_valid():
+            # receiver_username으로 User 객체 찾기
+            receiver_username = request.data.get('receiver_username')
+            receiver = None
+            if receiver_username:
+                from django.contrib.auth.models import User
+                try:
+                    receiver = User.objects.get(username=receiver_username)
+                except User.DoesNotExist:
+                    pass
+            
             serializer.save(
                 room=room,
-                sender=request.user
+                sender=request.user,
+                receiver=receiver
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
@@ -313,11 +324,12 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # 최근 1시간 이내의 시그널만 조회
         since = timezone.now() - timezone.timedelta(hours=1)
         signals = room.signals.filter(
             Q(receiver=request.user) | Q(receiver__isnull=True),
             created_at__gte=since
-        )
+        ).order_by('created_at')
         
         serializer = SignalMessageSerializer(signals, many=True)
         return Response(serializer.data)

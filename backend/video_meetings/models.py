@@ -143,7 +143,8 @@ class SignalMessage(models.Model):
     MESSAGE_TYPES = [
         ('offer', 'Offer'),
         ('answer', 'Answer'),
-        ('ice-candidate', 'ICE Candidate'),
+        ('candidate', 'ICE Candidate'),
+        ('approval', 'Approval'),  # ⭐ 추가
     ]
     
     room = models.ForeignKey(

@@ -129,6 +129,14 @@ function VideoMeetingRoom() {
 
     let pc = peerConnections.current[peerId];
     
+    // ⭐ approval 시그널 처리 (참가자가 받음)
+    if (type === 'approval' && !isHost) {
+      console.log('🎉 승인 알림 수신! 방장과 연결을 기다립니다.');
+      // 방장이 Offer를 보낼 때까지 대기
+      // 필요시 화면에 "승인됨" 메시지 표시
+      return;
+    }
+    
     if (!pc) {
       pc = createPeerConnection(peerId, false);
       if (!pc) return;
@@ -368,17 +376,33 @@ function VideoMeetingRoom() {
   // ⭐ 참가 승인/거부 함수 추가
   const handleApprove = async (participantId) => {
     try {
-      await axios.post(`/video-meetings/${id}/approve_participant/`, {
+      const response = await axios.post(`/video-meetings/${id}/approve_participant/`, {
         participant_id: participantId
       });
       
-      console.log(`✅ 참가 승인 완료: ${participantId}`);
+      const approvedParticipant = response.data;
+      console.log(`✅ 참가 승인 완료:`, approvedParticipant);
       
       // 대기 목록에서 제거
       setPendingRequests(prev => prev.filter(p => p.id !== participantId));
       
       // 참가자 목록 새로고침
       fetchRoomDetails();
+      
+      // ⭐ 승인된 참가자와 피어 연결 시작 (방장이 Offer 생성)
+      const participantUsername = approvedParticipant.username;
+      if (participantUsername && !peerConnections.current[participantUsername]) {
+        console.log(`🤝 승인된 참가자와 피어 연결 시작: ${participantUsername}`);
+        
+        // 약간의 지연 후 연결 시작 (참가자가 준비될 시간)
+        setTimeout(() => {
+          const pc = createPeerConnection(participantUsername, true);
+          if (pc) {
+            // negotiationneeded 이벤트가 자동으로 Offer를 생성함
+            console.log(`📡 Peer Connection 생성 완료, Offer 대기 중: ${participantUsername}`);
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error('❌ 참가 승인 실패:', error);
       alert('참가 승인에 실패했습니다.');
@@ -432,6 +456,19 @@ function VideoMeetingRoom() {
       if (isHost) {
         pollPendingRequests(); // 즉시 한 번 실행
         pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 2000);
+        
+        // ⭐ 이미 승인된 참가자들과 연결 시작
+        const approvedParticipants = room.participants.filter(p => p.status === 'approved');
+        console.log(`👥 이미 승인된 참가자 ${approvedParticipants.length}명과 연결 시작`);
+        
+        approvedParticipants.forEach(participant => {
+          if (participant.username && participant.username !== user.username) {
+            setTimeout(() => {
+              console.log(`🤝 기존 참가자와 연결: ${participant.username}`);
+              createPeerConnection(participant.username, true);
+            }, 500);
+          }
+        });
       }
       
       // Host가 아닌 경우 join_ready 시그널 전송
@@ -440,7 +477,7 @@ function VideoMeetingRoom() {
         sendSignal(room.host_username, 'join_ready');
       }
     });
-  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, sendSignal, pollPendingRequests]);
+  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, sendSignal, pollPendingRequests, createPeerConnection]);
 
   // =========================================================================
   // 4. UI Rendering
