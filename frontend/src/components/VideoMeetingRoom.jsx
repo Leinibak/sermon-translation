@@ -631,7 +631,7 @@ function VideoMeetingRoom() {
         }, 1000);
       }
     });
-  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, sendSignal, pollPendingRequests, createPeerConnection]);
+  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, pollPendingRequests, sendSignal, createPeerConnection]);
 
   // =========================================================================
   // 4. UI Rendering
