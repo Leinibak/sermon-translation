@@ -1,7 +1,8 @@
-# backend/video_meetings/serializers.py
+# backend/video_meetings/serializers.py (수정 버전)
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import VideoRoom, RoomParticipant, SignalMessage
+import json
 
 class ParticipantSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
@@ -16,14 +17,14 @@ class VideoRoomListSerializer(serializers.ModelSerializer):
     host_username = serializers.CharField(source='host.username', read_only=True)
     participant_count = serializers.SerializerMethodField()
     is_host = serializers.SerializerMethodField()
-    participant_status = serializers.SerializerMethodField()  # ✅ 추가
+    participant_status = serializers.SerializerMethodField()
     
     class Meta:
         model = VideoRoom
         fields = [
             'id', 'title', 'description', 'host', 'host_username',
             'status', 'max_participants', 'participant_count',
-            'scheduled_time', 'started_at', 'is_host', 'participant_status',  # ✅ 추가
+            'scheduled_time', 'started_at', 'is_host', 'participant_status',
             'created_at'
         ]
     
@@ -112,11 +113,21 @@ class SignalMessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
     receiver_username = serializers.CharField(source='receiver.username', read_only=True)
     
+    # ⭐⭐⭐ payload 필드 추가: data를 JSON 문자열로 변환하여 반환
+    payload = serializers.SerializerMethodField()
+    
     class Meta:
         model = SignalMessage
         fields = [
             'id', 'room', 'sender', 'sender_username',
             'receiver', 'receiver_username', 'message_type',
-            'data', 'created_at'
+            'data', 'payload',  # ⭐ payload 필드 추가
+            'created_at'
         ]
         read_only_fields = ['id', 'sender', 'created_at']
+    
+    def get_payload(self, obj):
+        """data 필드를 JSON 문자열로 변환"""
+        if obj.data:
+            return json.dumps(obj.data)
+        return json.dumps({})  # ⭐ 빈 객체 반환 (undefined 방지)

@@ -1,4 +1,4 @@
-# backend/video_meetings/views.py (개선 버전)
+# backend/video_meetings/views.py (수정 버전)
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -61,7 +61,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
-        """회의 시작 (수동 시작용 - 예비)"""
+        """회의 시작"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -142,7 +142,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             
             print(f"✅ 참가 요청 생성: {participant.id}")
             
-            # ⭐⭐⭐ WebSocket을 통해 방장에게 즉시 알림 전송
+            # WebSocket을 통해 방장에게 즉시 알림 전송
             channel_layer = get_channel_layer()
             room_group_name = f'video_room_{room.id}'
             
@@ -215,7 +215,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         
         print(f"✅ 승인 완료: {participant.user.username}")
         
-        # ⭐⭐⭐ WebSocket을 통해 참가자에게 즉시 승인 알림 전송
+        # WebSocket을 통해 참가자에게 즉시 승인 알림 전송
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -254,7 +254,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.status = 'rejected'
         participant.save()
         
-        # ⭐ WebSocket 알림 전송 (선택사항)
+        # WebSocket 알림 전송
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -330,7 +330,24 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         print(f"   Type: {message_type}")
         print(f"   From: {request.user.username}")
         print(f"   To: {receiver_username or 'all'}")
+        print(f"   Payload Type: {type(payload)}")
+        print(f"   Payload: {str(payload)[:100]}...")
         print(f"{'='*60}\n")
+        
+        # ⭐⭐⭐ 핵심 수정: payload가 None이거나 'undefined' 문자열인 경우 처리
+        if payload is None or payload == 'undefined' or payload == '':
+            print(f"⚠️ Payload가 비어있음 - 빈 객체로 설정")
+            payload = {}
+        
+        # ⭐⭐⭐ payload가 문자열이면 파싱 시도, 아니면 그대로 사용
+        if isinstance(payload, str):
+            try:
+                payload_data = json.loads(payload)
+            except json.JSONDecodeError:
+                print(f"⚠️ Payload JSON 파싱 실패 - 빈 객체로 설정")
+                payload_data = {}
+        else:
+            payload_data = payload
         
         receiver = None
         if receiver_username:
@@ -346,7 +363,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 sender=request.user,
                 receiver=receiver,
                 message_type=message_type,
-                data=json.loads(payload) if isinstance(payload, str) else payload
+                data=payload_data  # ⭐ 이미 파싱된 딕셔너리 저장
             )
             
             print(f"✅ 시그널 저장 완료: ID={signal.id}")
