@@ -1,4 +1,4 @@
-// frontend/src/hooks/useWebRTC.js (수정 버전)
+// frontend/src/hooks/useWebRTC.js (개선 버전)
 import { useState, useRef, useCallback } from 'react';
 import axios from '../api/axios';
 
@@ -44,8 +44,8 @@ export function useWebRTC(roomId, currentUser, isHost) {
       localStreamRef.current = stream;
       
       console.log('✅ 미디어 준비 완료');
-      console.log(`   Video: ${stream.getVideoTracks().length}`);
-      console.log(`   Audio: ${stream.getAudioTracks().length}`);
+      console.log(`   Video tracks: ${stream.getVideoTracks().length}`);
+      console.log(`   Audio tracks: ${stream.getAudioTracks().length}`);
       
       return stream;
     } catch (err) {
@@ -74,7 +74,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
 
     try {
       const response = await axios.post(`/video-meetings/${roomId}/send_signal/`, message);
-      console.log(`✅ 시그널 전송 성공 (${type}):`, response.data.id);
+      console.log(`✅ 시그널 전송 성공 (${type})`);
       return response.data;
     } catch (err) {
       console.error(`❌ Signal 전송 실패 (${type}):`, err);
@@ -94,134 +94,139 @@ export function useWebRTC(roomId, currentUser, isHost) {
     console.log(`   Current User: ${currentUser?.username}`);
     console.log(`${'='.repeat(60)}\n`);
     
-    // 기존 연결 확인
+    // ⭐ 기존 연결 확인 및 재사용
     const existing = peerConnections.current[peerId];
     if (existing) {
       const state = existing.connectionState;
       console.log(`♻️ 기존 연결 상태: ${state}`);
       
-      if (state === 'connected') {
-        console.log('✅ 이미 연결됨 - 재사용');
+      if (state === 'connected' || state === 'connecting') {
+        console.log('✅ 기존 연결 재사용');
         return existing;
-      } else if (state === 'connecting') {
-        console.log('⏳ 연결 중 - 대기');
-        return existing;
-      } else {
-        console.log('🗑️ 기존 연결 정리');
-        try {
-          existing.close();
-        } catch (e) {
-          console.error('연결 종료 중 오류:', e);
-        }
-        delete peerConnections.current[peerId];
       }
+      
+      console.log('🗑️ 기존 연결 정리');
+      try {
+        existing.close();
+      } catch (e) {
+        console.error('연결 종료 오류:', e);
+      }
+      delete peerConnections.current[peerId];
     }
     
     try {
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // ⭐ Local Tracks 먼저 추가 (연결 전)
+      // ⭐⭐⭐ 1단계: Local Tracks 먼저 추가
       if (localStreamRef.current) {
         const tracks = localStreamRef.current.getTracks();
-        console.log(`🎤 Local Tracks 추가 (${peerId}):`, tracks.map(t => t.kind));
+        console.log(`🎤 Local Tracks 추가 (${peerId}):`, tracks.map(t => `${t.kind}:${t.id}`));
         
         tracks.forEach(track => {
           try {
-            pc.addTrack(track, localStreamRef.current);
-            console.log(`✅ ${track.kind} track 추가 완료`);
+            const sender = pc.addTrack(track, localStreamRef.current);
+            console.log(`✅ ${track.kind} track 추가: ${track.id}`);
+            console.log(`   Sender ID: ${sender.track.id}`);
           } catch (e) {
             console.error(`❌ Track 추가 실패:`, e);
+          }
+        });
+        
+        // Track 추가 확인
+        const senders = pc.getSenders();
+        console.log(`📊 Total Senders: ${senders.length}`);
+        senders.forEach(s => {
+          if (s.track) {
+            console.log(`   - ${s.track.kind}: ${s.track.id}`);
           }
         });
       } else {
         console.error(`❌ Local Stream 없음!`);
       }
 
-      // ICE Candidate 이벤트
+      // ⭐⭐⭐ 2단계: 이벤트 핸들러 설정
+      
+      // ICE Candidate
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(`📡 ICE Candidate (${peerId}):`, event.candidate.candidate.substring(0, 50) + '...');
+          console.log(`📡 ICE Candidate (${peerId})`);
           sendSignal(peerId, 'candidate', event.candidate.toJSON());
         } else {
           console.log(`✅ ICE Gathering 완료 (${peerId})`);
         }
       };
 
-      // Remote Track 이벤트
+      // ⭐⭐⭐ Remote Track - 가장 중요!
       pc.ontrack = (event) => {
-        console.log(`\n${'='.repeat(60)}`);
+        console.log(`\n${'🎉'.repeat(20)}`);
         console.log(`🎥 Remote Track 수신!`);
         console.log(`   From: ${peerId}`);
         console.log(`   Kind: ${event.track.kind}`);
+        console.log(`   Track ID: ${event.track.id}`);
+        console.log(`   Track State: ${event.track.readyState}`);
         console.log(`   Streams: ${event.streams.length}`);
-        console.log(`${'='.repeat(60)}\n`);
         
-        const remoteStream = event.streams[0];
-        
-        if (!remoteStream) {
-          console.error(`❌ Remote Stream 없음`);
-          return;
-        }
-
-        console.log(`📺 Remote Stream ID: ${remoteStream.id}`);
-        console.log(`   Tracks: ${remoteStream.getTracks().map(t => t.kind).join(', ')}`);
-        
-        setRemoteStreams(prev => {
-          const existingIndex = prev.findIndex(p => p.peerId === peerId);
+        if (event.streams.length > 0) {
+          const remoteStream = event.streams[0];
+          console.log(`   Stream ID: ${remoteStream.id}`);
+          console.log(`   Stream Tracks: ${remoteStream.getTracks().map(t => `${t.kind}:${t.id}`).join(', ')}`);
           
-          if (existingIndex >= 0) {
-            console.log(`♻️ Remote Stream 업데이트: ${peerId}`);
-            const updated = [...prev];
-            updated[existingIndex] = { 
-              ...updated[existingIndex], 
-              stream: remoteStream 
-            };
-            return updated;
-          }
-          
-          console.log(`🆕 Remote Stream 추가: ${peerId}`);
-          return [
-            ...prev, 
-            { 
-              peerId, 
-              username: peerId,
-              stream: remoteStream,
-              isMuted: false,
-              isVideoOff: false
+          // ⭐ Remote Stream 상태 업데이트
+          setRemoteStreams(prev => {
+            const existingIndex = prev.findIndex(p => p.peerId === peerId);
+            
+            if (existingIndex >= 0) {
+              console.log(`♻️ Remote Stream 업데이트: ${peerId}`);
+              const updated = [...prev];
+              updated[existingIndex] = { 
+                ...updated[existingIndex], 
+                stream: remoteStream 
+              };
+              return updated;
             }
-          ];
-        });
+            
+            console.log(`🆕 Remote Stream 추가: ${peerId}`);
+            return [
+              ...prev, 
+              { 
+                peerId, 
+                username: peerId,
+                stream: remoteStream,
+                isMuted: false,
+                isVideoOff: false
+              }
+            ];
+          });
+        } else {
+          console.error(`❌ Remote Stream 없음!`);
+        }
+        
+        console.log(`${'🎉'.repeat(20)}\n`);
       };
 
-      // ICE Connection State 변경
+      // ICE Connection State
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
         console.log(`🔌 ICE State (${peerId}): ${state}`);
         
         setConnectionStatus(prev => ({...prev, [peerId]: state}));
         
-        if (state === 'failed' || state === 'disconnected') {
-          console.error(`❌ ICE 연결 실패/중단 (${peerId})`);
-          setTimeout(() => {
-            if (pc.restartIce) {
-              console.log(`🔄 ICE 재시작 시도 (${peerId})`);
-              pc.restartIce();
-            }
-          }, 1000);
-        } else if (state === 'connected') {
+        if (state === 'connected') {
           console.log(`✅✅✅ ICE 연결 성공! (${peerId})`);
+        } else if (state === 'failed' || state === 'disconnected') {
+          console.error(`❌ ICE 연결 문제 (${peerId}): ${state}`);
         }
       };
 
-      // Connection State 변경
+      // Connection State
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
         console.log(`🔗 Connection State (${peerId}): ${state}`);
         
         if (state === 'connected') {
-          console.log(`\n${'🎉'.repeat(20)}`);
+          console.log(`\n${'🎊'.repeat(20)}`);
           console.log(`   ✅✅✅ Peer 연결 완료! (${peerId})`);
-          console.log(`${'🎉'.repeat(20)}\n`);
+          console.log(`${'🎊'.repeat(20)}\n`);
         } else if (state === 'failed') {
           console.error(`❌ Peer 연결 실패 (${peerId})`);
         }
@@ -230,11 +235,11 @@ export function useWebRTC(roomId, currentUser, isHost) {
       // 저장
       peerConnections.current[peerId] = pc;
 
-      // ⭐ Initiator가 Offer 생성
+      // ⭐⭐⭐ 3단계: Initiator가 Offer 생성
       if (isInitiator) {
         console.log(`🎬 Initiator: Offer 생성 시작 (${peerId})`);
         
-        // 약간의 딜레이 후 Offer 생성
+        // 약간의 딜레이 (Tracks 안정화)
         setTimeout(async () => {
           try {
             if (pc.signalingState !== 'stable') {
@@ -243,22 +248,25 @@ export function useWebRTC(roomId, currentUser, isHost) {
             }
             
             console.log(`📝 Creating Offer for ${peerId}...`);
+            
             const offer = await pc.createOffer({
               offerToReceiveAudio: true,
               offerToReceiveVideo: true
             });
             
-            console.log(`📄 Offer SDP (${peerId}):\n`, offer.sdp.substring(0, 200) + '...');
+            console.log(`✅ Offer 생성 완료`);
+            console.log(`   Type: ${offer.type}`);
+            console.log(`   SDP 길이: ${offer.sdp.length} bytes`);
             
             await pc.setLocalDescription(offer);
-            console.log(`✅ Local Description set (${peerId})`);
+            console.log(`✅ Local Description set`);
             
             await sendSignal(peerId, 'offer', pc.localDescription.toJSON());
             console.log(`✅✅ Offer 전송 완료! (${peerId})`);
           } catch (e) {
             console.error(`❌ Offer 생성/전송 실패 (${peerId}):`, e);
           }
-        }, 500);
+        }, 1000);
       }
       
       return pc;
@@ -290,8 +298,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
     console.log(`📨 시그널 수신`);
     console.log(`   Type: ${type}`);
     console.log(`   From: ${peerId}`);
-    console.log(`   To: ${receiver_username || 'all'}`);
-    console.log(`   Signal ID: ${signalId}`);
+    console.log(`   To: ${receiver_username || 'broadcast'}`);
     console.log(`${'='.repeat(60)}\n`);
     
     // 자신의 시그널 무시
@@ -317,47 +324,22 @@ export function useWebRTC(roomId, currentUser, isHost) {
       return;
     }
 
-    // Approval 시그널 처리
-    if (type === 'approval' && !isHost) {
-      console.log('🎉 승인 알림 수신!');
-      processedSignals.current.add(signalId);
-      if (fetchRoomDetails) {
-        await fetchRoomDetails();
-      }
-      return;
-    }
-    
-    // Join Ready 시그널 처리
+    // Join Ready 시그널 처리 (방장만)
     if (type === 'join_ready') {
       console.log(`📢 Join Ready 수신 from ${peerId}`);
       processedSignals.current.add(signalId);
       
       if (isHost) {
-        console.log(`👑 방장이 Join Ready 수신 - 피어 연결 시작`);
+        console.log(`👑 방장이 Join Ready 수신 - Peer Connection 생성`);
         
         setTimeout(() => {
           const existingPc = peerConnections.current[peerId];
           
           if (!existingPc || existingPc.connectionState === 'failed' || existingPc.connectionState === 'closed') {
-            console.log(`🆕 새로운 Peer Connection 생성: ${peerId}`);
+            console.log(`🆕 새로운 Peer Connection 생성 (Initiator): ${peerId}`);
             createPeerConnection(peerId, true);
           } else {
-            console.log(`♻️ 기존 연결 존재 (${existingPc.connectionState}) - Offer 재전송`);
-            
-            if (existingPc.signalingState === 'stable') {
-              existingPc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true
-              }).then(offer => {
-                return existingPc.setLocalDescription(offer);
-              }).then(() => {
-                return sendSignal(peerId, 'offer', existingPc.localDescription.toJSON());
-              }).then(() => {
-                console.log(`✅ Offer 재전송 완료 (${peerId})`);
-              }).catch(e => {
-                console.error(`❌ Offer 재전송 실패 (${peerId}):`, e);
-              });
-            }
+            console.log(`♻️ 기존 연결 존재 (${existingPc.connectionState})`);
           }
         }, 500);
       }
@@ -387,20 +369,11 @@ export function useWebRTC(roomId, currentUser, isHost) {
           console.log(`📥 Offer 처리 시작 (${peerId})`);
           console.log(`   Signaling State: ${pc.signalingState}`);
           
-          if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer') {
-            if (pc.signalingState === 'have-local-offer') {
-              console.log('🔄 로컬 Offer 롤백...');
-              await pc.setLocalDescription({type: 'rollback'});
-            }
-          }
-          
-          console.log(`📄 Setting Remote Description...`);
           await pc.setRemoteDescription(new RTCSessionDescription(data));
           console.log(`✅ Remote Description set`);
           
-          console.log(`📝 Creating Answer...`);
           const answer = await pc.createAnswer();
-          console.log(`📄 Answer SDP:\n`, answer.sdp.substring(0, 200) + '...');
+          console.log(`✅ Answer 생성`);
           
           await pc.setLocalDescription(answer);
           console.log(`✅ Local Description (Answer) set`);
@@ -414,7 +387,6 @@ export function useWebRTC(roomId, currentUser, isHost) {
           console.log(`   Signaling State: ${pc.signalingState}`);
           
           if (pc.signalingState === 'have-local-offer') {
-            console.log(`📄 Setting Remote Description (Answer)...`);
             await pc.setRemoteDescription(new RTCSessionDescription(data));
             console.log(`✅✅ Answer 적용 완료! (${peerId})`);
           } else {
@@ -425,9 +397,8 @@ export function useWebRTC(roomId, currentUser, isHost) {
         case 'candidate':
           if (data && data.candidate) {
             if (pc.remoteDescription) {
-              console.log(`📡 ICE Candidate 추가 (${peerId})`);
               await pc.addIceCandidate(new RTCIceCandidate(data));
-              console.log(`✅ ICE Candidate 추가 완료`);
+              console.log(`✅ ICE Candidate 추가`);
             } else {
               console.warn(`⚠️ Remote Description 없음 - Candidate 보류`);
             }
