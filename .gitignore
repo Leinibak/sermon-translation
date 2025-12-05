@@ -38,7 +38,7 @@ media/
 .env.local
 
 *.ps1
-*_snapshot*
+*snapshot*
 
 # Node
 frontend/npm-debug.log*

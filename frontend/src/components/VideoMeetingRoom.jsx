@@ -1,7 +1,7 @@
 // frontend/src/components/VideoMeetingRoom.jsx (수정 버전)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Users, UserCheck, UserX, Bell, Loader } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Users, UserCheck, UserX, Bell, Loader, X } from 'lucide-react';
 import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -18,12 +18,13 @@ function VideoMeetingRoom() {
 
   // 로컬 미디어 관련 Ref
   const localVideoRef = useRef(null);
-  const localStreamRef = useRef(null); // ⭐ ref로 변경
+  const localStreamRef = useRef(null);
   
   // WebRTC 상태
   const [remoteStreams, setRemoteStreams] = useState([]);
   const peerConnections = useRef({});
   const signalPollingIntervalRef = useRef(null);
+  const pendingPollingIntervalRef = useRef(null); // ⭐ 추가
 
   // 회의실 및 UI 상태
   const [room, setRoom] = useState(null);
@@ -35,7 +36,7 @@ function VideoMeetingRoom() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [error, setError] = useState(null);
-  const [mediaReady, setMediaReady] = useState(false); // ⭐ 미디어 준비 상태
+  const [mediaReady, setMediaReady] = useState(false);
 
   const currentPeerId = user?.username;
 
@@ -95,7 +96,6 @@ function VideoMeetingRoom() {
       peerConnections.current[peerId] = pc;
       console.log(`✅ Peer Connection 생성 완료: ${peerId}`);
 
-      // ⭐ ref에서 스트림 가져오기
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
         console.log(`🎤 Local Tracks 추가: ${peerId}`);
@@ -119,7 +119,7 @@ function VideoMeetingRoom() {
       console.error('❌ Peer Connection 생성 중 오류:', e);
       return null;
     }
-  }, [sendSignal]); // ⭐ localStream 의존성 제거
+  }, [sendSignal]);
 
   const handleSignalMessage = useCallback(async (message) => {
     const { sender_username: peerId, message_type: type, payload } = message;
@@ -186,10 +186,28 @@ function VideoMeetingRoom() {
       }
     }
   }, [id, currentPeerId, handleSignalMessage]);
+
+  // ⭐ 대기 요청 폴링 함수 추가
+  const pollPendingRequests = useCallback(async () => {
+    if (!isHost) return;
+
+    try {
+      const response = await axios.get(`/video-meetings/${id}/pending_requests/`);
+      const pending = response.data;
+      
+      console.log(`📋 대기 요청 ${pending.length}개:`, pending);
+      setPendingRequests(pending);
+      
+      // 새로운 요청이 있으면 패널 자동 표시
+      if (pending.length > 0 && !showPendingPanel) {
+        setShowPendingPanel(true);
+      }
+    } catch (error) {
+      console.error('❌ 대기 요청 폴링 실패:', error);
+    }
+  }, [id, isHost, showPendingPanel]);
   
-  // ⭐ 미디어 스트림 가져오기 (한 번만 실행)
   const getLocalMedia = useCallback(async () => {
-    // 이미 스트림이 있으면 재사용
     if (localStreamRef.current) {
       console.log('✅ 기존 스트림 재사용');
       return localStreamRef.current;
@@ -264,7 +282,7 @@ function VideoMeetingRoom() {
     }
   }, [id, user, navigate]);
 
-  // ⭐ 미디어 정리 함수
+  // ⭐ 미디어 정리 함수 개선
   const cleanupMedia = useCallback(() => {
     console.log('🧹 미디어 정리 시작...');
     
@@ -274,24 +292,30 @@ function VideoMeetingRoom() {
     });
     peerConnections.current = {};
     
-    // 2. Local Stream 정리
+    // 2. Local Stream 정리 (동기적으로)
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log(`🛑 Track 중지: ${track.kind}`);
+        console.log(`🛑 Track 중지: ${track.kind} (readyState: ${track.readyState})`);
       });
+      
+      // ⭐ Video Element에서도 제거
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      
       localStreamRef.current = null;
     }
     
-    // 3. Video Element 정리
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
-    }
-    
-    // 4. Polling 중지
+    // 3. Polling 중지
     if (signalPollingIntervalRef.current) {
       clearInterval(signalPollingIntervalRef.current);
       signalPollingIntervalRef.current = null;
+    }
+    
+    if (pendingPollingIntervalRef.current) {
+      clearInterval(pendingPollingIntervalRef.current);
+      pendingPollingIntervalRef.current = null;
     }
     
     setMediaReady(false);
@@ -303,18 +327,20 @@ function VideoMeetingRoom() {
   const handleLeave = async () => {
     console.log('👋 회의 종료/나가기 시도...');
     
+    // ⭐ 먼저 미디어 정리 (동기적으로)
+    cleanupMedia();
+    
+    // ⭐ 약간의 지연을 주어 브라우저가 처리할 시간 확보
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     try {
-      // 미디어 정리
-      cleanupMedia();
-      
       // 백엔드에 나가기 요청
       await axios.post(`/video-meetings/${id}/leave/`);
       console.log('✅ 회의실 나가기 완료');
-      
-      navigate('/video-meetings');
     } catch (error) {
       console.error('❌ 회의실 나가기 실패:', error);
-      // 에러가 발생해도 페이지 이동
+    } finally {
+      // 페이지 이동
       navigate('/video-meetings');
     }
   };
@@ -339,11 +365,46 @@ function VideoMeetingRoom() {
     }
   };
 
+  // ⭐ 참가 승인/거부 함수 추가
+  const handleApprove = async (participantId) => {
+    try {
+      await axios.post(`/video-meetings/${id}/approve_participant/`, {
+        participant_id: participantId
+      });
+      
+      console.log(`✅ 참가 승인 완료: ${participantId}`);
+      
+      // 대기 목록에서 제거
+      setPendingRequests(prev => prev.filter(p => p.id !== participantId));
+      
+      // 참가자 목록 새로고침
+      fetchRoomDetails();
+    } catch (error) {
+      console.error('❌ 참가 승인 실패:', error);
+      alert('참가 승인에 실패했습니다.');
+    }
+  };
+
+  const handleReject = async (participantId) => {
+    try {
+      await axios.post(`/video-meetings/${id}/reject_participant/`, {
+        participant_id: participantId
+      });
+      
+      console.log(`✅ 참가 거부 완료: ${participantId}`);
+      
+      // 대기 목록에서 제거
+      setPendingRequests(prev => prev.filter(p => p.id !== participantId));
+    } catch (error) {
+      console.error('❌ 참가 거부 실패:', error);
+      alert('참가 거부에 실패했습니다.');
+    }
+  };
+
   // =========================================================================
   // 3. useEffect Hooks
   // =========================================================================
 
-  // ⭐ 컴포넌트 마운트/언마운트 시 정리
   useEffect(() => {
     fetchRoomDetails();
     
@@ -353,7 +414,6 @@ function VideoMeetingRoom() {
     };
   }, [fetchRoomDetails, cleanupMedia]);
   
-  // ⭐ WebRTC 초기화 (미디어 준비 후 한 번만)
   useEffect(() => {
     if (!room || mediaReady || !user) return;
     
@@ -368,13 +428,19 @@ function VideoMeetingRoom() {
       // 시그널 폴링 시작
       signalPollingIntervalRef.current = setInterval(pollSignals, 1000);
       
+      // ⭐ 방장이면 대기 요청 폴링 시작
+      if (isHost) {
+        pollPendingRequests(); // 즉시 한 번 실행
+        pendingPollingIntervalRef.current = setInterval(pollPendingRequests, 2000);
+      }
+      
       // Host가 아닌 경우 join_ready 시그널 전송
       if (!isHost && room.host_username) {
         console.log('📢 Join Ready 시그널 전송 (Host에게)');
         sendSignal(room.host_username, 'join_ready');
       }
     });
-  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, sendSignal]);
+  }, [room, user, isHost, mediaReady, getLocalMedia, pollSignals, sendSignal, pollPendingRequests]);
 
   // =========================================================================
   // 4. UI Rendering
@@ -440,7 +506,69 @@ function VideoMeetingRoom() {
         </div>
       </div>
 
-      {/* ⭐ 메인 비디오 영역 - 크기 조정 */}
+      {/* ⭐ 대기 요청 패널 */}
+      {isHost && showPendingPanel && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-gray-900 font-semibold flex items-center">
+              <Users className="w-5 h-5 mr-2" />
+              참가 대기 중 ({pendingRequests.length})
+            </h3>
+            <button
+              onClick={() => setShowPendingPanel(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          {pendingRequests.length === 0 ? (
+            <p className="text-gray-600 text-sm">대기 중인 참가자가 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {pendingRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between bg-white p-3 rounded-lg shadow-sm"
+                >
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-blue-600 font-semibold text-sm">
+                        {request.username?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-gray-900 font-medium">{request.username}</p>
+                      <p className="text-gray-500 text-xs">
+                        {new Date(request.created_at).toLocaleString('ko-KR')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApprove(request.id)}
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center text-sm"
+                    >
+                      <UserCheck className="w-4 h-4 mr-1" />
+                      승인
+                    </button>
+                    <button
+                      onClick={() => handleReject(request.id)}
+                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center text-sm"
+                    >
+                      <UserX className="w-4 h-4 mr-1" />
+                      거부
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 메인 비디오 영역 */}
       <div className="flex-1 p-4 overflow-y-auto">
         <div className="max-w-6xl mx-auto grid gap-4" 
              style={{
