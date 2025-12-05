@@ -1,4 +1,4 @@
-# video_meetings/consumers.py (알림 핸들러 추가)
+# backend/video_meetings/consumers.py (개선 버전)
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -31,6 +31,12 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type')
+        
+        print(f"\n{'='*60}")
+        print(f"📨 WebSocket 메시지 수신")
+        print(f"   Type: {message_type}")
+        print(f"   From: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
+        print(f"{'='*60}\n")
         
         if message_type == 'join':
             self.user_id = data.get('user_id')
@@ -66,23 +72,54 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     async def join_request_notification(self, event):
         """참가 요청 알림 (방장에게)"""
+        print(f"\n{'📢'*30}")
+        print(f"📢 참가 요청 알림 전송 중...")
+        print(f"   Participant: {event['username']}")
+        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
+        print(f"{'📢'*30}\n")
+        
         await self.send(text_data=json.dumps({
             'type': 'join_request',
             'participant_id': event['participant_id'],
             'username': event['username'],
             'message': event['message']
         }))
-        print(f"📢 참가 요청 알림 전송: {event['username']}")
+        
+        print(f"✅ 참가 요청 알림 전송 완료: {event['username']}")
     
     async def approval_notification(self, event):
         """승인 알림 (참가자에게)"""
+        print(f"\n{'✅'*30}")
+        print(f"✅ 승인 알림 전송 중...")
+        print(f"   Participant: {event['participant_username']}")
+        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
+        print(f"{'✅'*30}\n")
+        
         # 해당 참가자에게만 전송
         if self.user.is_authenticated and self.user.username == event['participant_username']:
             await self.send(text_data=json.dumps({
                 'type': 'approval',
                 'message': event['message']
             }))
-            print(f"📢 승인 알림 전송: {event['participant_username']}")
+            print(f"✅ 승인 알림 전송 완료: {event['participant_username']}")
+        else:
+            print(f"⏭️ 다른 사용자 - 알림 전송 안 함")
+    
+    async def rejection_notification(self, event):
+        """거부 알림 (참가자에게)"""
+        print(f"\n{'❌'*30}")
+        print(f"❌ 거부 알림 전송 중...")
+        print(f"   Participant: {event['participant_username']}")
+        print(f"   Current User: {self.user.username if self.user.is_authenticated else 'Anonymous'}")
+        print(f"{'❌'*30}\n")
+        
+        # 해당 참가자에게만 전송
+        if self.user.is_authenticated and self.user.username == event['participant_username']:
+            await self.send(text_data=json.dumps({
+                'type': 'rejection',
+                'message': event['message']
+            }))
+            print(f"✅ 거부 알림 전송 완료: {event['participant_username']}")
     
     # =========================================================================
     # 기존 핸들러

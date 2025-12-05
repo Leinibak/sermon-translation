@@ -1,4 +1,4 @@
-// frontend/src/hooks/useVideoMeetingAPI.js
+// frontend/src/hooks/useVideoMeetingAPI.js (개선 버전)
 import { useState, useCallback } from 'react';
 import axios from '../api/axios';
 
@@ -96,7 +96,7 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   // =========================================================================
-  // Leave Room
+  // Leave / End Room
   // =========================================================================
   
   const leaveRoom = useCallback(async () => {
@@ -105,6 +105,18 @@ export function useVideoMeetingAPI(roomId) {
       console.log('✅ 회의실 나가기 완료');
     } catch (error) {
       console.error('❌ 회의실 나가기 실패:', error);
+      throw error;
+    }
+  }, [roomId]);
+
+  // ⭐ 새로 추가: 회의 종료
+  const endMeeting = useCallback(async () => {
+    try {
+      await axios.post(`/video-meetings/${roomId}/end/`);
+      console.log('✅ 회의 종료 완료');
+    } catch (error) {
+      console.error('❌ 회의 종료 실패:', error);
+      throw error;
     }
   }, [roomId]);
 
@@ -144,6 +156,7 @@ export function useVideoMeetingAPI(roomId) {
     approveParticipant,
     rejectParticipant,
     leaveRoom,
+    endMeeting, // ⭐ 새로 추가
     pollSignals,
   };
 }
