@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # jq 설치
 RUN apt-get update && apt-get install -y jq curl
 
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
 # 소스 복사
 COPY . .
 
