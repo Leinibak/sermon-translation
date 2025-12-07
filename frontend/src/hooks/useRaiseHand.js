@@ -7,85 +7,111 @@ export function useRaiseHand(roomId, currentUser) {
   const [raisedHands, setRaisedHands] = useState([]);
 
   /**
+   * 손든 사용자 목록 조회
+   */
+  const fetchRaisedHands = useCallback(async () => {
+    try {
+      const response = await axios.get(`/video-meetings/${roomId}/raised-hands/`);
+      setRaisedHands(response.data);
+      
+      // 내가 손을 들었는지 확인
+      const myHand = response.data.find(h => h.username === currentUser?.username);
+      setIsHandRaised(!!myHand);
+      
+      console.log(`✋ 손든 사용자 ${response.data.length}명`);
+    } catch (error) {
+      console.error('❌ 손들기 목록 조회 실패:', error);
+    }
+  }, [roomId, currentUser]);
+
+  /**
    * 손들기
    */
   const raiseHand = useCallback(async () => {
     try {
-      await axios.post(`/video-meetings/${roomId}/raise_hand/`);
+      console.log('✋ 손들기...');
+
+      await axios.post(`/video-meetings/${roomId}/raise-hand/`);
+
       setIsHandRaised(true);
-      console.log('✋ 손들기 완료');
+      console.log('✅ 손들기 완료');
+
+      // 목록 갱신
+      await fetchRaisedHands();
     } catch (error) {
       console.error('❌ 손들기 실패:', error);
-      alert('손들기에 실패했습니다.');
+      
+      if (error.response?.data?.detail) {
+        alert(error.response.data.detail);
+      }
     }
-  }, [roomId]);
+  }, [roomId, fetchRaisedHands]);
 
   /**
    * 손내리기
    */
   const lowerHand = useCallback(async () => {
     try {
-      await axios.post(`/video-meetings/${roomId}/lower_hand/`);
+      console.log('👋 손내리기...');
+
+      await axios.post(`/video-meetings/${roomId}/lower-hand/`);
+
       setIsHandRaised(false);
-      console.log('✋ 손내리기 완료');
+      console.log('✅ 손내리기 완료');
+
+      // 목록 갱신
+      await fetchRaisedHands();
     } catch (error) {
       console.error('❌ 손내리기 실패:', error);
-    }
-  }, [roomId]);
-
-  /**
-   * 손든 사용자 목록 가져오기
-   */
-  const fetchRaisedHands = useCallback(async () => {
-    try {
-      const response = await axios.get(`/video-meetings/${roomId}/raised_hands/`);
-      setRaisedHands(response.data);
       
-      // 내가 손들었는지 확인
-      const myHand = response.data.find(
-        hand => hand.username === currentUser?.username
-      );
-      setIsHandRaised(!!myHand);
-    } catch (error) {
-      console.error('❌ 손든 사용자 목록 로딩 실패:', error);
+      if (error.response?.data?.detail) {
+        alert(error.response.data.detail);
+      }
     }
-  }, [roomId, currentUser]);
+  }, [roomId, fetchRaisedHands]);
 
   /**
-   * WebSocket 손들기 알림 처리
+   * 실시간 손들기 알림 처리
    */
-  const handleHandRaiseNotification = useCallback((action, username) => {
-    console.log('✋ 손들기 알림:', action, username);
+  const handleHandRaiseNotification = useCallback((data) => {
+    console.log(`✋ 손들기 알림: ${data.username} - ${data.action}`);
 
-    if (action === 'raise') {
+    if (data.action === 'raise') {
+      // 손들기
       setRaisedHands(prev => {
-        // 중복 방지
-        if (prev.some(hand => hand.username === username)) {
+        // 중복 확인
+        const exists = prev.some(h => h.username === data.username);
+        if (exists) {
           return prev;
         }
-        return [...prev, {
-          username,
-          raised_at: new Date().toISOString(),
-          is_active: true
-        }];
+
+        return [
+          ...prev,
+          {
+            username: data.username,
+            raised_at: new Date().toISOString(),
+            is_active: true
+          }
+        ];
       });
 
-      // 내가 손든 경우
-      if (username === currentUser?.username) {
+      // 내가 손을 들었으면
+      if (data.username === currentUser?.username) {
         setIsHandRaised(true);
       }
-    } else if (action === 'lower') {
-      setRaisedHands(prev => prev.filter(hand => hand.username !== username));
+    } else if (data.action === 'lower') {
+      // 손내리기
+      setRaisedHands(prev => prev.filter(h => h.username !== data.username));
 
-      // 내가 손내린 경우
-      if (username === currentUser?.username) {
+      // 내가 손을 내렸으면
+      if (data.username === currentUser?.username) {
         setIsHandRaised(false);
       }
     }
   }, [currentUser]);
 
   /**
-   * 초기 손든 사용자 목록 로드
+   * 초기 데이터 로드
    */
   useEffect(() => {
     fetchRaisedHands();

@@ -9,44 +9,56 @@ export function useReactions(roomId) {
   /**
    * 반응 전송
    */
-  const sendReaction = useCallback(async (emoji) => {
+  const sendReaction = useCallback(async (reactionType) => {
     try {
-      await axios.post(`/video-meetings/${roomId}/send_reaction/`, {
-        reaction_type: emoji
+      console.log('👍 반응 전송:', reactionType);
+
+      await axios.post(`/video-meetings/${roomId}/reactions/send/`, {
+        reaction_type: reactionType
       });
 
-      console.log('✅ 반응 전송 완료:', emoji);
+      console.log('✅ 반응 전송 완료');
     } catch (error) {
       console.error('❌ 반응 전송 실패:', error);
     }
   }, [roomId]);
 
   /**
-   * WebSocket으로 받은 반응 처리
+   * 실시간 반응 수신 처리
    */
-  const handleReactionNotification = useCallback((username, emoji) => {
-    console.log('👍 반응 수신:', username, emoji);
+  const handleReactionNotification = useCallback((reaction) => {
+    console.log('🎉 반응 수신:', reaction.username, reaction.reaction);
 
-    const reactionId = reactionIdCounter.current++;
+    // 고유 ID 생성
+    const id = `reaction-${Date.now()}-${reactionIdCounter.current++}`;
 
+    // 반응을 활성 목록에 추가
     const newReaction = {
-      id: reactionId,
-      username,
-      emoji,
+      id,
+      emoji: reaction.reaction,
+      username: reaction.username,
       timestamp: Date.now()
     };
 
     setActiveReactions(prev => [...prev, newReaction]);
 
-    // 3초 후 애니메이션과 함께 제거
+    // 3초 후 자동 제거
     setTimeout(() => {
-      setActiveReactions(prev => prev.filter(r => r.id !== reactionId));
+      setActiveReactions(prev => prev.filter(r => r.id !== id));
     }, 3000);
+  }, []);
+
+  /**
+   * 반응 정리 (메모리 누수 방지)
+   */
+  const cleanupReactions = useCallback(() => {
+    setActiveReactions([]);
   }, []);
 
   return {
     activeReactions,
     sendReaction,
-    handleReactionNotification
+    handleReactionNotification,
+    cleanupReactions
   };
 }

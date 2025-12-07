@@ -1,4 +1,4 @@
-# backend/video_meetings/views.py (수정 버전)
+# backend/video_meetings/views.py (개선 버전)
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -11,13 +11,19 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
 
-from .models import VideoRoom, RoomParticipant, SignalMessage
+from .models import (
+    VideoRoom, RoomParticipant, SignalMessage,
+    ChatMessage, Reaction, RaisedHand
+)
 from .serializers import (
     VideoRoomListSerializer,
     VideoRoomDetailSerializer,
     VideoRoomCreateSerializer,
     ParticipantSerializer,
-    SignalMessageSerializer
+    SignalMessageSerializer,
+    ChatMessageSerializer,
+    ReactionSerializer,
+    RaisedHandSerializer
 )
 
 
@@ -44,12 +50,10 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         serializer.save(host=self.request.user)
     
     def retrieve(self, request, *args, **kwargs):
-        """
-        회의실 상세 조회 - 방장이 처음 입장하면 자동으로 회의 시작
-        """
+        """회의실 상세 조회"""
         room = self.get_object()
         
-        # ⭐ 방장이 처음 입장하면 자동으로 active 상태로 변경
+        # 방장이 처음 입장하면 자동으로 active 상태로 변경
         if room.host == request.user and room.status == 'waiting':
             room.status = 'active'
             room.started_at = timezone.now()
@@ -92,29 +96,35 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         room.ended_at = timezone.now()
         room.save()
         
+        # 모든 참가자 퇴장 처리
         room.participants.filter(status='approved').update(
             status='left',
             left_at=timezone.now()
         )
+        
+        # WebSocket 알림 (선택사항)
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'meeting_ended',
+                    'message': '회의가 종료되었습니다.'
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = self.get_serializer(room)
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
     def join_request(self, request, pk=None):
-        """
-        회의 참가 요청 - 요청 즉시 방장에게 WebSocket 알림 전송
-        """
+        """회의 참가 요청"""
         room = self.get_object()
         user = request.user
-        
-        print(f"\n{'='*60}")
-        print(f"🔔 참가 요청 시작")
-        print(f"   방 ID: {room.id}")
-        print(f"   방 제목: {room.title}")
-        print(f"   방장: {room.host.username}")
-        print(f"   요청자: {user.username}")
-        print(f"{'='*60}\n")
         
         if room.host == user:
             return Response(
@@ -122,6 +132,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # 기존 요청 확인
         existing = room.participants.filter(user=user).first()
         if existing:
             if existing.status == 'approved':
@@ -140,9 +151,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 defaults={'status': 'pending'}
             )
             
-            print(f"✅ 참가 요청 생성: {participant.id}")
-            
-            # WebSocket을 통해 방장에게 즉시 알림 전송
+            # WebSocket 알림
             channel_layer = get_channel_layer()
             room_group_name = f'video_room_{room.id}'
             
@@ -156,15 +165,11 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            print(f"📢 WebSocket 알림 전송 완료: {user.username} → 방장")
-            
             serializer = ParticipantSerializer(participant)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
             print(f"❌ 참가 요청 생성 중 오류: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response(
                 {'detail': f'참가 요청 생성 실패: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -172,16 +177,8 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """
-        참가 승인 - 승인 즉시 참가자에게 WebSocket 알림 전송
-        """
+        """참가 승인"""
         room = self.get_object()
-        
-        print(f"\n{'='*60}")
-        print(f"✅ 승인 요청")
-        print(f"   방장: {request.user.username}")
-        print(f"   방 ID: {room.id}")
-        print(f"{'='*60}\n")
         
         if room.host != request.user:
             return Response(
@@ -202,6 +199,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             room=room
         )
         
+        # 최대 참가자 수 확인
         approved_count = room.participants.filter(status='approved').count()
         if approved_count >= room.max_participants:
             return Response(
@@ -213,9 +211,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.joined_at = timezone.now()
         participant.save()
         
-        print(f"✅ 승인 완료: {participant.user.username}")
-        
-        # WebSocket을 통해 참가자에게 즉시 승인 알림 전송
+        # WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -227,8 +223,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 'message': '참가가 승인되었습니다.'
             }
         )
-        
-        print(f"📢 WebSocket 승인 알림 전송 완료: {participant.user.username}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
@@ -254,7 +248,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.status = 'rejected'
         participant.save()
         
-        # WebSocket 알림 전송
+        # WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -266,8 +260,6 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 'message': '참가가 거부되었습니다.'
             }
         )
-        
-        print(f"✅ 거부 완료: {participant.user.username}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
@@ -310,6 +302,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         """WebRTC 신호 전송"""
         room = self.get_object()
         
+        # 권한 확인
         is_authorized = (
             room.host == request.user or
             room.participants.filter(user=request.user, status='approved').exists()
@@ -322,40 +315,28 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             )
         
         message_type = request.data.get('message_type')
-        payload = request.data.get('payload')
+        payload = request.data.get('payload', '{}')
         receiver_username = request.data.get('receiver_username')
         
-        print(f"\n{'='*60}")
-        print(f"📤 시그널 전송 요청")
-        print(f"   Type: {message_type}")
-        print(f"   From: {request.user.username}")
-        print(f"   To: {receiver_username or 'all'}")
-        print(f"   Payload Type: {type(payload)}")
-        print(f"   Payload: {str(payload)[:100]}...")
-        print(f"{'='*60}\n")
-        
-        # ⭐⭐⭐ 핵심 수정: payload가 None이거나 'undefined' 문자열인 경우 처리
+        # payload 검증 및 변환
         if payload is None or payload == 'undefined' or payload == '':
-            print(f"⚠️ Payload가 비어있음 - 빈 객체로 설정")
-            payload = {}
-        
-        # ⭐⭐⭐ payload가 문자열이면 파싱 시도, 아니면 그대로 사용
-        if isinstance(payload, str):
+            payload_data = {}
+        elif isinstance(payload, str):
             try:
                 payload_data = json.loads(payload)
             except json.JSONDecodeError:
-                print(f"⚠️ Payload JSON 파싱 실패 - 빈 객체로 설정")
                 payload_data = {}
         else:
             payload_data = payload
         
+        # receiver 확인
         receiver = None
         if receiver_username:
             from django.contrib.auth.models import User
             try:
                 receiver = User.objects.get(username=receiver_username)
             except User.DoesNotExist:
-                print(f"   ⚠️ Receiver 없음: {receiver_username}")
+                pass
         
         try:
             signal = SignalMessage.objects.create(
@@ -363,17 +344,13 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 sender=request.user,
                 receiver=receiver,
                 message_type=message_type,
-                data=payload_data  # ⭐ 이미 파싱된 딕셔너리 저장
+                data=payload_data
             )
-            
-            print(f"✅ 시그널 저장 완료: ID={signal.id}")
             
             serializer = SignalMessageSerializer(signal)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             print(f"❌ 시그널 저장 실패: {e}")
-            import traceback
-            traceback.print_exc()
             return Response(
                 {'detail': f'시그널 전송 실패: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -384,6 +361,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         """신호 메시지 조회"""
         room = self.get_object()
         
+        # 권한 확인
         is_authorized = (
             room.host == request.user or
             room.participants.filter(user=request.user, status='approved').exists()
@@ -395,8 +373,8 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 최근 1시간 이내의 시그널 조회
-        since = timezone.now() - timezone.timedelta(hours=1)
+        # 최근 5분 이내의 시그널만 조회 (성능 개선)
+        since = timezone.now() - timezone.timedelta(minutes=5)
         
         signals = room.signals.filter(
             Q(receiver=request.user) | Q(receiver__isnull=True),
@@ -404,4 +382,207 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         ).order_by('created_at')
         
         serializer = SignalMessageSerializer(signals, many=True)
+        return Response(serializer.data)
+    
+    # =========================================================================
+    # ⭐⭐⭐ 채팅 기능 (신규 추가)
+    # =========================================================================
+    
+    @action(detail=True, methods=['get'], url_path='chat/messages')
+    def get_chat_messages(self, request, pk=None):
+        """채팅 메시지 목록 조회"""
+        room = self.get_object()
+        
+        messages = room.chat_messages.filter(
+            message_type='text'
+        ).order_by('created_at')
+        
+        serializer = ChatMessageSerializer(
+            messages, 
+            many=True, 
+            context={'request': request}
+        )
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='chat/send')
+    def send_chat_message(self, request, pk=None):
+        """채팅 메시지 전송"""
+        room = self.get_object()
+        content = request.data.get('content', '').strip()
+        
+        if not content:
+            return Response(
+                {'detail': '메시지 내용이 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        message = ChatMessage.objects.create(
+            room=room,
+            sender=request.user,
+            message_type='text',
+            content=content
+        )
+        
+        # WebSocket 알림
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'chat_message_notification',
+                    'message_id': message.id,
+                    'sender': request.user.username,
+                    'content': content,
+                    'created_at': message.created_at.isoformat()
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ 채팅 WebSocket 알림 실패: {e}")
+        
+        serializer = ChatMessageSerializer(message, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    # =========================================================================
+    # ⭐⭐⭐ 반응 기능 (신규 추가)
+    # =========================================================================
+    
+    @action(detail=True, methods=['post'], url_path='reactions/send')
+    def send_reaction(self, request, pk=None):
+        """반응 전송"""
+        room = self.get_object()
+        reaction_type = request.data.get('reaction_type')
+        
+        if not reaction_type:
+            return Response(
+                {'detail': '반응 타입이 필요합니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        reaction = Reaction.objects.create(
+            room=room,
+            user=request.user,
+            reaction_type=reaction_type
+        )
+        
+        # WebSocket 알림
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'reaction_notification',
+                    'username': request.user.username,
+                    'reaction': reaction_type
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ 반응 WebSocket 알림 실패: {e}")
+        
+        serializer = ReactionSerializer(reaction)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    # =========================================================================
+    # ⭐⭐⭐ 손들기 기능 (신규 추가)
+    # =========================================================================
+    
+    @action(detail=True, methods=['get'], url_path='raised-hands')
+    def get_raised_hands(self, request, pk=None):
+        """손든 사용자 목록 조회"""
+        room = self.get_object()
+        
+        raised_hands = room.raised_hands.filter(
+            is_active=True
+        ).order_by('raised_at')
+        
+        serializer = RaisedHandSerializer(raised_hands, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='raise-hand')
+    def raise_hand(self, request, pk=None):
+        """손들기"""
+        room = self.get_object()
+        
+        # 이미 손을 들었는지 확인
+        existing = room.raised_hands.filter(
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if existing:
+            return Response(
+                {'detail': '이미 손을 들었습니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 새로 손들기 또는 기존 레코드 재활성화
+        raised_hand, created = RaisedHand.objects.update_or_create(
+            room=room,
+            user=request.user,
+            defaults={
+                'is_active': True,
+                'raised_at': timezone.now(),
+                'lowered_at': None
+            }
+        )
+        
+        # WebSocket 알림
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'hand_raise_notification',
+                    'action': 'raise',
+                    'username': request.user.username
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ 손들기 WebSocket 알림 실패: {e}")
+        
+        serializer = RaisedHandSerializer(raised_hand)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'], url_path='lower-hand')
+    def lower_hand(self, request, pk=None):
+        """손내리기"""
+        room = self.get_object()
+        
+        raised_hand = room.raised_hands.filter(
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not raised_hand:
+            return Response(
+                {'detail': '손을 들지 않았습니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        raised_hand.is_active = False
+        raised_hand.lowered_at = timezone.now()
+        raised_hand.save()
+        
+        # WebSocket 알림
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'hand_raise_notification',
+                    'action': 'lower',
+                    'username': request.user.username
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ 손내리기 WebSocket 알림 실패: {e}")
+        
+        serializer = RaisedHandSerializer(raised_hand)
         return Response(serializer.data)
