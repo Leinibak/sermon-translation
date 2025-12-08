@@ -3,10 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* src/index.css 파일 상단에서 두 개의 @import를 제거하고 이것 하나로 대체합니다. */
-
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Gowun+Dodum&display=swap');
-
 /* 공통 */
 body {
   font-family: 'Arial', sans-serif;
@@ -18,6 +14,27 @@ body {
 /* 고운 돋움체를 강제로 적용하는 클래스 */
 .font-gowun-dotum-force {
     font-family: 'Gowun Dotum', sans-serif !important;
+}
+
+@font-face {
+  font-family: 'Gowun Batang';
+  font-weight: 400;
+  font-style: normal;
+  src: url('/static/fonts/GowunBatang-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Gowun Batang';
+  font-weight: 700;
+  font-style: normal;
+  src: url('/static/fonts/GowunBatang-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Gowun Dodum';
+  font-weight: 400;
+  font-style: normal;
+  src: url('/static/fonts/GowunDodum-Regular.ttf') format('truetype');
 }
 
 /* ✅ 블로그 본문용 한글 폰트 클래스 */
