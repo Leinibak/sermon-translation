@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+            <!-- ⭐⭐⭐ 카메라/마이크 권한 정책 -->
+    <meta 
+      http-equiv="Permissions-Policy" 
+      content="camera=(self), microphone=(self), display-capture=(self)"
+    >
+    
+        <!-- Feature Policy (구형 브라우저 호환) -->
+    <meta 
+      http-equiv="Feature-Policy" 
+      content="camera 'self'; microphone 'self'; display-capture 'self'"
+    >
     
     <!-- Favicon 설정 -->
     <link rel="icon" type="image/x-icon" href="/favicon_sosik.ico" />
