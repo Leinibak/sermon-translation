@@ -100,6 +100,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# ⭐ 추가: Static files 디렉토리 설정
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# ⭐ Static files storage (프로덕션)
+if ENVIRONMENT == "prod":
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

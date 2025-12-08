@@ -19,7 +19,7 @@ README.md.temp
 
 backend/*.sqlite3
 backend/media/
-backend/static/
+# backend/static/
 backend/staticfiles/
 *.env.* 
 *copy*
