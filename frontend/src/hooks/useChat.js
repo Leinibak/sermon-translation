@@ -12,26 +12,33 @@ export function useChat(roomId, currentUser) {
   const lastFetchTimeRef = useRef(Date.now());
   const pollingIntervalRef = useRef(null);
 
-  /**
-   * 채팅 메시지 목록 로드
-   */
-  const fetchMessages = useCallback(async () => {
-    if (!roomId) return;
 
+  // 채팅 메시지 불러오기
+  const fetchMessages = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`/video-meetings/${roomId}/chat/messages/`);
+      const response = await axios.get(`/video-meetings/${roomId}/chat/messages`);
+      const newMessages = response.data;
       
-      setMessages(response.data);
-      lastFetchTimeRef.current = Date.now();
+      setMessages(newMessages);
       
-      console.log(`💬 채팅 메시지 로드: ${response.data.length}개`);
+      // 새 메시지 감지 (unread count 업데이트)
+      if (!isChatOpen && lastMessageIdRef.current) {
+        const newCount = newMessages.filter(
+          m => m.id > lastMessageIdRef.current && !m.is_mine
+        ).length;
+        setUnreadCount(prev => prev + newCount);
+      }
+      
+      if (newMessages.length > 0) {
+        lastMessageIdRef.current = newMessages[newMessages.length - 1].id;
+      }
+      
+      setLoading(false);
     } catch (error) {
-      console.error('❌ 채팅 메시지 로드 실패:', error);
-    } finally {
+      console.error('❌ 채팅 메시지 로딩 실패:', error);
       setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, isChatOpen]);
 
   /**
    * 새 메시지 폴링

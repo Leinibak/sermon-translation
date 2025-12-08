@@ -1,4 +1,4 @@
-// frontend/src/hooks/useWebRTC.js (개선 버전)
+// frontend/src/hooks/useWebRTC.js (최종 안정화 버전)
 import { useState, useRef, useCallback, useEffect } from 'react';
 import axios from '../api/axios';
 
@@ -12,9 +12,9 @@ const ICE_SERVERS = {
   iceCandidatePoolSize: 10
 };
 
-// 연결 상태 추적을 위한 상수
-const CONNECTION_TIMEOUT = 15000; // 15초
-const RECONNECT_DELAY = 2000; // 2초
+const CONNECTION_TIMEOUT = 15000;
+const RECONNECT_DELAY = 2000;
+const MAX_PROCESSED_SIGNALS = 500; // ⭐ 메모리 제한
 
 export function useWebRTC(roomId, currentUser, isHost) {
   const [remoteStreams, setRemoteStreams] = useState([]);
@@ -27,27 +27,40 @@ export function useWebRTC(roomId, currentUser, isHost) {
   const connectionTimers = useRef({});
   const isCreatingConnection = useRef({});
   const signalQueue = useRef({});
+  const cleanupTimerRef = useRef(null);
   
-  // 메모리 누수 방지: 주기적인 정리
+  // ⭐ 메모리 누수 방지: 주기적인 정리
   useEffect(() => {
-    const cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      
-      // 5분 이상 된 processed signals 제거
-      if (processedSignals.current.size > 1000) {
-        console.log('🧹 Processed signals 정리 중...');
-        processedSignals.current.clear();
+    cleanupTimerRef.current = setInterval(() => {
+      // Processed signals 제한
+      if (processedSignals.current.size > MAX_PROCESSED_SIGNALS) {
+        console.log('🧹 Processed signals 정리:', processedSignals.current.size);
+        const arr = Array.from(processedSignals.current);
+        const keep = arr.slice(-MAX_PROCESSED_SIGNALS / 2);
+        processedSignals.current = new Set(keep);
       }
       
       // 만료된 타이머 정리
+      const now = Date.now();
       Object.keys(connectionTimers.current).forEach(peerId => {
         if (connectionTimers.current[peerId] < now - 60000) {
           delete connectionTimers.current[peerId];
         }
       });
-    }, 60000); // 1분마다 실행
+      
+      // 빈 pending candidates 정리
+      Object.keys(pendingCandidates.current).forEach(peerId => {
+        if (pendingCandidates.current[peerId]?.length === 0) {
+          delete pendingCandidates.current[peerId];
+        }
+      });
+    }, 30000); // 30초마다
     
-    return () => clearInterval(cleanupInterval);
+    return () => {
+      if (cleanupTimerRef.current) {
+        clearInterval(cleanupTimerRef.current);
+      }
+    };
   }, []);
 
   // =========================================================================
@@ -63,7 +76,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
         console.log('✅ 기존 스트림 재사용');
         return localStreamRef.current;
       } else {
-        console.log('⚠️ 기존 스트림이 비활성 상태 - 재생성');
+        console.log('⚠️ 기존 스트림 비활성 - 재생성');
         tracks.forEach(track => track.stop());
         localStreamRef.current = null;
       }
@@ -93,10 +106,10 @@ export function useWebRTC(roomId, currentUser, isHost) {
       console.log(`   Video: ${stream.getVideoTracks().length}개`);
       console.log(`   Audio: ${stream.getAudioTracks().length}개`);
       
-      // Track 종료 이벤트 리스너
+      // Track 종료 이벤트
       stream.getTracks().forEach(track => {
         track.onended = () => {
-          console.warn(`⚠️ Track 종료됨: ${track.kind}`);
+          console.warn(`⚠️ Track 종료: ${track.kind}`);
         };
       });
       
@@ -113,15 +126,13 @@ export function useWebRTC(roomId, currentUser, isHost) {
   
   const sendSignal = useCallback(async (toPeerId, type, payload = {}) => {
     if (!currentUser?.username) {
-      console.warn('⚠️ currentUser 없음, 시그널 전송 불가');
+      console.warn('⚠️ currentUser 없음');
       return;
     }
 
-    const payloadString = JSON.stringify(payload);
-
     const message = {
       message_type: type,
-      payload: payloadString,
+      payload: JSON.stringify(payload),
       receiver_username: toPeerId,
     };
 
@@ -131,46 +142,40 @@ export function useWebRTC(roomId, currentUser, isHost) {
       const response = await axios.post(
         `/video-meetings/${roomId}/send_signal/`, 
         message,
-        { timeout: 10000 } // 10초 타임아웃
+        { timeout: 10000 }
       );
-      console.log(`✅ 시그널 전송 성공 (${type}): ID ${response.data.id}`);
+      console.log(`✅ 시그널 전송 성공: ${response.data.id}`);
       return response.data;
     } catch (err) {
-      console.error(`❌ Signal 전송 실패 (${type}):`, err.message);
+      console.error(`❌ Signal 전송 실패:`, err.message);
       throw err;
     }
   }, [roomId, currentUser]);
 
   // =========================================================================
-  // Peer Connection (Race Condition 방지)
+  // Peer Connection
   // =========================================================================
   
   const createPeerConnection = useCallback(async (peerId, isInitiator) => {
-    // Race condition 방지: 이미 생성 중이면 대기
+    // Race condition 방지
     if (isCreatingConnection.current[peerId]) {
-      console.log(`⏳ 연결 생성 대기 중: ${peerId}`);
+      console.log(`⏳ 연결 생성 대기: ${peerId}`);
       
-      // 최대 5초 대기
       for (let i = 0; i < 50; i++) {
         await new Promise(resolve => setTimeout(resolve, 100));
         if (!isCreatingConnection.current[peerId]) {
           const existing = peerConnections.current[peerId];
           if (existing && existing.connectionState !== 'failed') {
-            console.log(`✅ 대기 후 기존 연결 사용: ${peerId}`);
+            console.log(`✅ 대기 후 기존 연결 사용`);
             return existing;
           }
         }
       }
     }
     
-    // 락 획득
     isCreatingConnection.current[peerId] = true;
     
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`🔧 Peer Connection 생성`);
-    console.log(`   Peer: ${peerId}`);
-    console.log(`   Initiator: ${isInitiator}`);
-    console.log(`${'='.repeat(60)}\n`);
+    console.log(`🔧 Peer Connection 생성: ${peerId} (Initiator: ${isInitiator})`);
     
     try {
       // 기존 연결 확인
@@ -192,21 +197,19 @@ export function useWebRTC(roomId, currentUser, isHost) {
         }
         delete peerConnections.current[peerId];
         
-        // 타이머 정리
         if (connectionTimers.current[peerId]) {
           clearTimeout(connectionTimers.current[peerId]);
           delete connectionTimers.current[peerId];
         }
       }
       
-      // Local Stream 확인
       if (!localStreamRef.current) {
         throw new Error('Local Stream이 없습니다');
       }
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // 연결 타임아웃 설정
+      // 타임아웃 설정
       connectionTimers.current[peerId] = setTimeout(() => {
         if (pc.connectionState !== 'connected') {
           console.error(`⏱️ 연결 타임아웃: ${peerId}`);
@@ -221,8 +224,8 @@ export function useWebRTC(roomId, currentUser, isHost) {
       
       tracks.forEach(track => {
         try {
-          const sender = pc.addTrack(track, localStreamRef.current);
-          console.log(`✅ ${track.kind} track 추가 (ID: ${sender.track?.id})`);
+          pc.addTrack(track, localStreamRef.current);
+          console.log(`✅ ${track.kind} track 추가`);
         } catch (e) {
           console.error(`❌ Track 추가 실패:`, e);
         }
@@ -231,16 +234,13 @@ export function useWebRTC(roomId, currentUser, isHost) {
       // Event Handlers
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(`📡 ICE Candidate 생성 (${peerId})`);
           sendSignal(peerId, 'candidate', event.candidate.toJSON())
             .catch(e => console.error('ICE Candidate 전송 실패:', e));
         }
       };
 
       pc.ontrack = (event) => {
-        console.log(`\n${'🎉'.repeat(30)}`);
         console.log(`🎥 Remote Track 수신! From: ${peerId}, Kind: ${event.track.kind}`);
-        console.log(`${'🎉'.repeat(30)}\n`);
         
         if (event.streams.length > 0) {
           const remoteStream = event.streams[0];
@@ -279,13 +279,12 @@ export function useWebRTC(roomId, currentUser, isHost) {
         if (state === 'connected') {
           console.log(`✅ ICE 연결 성공! (${peerId})`);
           
-          // 타이머 해제
           if (connectionTimers.current[peerId]) {
             clearTimeout(connectionTimers.current[peerId]);
             delete connectionTimers.current[peerId];
           }
           
-          // 대기 중인 ICE Candidates 처리
+          // 대기 Candidates 처리
           if (pendingCandidates.current[peerId]?.length > 0) {
             console.log(`📦 대기 Candidates 처리: ${pendingCandidates.current[peerId].length}개`);
             pendingCandidates.current[peerId].forEach(candidate => {
@@ -298,7 +297,6 @@ export function useWebRTC(roomId, currentUser, isHost) {
         } else if (state === 'failed') {
           console.error(`❌ ICE 연결 실패 (${peerId})`);
           
-          // 재연결 시도
           if (pc.restartIce) {
             setTimeout(() => {
               console.log(`🔄 ICE 재시작 (${peerId})`);
@@ -308,7 +306,6 @@ export function useWebRTC(roomId, currentUser, isHost) {
         } else if (state === 'disconnected') {
           console.warn(`⚠️ ICE 연결 끊김 (${peerId})`);
           
-          // 5초 후에도 연결 안되면 재생성
           setTimeout(() => {
             if (pc.iceConnectionState === 'disconnected') {
               console.log(`🔄 연결 재생성 시도 (${peerId})`);
@@ -324,7 +321,6 @@ export function useWebRTC(roomId, currentUser, isHost) {
         console.log(`🔗 Connection State (${peerId}): ${state}`);
         
         if (state === 'failed' || state === 'closed') {
-          // 원격 스트림 제거
           setRemoteStreams(prev => prev.filter(s => s.peerId !== peerId));
           delete peerConnections.current[peerId];
         }
@@ -344,11 +340,10 @@ export function useWebRTC(roomId, currentUser, isHost) {
         }
       };
 
-      // 저장
       peerConnections.current[peerId] = pc;
       console.log(`✅ Peer Connection 저장 완료`);
 
-      // Initiator가 Offer 생성
+      // Initiator: Offer 생성
       if (isInitiator) {
         console.log(`🎬 Initiator: Offer 생성 시작`);
         
@@ -367,17 +362,14 @@ export function useWebRTC(roomId, currentUser, isHost) {
               });
             }
             
-            console.log(`📝 Creating Offer for ${peerId}...`);
             const offer = await pc.createOffer({
               offerToReceiveAudio: true,
               offerToReceiveVideo: true
             });
             
             await pc.setLocalDescription(offer);
-            console.log(`✅ Local Description set`);
-            
             await sendSignal(peerId, 'offer', pc.localDescription.toJSON());
-            console.log(`✅✅✅ Offer 전송 완료!`);
+            console.log(`✅ Offer 전송 완료!`);
           } catch (e) {
             console.error(`❌ Offer 생성/전송 실패:`, e);
           }
@@ -389,13 +381,12 @@ export function useWebRTC(roomId, currentUser, isHost) {
       console.error('❌ Peer Connection 생성 오류:', e);
       return null;
     } finally {
-      // 락 해제
       delete isCreatingConnection.current[peerId];
     }
   }, [sendSignal, isHost]);
 
   // =========================================================================
-  // Signal Handling (메모리 누수 방지)
+  // Signal Handling
   // =========================================================================
   
   const handleSignal = useCallback(async (signal, fetchRoomDetails) => {
@@ -460,7 +451,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
       return;
     }
     
-    // Signal 큐에 추가 (순차 처리)
+    // Signal Queue에 추가
     if (!signalQueue.current[peerId]) {
       signalQueue.current[peerId] = [];
     }
@@ -472,7 +463,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
     }
   }, [currentUser, isHost, createPeerConnection]);
   
-  // Signal Queue 처리 함수
+  // Signal Queue 처리
   const processSignalQueue = async (peerId) => {
     const queue = signalQueue.current[peerId];
     
@@ -487,7 +478,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
       }
       
       queue.shift();
-      await new Promise(resolve => setTimeout(resolve, 50)); // 50ms 대기
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
   };
   
@@ -510,7 +501,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
     try {
       switch (type) {
         case 'offer':
-          console.log(`📥 Offer 처리 시작 (${peerId})`);
+          console.log(`📥 Offer 처리 시작`);
           
           if (pc.signalingState === 'have-local-offer') {
             await pc.setLocalDescription({type: 'rollback'});
@@ -525,23 +516,21 @@ export function useWebRTC(roomId, currentUser, isHost) {
           console.log(`✅ Answer 생성 완료`);
           
           await sendSignal(peerId, 'answer', pc.localDescription.toJSON());
-          console.log(`✅✅✅ Answer 전송 완료!`);
+          console.log(`✅ Answer 전송 완료!`);
           break;
           
         case 'answer':
-          console.log(`📥 Answer 처리 시작 (${peerId})`);
+          console.log(`📥 Answer 처리 시작`);
           
           if (pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(new RTCSessionDescription(data));
-            console.log(`✅✅✅ Answer 적용 완료!`);
+            console.log(`✅ Answer 적용 완료!`);
           } else {
             console.warn(`⚠️ 비정상 상태: ${pc.signalingState}`);
           }
           break;
           
         case 'candidate':
-          console.log(`📥 ICE Candidate 처리 (${peerId})`);
-          
           if (data && data.candidate) {
             if (pc.remoteDescription && pc.remoteDescription.type) {
               await pc.addIceCandidate(new RTCIceCandidate(data));
@@ -569,7 +558,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
   const cleanup = useCallback(() => {
     console.log('\n🧹 WebRTC 정리...');
     
-    // Peer Connections 정리
+    // Peer Connections
     Object.entries(peerConnections.current).forEach(([peerId, pc]) => {
       try {
         pc.close();
@@ -579,7 +568,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
     });
     peerConnections.current = {};
     
-    // Local Stream 정리
+    // Local Stream
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         track.stop();
@@ -588,9 +577,14 @@ export function useWebRTC(roomId, currentUser, isHost) {
       localStreamRef.current = null;
     }
     
-    // 타이머 정리
+    // 타이머
     Object.values(connectionTimers.current).forEach(timer => clearTimeout(timer));
     connectionTimers.current = {};
+    
+    // 정리 타이머
+    if (cleanupTimerRef.current) {
+      clearInterval(cleanupTimerRef.current);
+    }
     
     // 상태 초기화
     processedSignals.current.clear();
@@ -605,7 +599,7 @@ export function useWebRTC(roomId, currentUser, isHost) {
 
   return {
     localStreamRef,
-    peerConnections, // 외부에서 참조 가능하도록
+    peerConnections,
     remoteStreams,
     connectionStatus,
     getLocalMedia,
