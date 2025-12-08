@@ -100,26 +100,26 @@ services:
       - webboard_network
 
   # Nginx 리버스 프록시
-nginx:
-  image: nginx:alpine
-  container_name: webboard_nginx
-  ports:
-    - "80:80"
-    - "443:443"
-  volumes:
-    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    - ./nginx/conf.d:/etc/nginx/conf.d:ro
-    - static_volume:/staticfiles:ro
-    - ./fonts:/usr/share/nginx/html/fonts:ro   # ← 여기로 변경됨!
-    - media_volume:/media:ro
-    - ./certbot/conf:/etc/letsencrypt:ro
-    - ./certbot/www:/var/www/certbot:ro
-  depends_on:
-    - backend
-    - frontend
-  restart: always
-  networks:
-    - webboard_network
+  nginx:
+    image: nginx:alpine
+    container_name: webboard_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - static_volume:/staticfiles:ro
+      - ./fonts:/usr/share/nginx/html/fonts:ro   # ← 여기로 변경됨!
+      - media_volume:/media:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    networks:
+      - webboard_network
 
   # Certbot (SSL 인증서 갱신)
   certbot:
