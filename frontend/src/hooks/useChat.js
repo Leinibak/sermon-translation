@@ -7,49 +7,92 @@ export function useChat(roomId, currentUser) {
   const [loading, setLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  
   const messagesEndRef = useRef(null);
+  const lastFetchTimeRef = useRef(Date.now());
+  const pollingIntervalRef = useRef(null);
 
   /**
-   * 채팅 메시지 목록 불러오기
+   * 채팅 메시지 목록 로드
    */
   const fetchMessages = useCallback(async () => {
+    if (!roomId) return;
+
     try {
       setLoading(true);
       const response = await axios.get(`/video-meetings/${roomId}/chat/messages/`);
+      
       setMessages(response.data);
-      console.log(`✅ 채팅 메시지 ${response.data.length}개 로드`);
+      lastFetchTimeRef.current = Date.now();
+      
+      console.log(`💬 채팅 메시지 로드: ${response.data.length}개`);
     } catch (error) {
-      console.error('❌ 채팅 메시지 로딩 실패:', error);
+      console.error('❌ 채팅 메시지 로드 실패:', error);
     } finally {
       setLoading(false);
     }
   }, [roomId]);
 
   /**
+   * 새 메시지 폴링
+   */
+  const pollNewMessages = useCallback(async () => {
+    if (!roomId) return;
+
+    try {
+      const response = await axios.get(`/video-meetings/${roomId}/chat/messages/`);
+      const newMessages = response.data;
+
+      setMessages(prevMessages => {
+        // 기존 메시지 ID 추출
+        const existingIds = new Set(prevMessages.map(m => m.id));
+        
+        // 새로운 메시지만 필터링
+        const trulyNewMessages = newMessages.filter(m => !existingIds.has(m.id));
+        
+        if (trulyNewMessages.length > 0) {
+          console.log(`💬 새 메시지 ${trulyNewMessages.length}개 수신`);
+          
+          // 채팅창이 닫혀있으면 읽지 않은 메시지 카운트 증가
+          if (!isChatOpen) {
+            setUnreadCount(prev => prev + trulyNewMessages.length);
+          }
+          
+          return [...prevMessages, ...trulyNewMessages];
+        }
+        
+        return prevMessages;
+      });
+    } catch (error) {
+      console.error('❌ 새 메시지 폴링 실패:', error);
+    }
+  }, [roomId, isChatOpen]);
+
+  /**
    * 메시지 전송
    */
   const sendMessage = useCallback(async (content) => {
-    if (!content.trim()) {
+    if (!content.trim() || !roomId) {
+      console.warn('⚠️ 메시지 내용 없음');
       return;
     }
 
     try {
-      console.log('💬 메시지 전송:', content.substring(0, 30) + '...');
-      
       const response = await axios.post(`/video-meetings/${roomId}/chat/send/`, {
         content: content.trim()
       });
 
-      // 메시지 목록에 추가
-      const newMessage = response.data;
-      setMessages(prev => [...prev, newMessage]);
+      console.log('✅ 메시지 전송 성공:', response.data.id);
 
-      // 스크롤 하단으로
+      // 즉시 메시지 목록에 추가
+      setMessages(prev => [...prev, response.data]);
+
+      // 스크롤을 맨 아래로
       setTimeout(() => {
-        scrollToBottom();
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
 
-      console.log('✅ 메시지 전송 완료');
+      return response.data;
     } catch (error) {
       console.error('❌ 메시지 전송 실패:', error);
       throw error;
@@ -57,77 +100,48 @@ export function useChat(roomId, currentUser) {
   }, [roomId]);
 
   /**
-   * 실시간 메시지 수신 처리
-   */
-  const handleNewMessage = useCallback((message) => {
-    console.log('📩 실시간 메시지 수신:', message.sender);
-
-    setMessages(prev => {
-      // 중복 확인
-      const isDuplicate = prev.some(m => m.id === message.message_id);
-      if (isDuplicate) {
-        return prev;
-      }
-
-      return [...prev, {
-        id: message.message_id,
-        sender_username: message.sender,
-        content: message.content,
-        created_at: message.created_at,
-        is_mine: message.sender === currentUser?.username
-      }];
-    });
-
-    // 채팅창이 닫혀있고 내가 보낸 메시지가 아니면 미읽음 카운트 증가
-    if (!isChatOpen && message.sender !== currentUser?.username) {
-      setUnreadCount(prev => prev + 1);
-    }
-
-    // 스크롤 하단으로
-    setTimeout(() => {
-      scrollToBottom();
-    }, 100);
-  }, [currentUser, isChatOpen]);
-
-  /**
    * 채팅 패널 토글
    */
   const toggleChat = useCallback(() => {
-    setIsChatOpen(prev => !prev);
-    
-    // 채팅창 열 때 미읽음 카운트 초기화
-    if (!isChatOpen) {
-      setUnreadCount(0);
-    }
-  }, [isChatOpen]);
-
-  /**
-   * 스크롤 하단으로 이동
-   */
-  const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'end'
-      });
-    }
+    setIsChatOpen(prev => {
+      const newState = !prev;
+      
+      // 채팅창을 열면 읽지 않은 메시지 카운트 초기화
+      if (newState) {
+        setUnreadCount(0);
+      }
+      
+      return newState;
+    });
   }, []);
 
   /**
-   * 초기 메시지 로드
+   * 초기 로드 및 폴링 시작
    */
   useEffect(() => {
+    if (!roomId) return;
+
+    // 초기 메시지 로드
     fetchMessages();
-  }, [fetchMessages]);
+
+    // 3초마다 새 메시지 확인
+    pollingIntervalRef.current = setInterval(pollNewMessages, 3000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [roomId, fetchMessages, pollNewMessages]);
 
   /**
-   * 채팅창 열릴 때 스크롤 하단으로
+   * 자동 스크롤
    */
   useEffect(() => {
-    if (isChatOpen) {
-      scrollToBottom();
+    if (messages.length > 0 && isChatOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [isChatOpen, scrollToBottom]);
+  }, [messages, isChatOpen]);
 
   return {
     messages,
@@ -136,7 +150,6 @@ export function useChat(roomId, currentUser) {
     unreadCount,
     messagesEndRef,
     sendMessage,
-    handleNewMessage,
     toggleChat,
     fetchMessages
   };

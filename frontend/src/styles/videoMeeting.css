@@ -1,0 +1,225 @@
+/* frontend/src/styles/videoMeeting.css */
+
+/* ============================================================================
+   반응 애니메이션
+   ============================================================================ */
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-200px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: float-up 3s ease-out forwards;
+}
+
+/* ============================================================================
+   팝오버 스케일 애니메이션
+   ============================================================================ */
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0.8) translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* ============================================================================
+   손들기 애니메이션 (바운스)
+   ============================================================================ */
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+/* ============================================================================
+   펄스 효과 (연결 상태 표시)
+   ============================================================================ */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================================================
+   페이드 인 효과
+   ============================================================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in;
+}
+
+/* ============================================================================
+   슬라이드 업 효과
+   ============================================================================ */
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* ============================================================================
+   스피너 (로딩)
+   ============================================================================ */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================================================
+   비디오 카드 호버 효과
+   ============================================================================ */
+
+.video-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================================
+   채팅 메시지 애니메이션
+   ============================================================================ */
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.chat-message-enter {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* ============================================================================
+   알림 배지 애니메이션
+   ============================================================================ */
+
+@keyframes notification-pop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.notification-badge {
+  animation: notification-pop 0.3s ease-out;
+}
+
+/* ============================================================================
+   웨이브 효과 (마이크 활성 표시)
+   ============================================================================ */
+
+@keyframes wave {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.mic-active {
+  animation: wave 0.5s ease-in-out infinite;
+}
+
+/* ============================================================================
+   반응형 그리드 조정
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .animate-float-up {
+    animation: float-up 2.5s ease-out forwards;
+  }
+}
+
+/* ============================================================================
+   다크 모드 지원
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  .video-card {
+    background-color: rgba(31, 41, 55, 0.9);
+  }
+  
+  .video-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+}

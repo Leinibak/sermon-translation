@@ -1,64 +1,74 @@
 // frontend/src/hooks/useReactions.js
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import axios from '../api/axios';
+
+let globalReactionIdCounter = 0;
 
 export function useReactions(roomId) {
   const [activeReactions, setActiveReactions] = useState([]);
-  const reactionIdCounter = useRef(0);
 
   /**
    * 반응 전송
    */
-  const sendReaction = useCallback(async (reactionType) => {
-    try {
-      console.log('👍 반응 전송:', reactionType);
+  const sendReaction = useCallback(async (emoji) => {
+    if (!roomId || !emoji) {
+      console.warn('⚠️ roomId 또는 emoji 없음');
+      return;
+    }
 
+    try {
+      console.log(`👍 반응 전송: ${emoji}`);
+
+      // 서버에 반응 전송
       await axios.post(`/video-meetings/${roomId}/reactions/send/`, {
-        reaction_type: reactionType
+        reaction_type: emoji
       });
 
-      console.log('✅ 반응 전송 완료');
+      console.log('✅ 반응 전송 성공');
     } catch (error) {
       console.error('❌ 반응 전송 실패:', error);
     }
   }, [roomId]);
 
   /**
-   * 실시간 반응 수신 처리
+   * 반응 애니메이션 표시
+   * (WebSocket 또는 폴링으로 수신한 반응을 화면에 표시)
    */
-  const handleReactionNotification = useCallback((reaction) => {
-    console.log('🎉 반응 수신:', reaction.username, reaction.reaction);
+  const displayReaction = useCallback((emoji, username) => {
+    const reactionId = `reaction_${globalReactionIdCounter++}`;
 
-    // 고유 ID 생성
-    const id = `reaction-${Date.now()}-${reactionIdCounter.current++}`;
-
-    // 반응을 활성 목록에 추가
     const newReaction = {
-      id,
-      emoji: reaction.reaction,
-      username: reaction.username,
+      id: reactionId,
+      emoji,
+      username,
       timestamp: Date.now()
     };
+
+    console.log(`🎉 반응 표시: ${emoji} from ${username}`);
 
     setActiveReactions(prev => [...prev, newReaction]);
 
     // 3초 후 자동 제거
     setTimeout(() => {
-      setActiveReactions(prev => prev.filter(r => r.id !== id));
+      setActiveReactions(prev => prev.filter(r => r.id !== reactionId));
     }, 3000);
   }, []);
 
   /**
-   * 반응 정리 (메모리 누수 방지)
+   * WebSocket 메시지로부터 반응 수신 처리
    */
-  const cleanupReactions = useCallback(() => {
-    setActiveReactions([]);
-  }, []);
+  const handleReactionNotification = useCallback((data) => {
+    const { username, reaction } = data;
+
+    if (username && reaction) {
+      displayReaction(reaction, username);
+    }
+  }, [displayReaction]);
 
   return {
     activeReactions,
     sendReaction,
-    handleReactionNotification,
-    cleanupReactions
+    displayReaction,
+    handleReactionNotification
   };
 }

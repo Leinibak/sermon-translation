@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+import '../styles/videoMeeting.css';
 // Custom Hooks
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
