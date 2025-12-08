@@ -30,6 +30,9 @@ COPY . .
 # 정적 파일 디렉토리 생성
 RUN mkdir -p /app/staticfiles /app/media
 
+RUN mkdir -p /staticfiles/fonts \
+    && chmod -R 755 /staticfiles
+    
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # 포트 노출
