@@ -1,295 +1,161 @@
 #!/bin/bash
-# ============================================
-# deploy.sh (개선된 배포 스크립트)
-# ============================================
 
-set -e  # 에러 발생 시 중단
+# ================================================
+# 안전한 프로덕션 배포 스크립트
+# ================================================
 
-# 색상 코드
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+set -e
 
-# 로깅 함수
-log_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
-}
+COMPOSE_FILE="docker-compose.prod.yml"
+BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
 
-log_success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
+echo "🚀 Starting deployment process..."
 
-log_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
+# ================================================
+# 1️⃣ 사전 검증
+# ================================================
+echo "📋 Pre-deployment checks..."
 
-log_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
+# .env 파일 확인
+if [ ! -f .env ]; then
+    echo "❌ .env file not found!"
+    exit 1
+fi
 
-# 배포 시작
-echo "======================================"
-echo "🚀 웹보드 프로덕션 배포 시작"
-echo "======================================"
-echo "시작 시간: $(date '+%Y-%m-%d %H:%M:%S')"
-echo ""
+# Docker 실행 확인
+if ! docker info > /dev/null 2>&1; then
+    echo "❌ Docker is not running!"
+    exit 1
+fi
 
-# ========================================
-# 1. 환경변수 파일 확인
-# ========================================
-
-log_info "환경변수 파일 확인 중..."
-
-ENV_FILES=(
-    ".env.production"
-    "backend/.env.production"
-    "frontend/.env.production"
-)
-
-missing_files=()
-for file in "${ENV_FILES[@]}"; do
-    if [ ! -f "$file" ]; then
-        missing_files+=("$file")
+# 필수 디렉토리 확인
+required_dirs=("backend" "frontend" "nginx")
+for dir in "${required_dirs[@]}"; do
+    if [ ! -d "$dir" ]; then
+        echo "❌ Required directory not found: $dir"
+        exit 1
     fi
 done
 
-if [ ${#missing_files[@]} -gt 0 ]; then
-    log_error "다음 환경변수 파일이 없습니다:"
-    for file in "${missing_files[@]}"; do
-        echo "  - $file"
-    done
+# Frontend Dockerfile에서 참조하는 파일 확인
+if [ ! -f "frontend/nginx.prod.conf" ]; then
+    echo "❌ frontend/nginx.prod.conf not found!"
     exit 1
 fi
 
-log_success "모든 환경변수 파일 확인 완료"
-
-# ========================================
-# 2. Git 업데이트 (선택사항)
-# ========================================
-
-read -p "Git Pull을 실행하시겠습니까? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    log_info "Git Pull 실행 중..."
-    
-    # 현재 브랜치 확인
-    CURRENT_BRANCH=$(git branch --show-current)
-    log_info "현재 브랜치: $CURRENT_BRANCH"
-    
-    # 변경사항 확인
-    if ! git diff-index --quiet HEAD --; then
-        log_warning "커밋되지 않은 변경사항이 있습니다."
-        read -p "계속하시겠습니까? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "배포 취소됨"
-            exit 1
-        fi
-    fi
-    
-    # Pull 실행
-    git pull origin "$CURRENT_BRANCH"
-    log_success "Git Pull 완료"
-else
-    log_warning "Git Pull 건너뜀"
+# Backend entrypoint 파일 확인 및 실행 권한 부여
+if [ ! -f "backend/entrypoint.prod.sh" ]; then
+    echo "❌ backend/entrypoint.prod.sh not found!"
+    exit 1
 fi
+chmod +x backend/entrypoint.prod.sh
 
-# ========================================
-# 3. 백업 생성
-# ========================================
+echo "✅ All pre-deployment checks passed!"
 
-log_info "현재 컨테이너 상태 백업 중..."
-
-BACKUP_DIR="backups"
-BACKUP_TIME=$(date '+%Y%m%d_%H%M%S')
-BACKUP_FILE="$BACKUP_DIR/backup_$BACKUP_TIME.txt"
-
+# ================================================
+# 2️⃣ 백업 생성
+# ================================================
+echo "💾 Creating backup..."
 mkdir -p "$BACKUP_DIR"
 
-# 현재 실행 중인 컨테이너 정보 저장
-docker compose -f docker-compose.prod.yml ps > "$BACKUP_FILE" 2>&1 || true
+# 데이터베이스 백업
+if docker ps | grep -q webboard_db_prod; then
+    echo "Backing up database..."
+    docker exec webboard_db_prod pg_dump -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-webboard_db} > "$BACKUP_DIR/database.sql"
+    echo "✅ Database backup created"
+fi
 
-log_success "백업 생성 완료: $BACKUP_FILE"
+# 미디어 파일 백업
+if [ -d "./media" ]; then
+    echo "Backing up media files..."
+    cp -r ./media "$BACKUP_DIR/"
+    echo "✅ Media files backup created"
+fi
 
-# ========================================
-# 4. 기존 컨테이너 중지
-# ========================================
+echo "✅ Backup completed: $BACKUP_DIR"
 
-log_info "기존 컨테이너 중지 중..."
+# ================================================
+# 3️⃣ 이미지 빌드
+# ================================================
+echo "🔨 Building Docker images..."
 
-# 타임아웃 설정 (30초)
-docker compose -f docker-compose.prod.yml down --timeout 30
-
-log_success "기존 컨테이너 중지 완료"
-
-# ========================================
-# 5. Docker 이미지 빌드
-# ========================================
-
-log_info "Docker 이미지 빌드 중..."
-
-# 빌드 옵션 확인
-read -p "캐시를 사용하지 않고 빌드하시겠습니까? (y/N): " -n 1 -r
-echo
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    BUILD_ARGS="--no-cache"
-    log_warning "캐시 없이 빌드합니다 (시간이 더 걸립니다)"
+if docker compose -f $COMPOSE_FILE build --no-cache; then
+    echo "✅ Docker images built successfully!"
 else
-    BUILD_ARGS=""
-    log_info "캐시를 사용하여 빌드합니다"
-fi
-
-# 빌드 실행
-if ! docker compose -f docker-compose.prod.yml build $BUILD_ARGS; then
-    log_error "Docker 이미지 빌드 실패!"
-    log_info "이전 상태로 롤백을 시도합니다..."
-    docker compose -f docker-compose.prod.yml up -d
+    echo "❌ Docker build failed!"
+    echo "ℹ️  Rolling back is not needed (old containers still running)"
     exit 1
 fi
 
-log_success "Docker 이미지 빌드 완료"
+# ================================================
+# 4️⃣ 컨테이너 중지 및 제거
+# ================================================
+echo "🛑 Stopping old containers..."
+docker compose -f $COMPOSE_FILE down
 
-# ========================================
-# 6. 컨테이너 시작
-# ========================================
+# ================================================
+# 5️⃣ 새 컨테이너 시작
+# ================================================
+echo "🚀 Starting new containers..."
 
-log_info "컨테이너 시작 중..."
+docker compose -f $COMPOSE_FILE up -d
 
-if ! docker compose -f docker-compose.prod.yml up -d; then
-    log_error "컨테이너 시작 실패!"
-    exit 1
-fi
+# ================================================
+# 6️⃣ 헬스체크
+# ================================================
+echo "🏥 Waiting for services to be healthy..."
 
-log_success "컨테이너 시작 완료"
-
-# ========================================
-# 7. 서비스 준비 대기
-# ========================================
-
-log_info "서비스 준비 대기 중..."
-
-MAX_WAIT=60  # 최대 60초 대기
-WAIT_INTERVAL=5
-elapsed=0
-
-while [ $elapsed -lt $MAX_WAIT ]; do
-    # 백엔드 헬스체크
-    if docker compose -f docker-compose.prod.yml exec -T backend curl -f http://localhost:8000/api/health/ > /dev/null 2>&1; then
-        log_success "백엔드 서비스 준비 완료"
+# Backend 헬스체크 (최대 2분 대기)
+MAX_WAIT=120
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if docker compose -f $COMPOSE_FILE ps backend | grep -q "healthy"; then
+        echo "✅ Backend is healthy!"
         break
     fi
     
-    echo -n "."
-    sleep $WAIT_INTERVAL
-    elapsed=$((elapsed + WAIT_INTERVAL))
-done
-
-echo ""
-
-if [ $elapsed -ge $MAX_WAIT ]; then
-    log_warning "백엔드 헬스체크 타임아웃 (계속 진행)"
-fi
-
-# ========================================
-# 8. 데이터베이스 마이그레이션
-# ========================================
-
-log_info "데이터베이스 마이그레이션 실행 중..."
-
-if ! docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput; then
-    log_error "마이그레이션 실패!"
-    log_info "컨테이너 로그:"
-    docker compose -f docker-compose.prod.yml logs --tail=50 backend
-    exit 1
-fi
-
-log_success "마이그레이션 완료"
-
-# ========================================
-# 9. 정적 파일 수집
-# ========================================
-
-log_info "정적 파일 수집 중..."
-
-if ! docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput; then
-    log_error "정적 파일 수집 실패!"
-    exit 1
-fi
-
-log_success "정적 파일 수집 완료"
-
-# ========================================
-# 10. 배포 검증
-# ========================================
-
-log_info "배포 검증 중..."
-
-# 컨테이너 상태 확인
-echo ""
-echo "📊 컨테이너 상태:"
-docker compose -f docker-compose.prod.yml ps
-
-# 실행 중인 컨테이너 개수 확인
-RUNNING_CONTAINERS=$(docker compose -f docker-compose.prod.yml ps --status running --format json | wc -l)
-EXPECTED_CONTAINERS=5  # db, redis, backend, frontend, nginx
-
-if [ "$RUNNING_CONTAINERS" -lt "$EXPECTED_CONTAINERS" ]; then
-    log_warning "일부 컨테이너가 실행되지 않았습니다."
-    read -p "배포를 계속하시겠습니까? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_error "배포 취소됨"
+    if docker compose -f $COMPOSE_IF ps backend | grep -q "unhealthy"; then
+        echo "❌ Backend is unhealthy!"
+        echo "📋 Backend logs:"
+        docker compose -f $COMPOSE_FILE logs --tail=50 backend
         exit 1
     fi
+    
+    echo "Waiting for backend... ($WAITED/$MAX_WAIT seconds)"
+    sleep 5
+    WAITED=$((WAITED + 5))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    echo "❌ Backend health check timeout!"
+    echo "📋 Backend logs:"
+    docker compose -f $COMPOSE_FILE logs --tail=50 backend
+    exit 1
 fi
 
-# ========================================
-# 11. 로그 확인 옵션
-# ========================================
-
-echo ""
-read -p "컨테이너 로그를 확인하시겠습니까? (y/N): " -n 1 -r
-echo
-
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    log_info "최근 로그 (Ctrl+C로 종료):"
-    docker compose -f docker-compose.prod.yml logs -f --tail=50
+# Nginx 헬스체크
+sleep 5
+if curl -f http://localhost/health > /dev/null 2>&1; then
+    echo "✅ Nginx is responding!"
+else
+    echo "⚠️  Nginx health check failed, but continuing..."
 fi
 
-# ========================================
-# 12. 배포 완료
-# ========================================
+# ================================================
+# 7️⃣ 배포 완료
+# ================================================
+echo ""
+echo "✅ ======================================"
+echo "✅  Deployment completed successfully!"
+echo "✅ ======================================"
+echo ""
+echo "📊 Container status:"
+docker compose -f $COMPOSE_FILE ps
 
 echo ""
-echo "======================================"
-log_success "배포 완료!"
-echo "======================================"
-echo "완료 시간: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "📝 Useful commands:"
+echo "  View logs:     docker compose -f $COMPOSE_FILE logs -f [service]"
+echo "  Restart:       docker compose -f $COMPOSE_FILE restart [service]"
+echo "  Stop all:      docker compose -f $COMPOSE_FILE down"
+echo "  Backup location: $BACKUP_DIR"
 echo ""
-echo "🌐 접속 정보:"
-echo "  Frontend: http://89.168.85.29"
-echo "  Backend API: http://89.168.85.29/api"
-echo "  Django Admin: http://89.168.85.29/admin"
-echo "  HTTPS: https://jounsori.org (SSL 설정 후)"
-echo ""
-echo "📝 유용한 명령어:"
-echo "  로그 확인: docker compose -f docker-compose.prod.yml logs -f"
-echo "  상태 확인: docker compose -f docker-compose.prod.yml ps"
-echo "  재시작: docker compose -f docker-compose.prod.yml restart"
-echo "  중지: docker compose -f docker-compose.prod.yml down"
-echo ""
-
-# 배포 정보 저장
-DEPLOY_LOG="$BACKUP_DIR/deploy_$BACKUP_TIME.log"
-{
-    echo "배포 시간: $(date '+%Y-%m-%d %H:%M:%S')"
-    echo "Git 커밋: $(git rev-parse HEAD)"
-    echo "Git 브랜치: $(git branch --show-current)"
-    echo ""
-    docker compose -f docker-compose.prod.yml ps
-} > "$DEPLOY_LOG"
-
-log_success "배포 로그 저장: $DEPLOY_LOG"

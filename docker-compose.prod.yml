@@ -1,3 +1,5 @@
+# docker-compose.prod.yml
+
 services:
   # PostgreSQL 데이터베이스
   db:
