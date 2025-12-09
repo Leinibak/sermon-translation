@@ -1,6 +1,6 @@
 #!/bin/sh
 # ===========================================
-# FILE: backend/entrypoint.prod.sh (프로덕션 환경용)
+# FILE: backend/entrypoint.prod.sh (프로덕션 환경용 - 슈퍼유저 로직 제거)
 # ===========================================
 
 set -e
@@ -45,23 +45,9 @@ python manage.py migrate --noinput
 echo "📦 정적 파일 수집..."
 python manage.py collectstatic --noinput --clear
 
-# 슈퍼유저 생성 (선택사항)
-if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
-    echo "👤 슈퍼유저 확인 중..."
-    python manage.py shell <<EOF
-from django.contrib.auth import get_user_model
-User = get_user_model()
-username = "$DJANGO_SUPERUSER_USERNAME"
-email = "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
-password = "$DJANGO_SUPERUSER_PASSWORD"
-
-if not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username, email, password)
-    print(f"✅ 슈퍼유저 '{username}' 생성 완료")
-else:
-    print(f"ℹ️ 슈퍼유저 '{username}' 이미 존재")
-EOF
-fi
+# ⚠️ 슈퍼유저 생성 로직이 이 섹션에서 제거되었습니다.
+# 관리자 계정은 수동으로 생성해야 합니다:
+# docker compose exec backend python manage.py createsuperuser
 
 # ========================================
 # 3. 서버 시작
@@ -72,14 +58,14 @@ echo "========================================"
 echo "🎯 프로덕션 서버 설정"
 echo "========================================"
 echo "📌 Gunicorn (HTTP/WSGI)"
-echo "   - 포트: 8000"
-echo "   - Workers: ${GUNICORN_WORKERS:-4}"
-echo "   - 일반 HTTP API 처리"
+echo "   - 포트: 8000"
+echo "   - Workers: ${GUNICORN_WORKERS:-4}"
+echo "   - 일반 HTTP API 처리"
 echo ""
 echo "📌 Daphne (WebSocket/ASGI)"
-echo "   - 포트: 8001"
-echo "   - WebSocket 연결 처리"
-echo "   - /ws/ 경로 전용"
+echo "   - 포트: 8001"
+echo "   - WebSocket 연결 처리"
+echo "   - /ws/ 경로 전용"
 echo "========================================"
 echo ""
 
@@ -150,14 +136,14 @@ shutdown() {
     
     # Gunicorn 종료
     if kill -0 $GUNICORN_PID 2>/dev/null; then
-        echo "   -> Gunicorn 종료 중 (PID: $GUNICORN_PID)"
+        echo "   -> Gunicorn 종료 중 (PID: $GUNICORN_PID)"
         kill -TERM $GUNICORN_PID
         wait $GUNICORN_PID 2>/dev/null || true
     fi
     
     # Daphne 종료
     if kill -0 $DAPHNE_PID 2>/dev/null; then
-        echo "   -> Daphne 종료 중 (PID: $DAPHNE_PID)"
+        echo "   -> Daphne 종료 중 (PID: $DAPHNE_PID)"
         kill -TERM $DAPHNE_PID
         wait $DAPHNE_PID 2>/dev/null || true
     fi
