@@ -260,17 +260,17 @@ if ENVIRONMENT == "prod":
     X_FRAME_OPTIONS = 'DENY'
 
 # ============================================================================
-# REST Framework 설정 (보안 강화)
+# REST Framework 설정 (Rate Limiting 조정)
 # ============================================================================
 
-REST_FRAMEWORK = {
+REST_FRAMEWORK = {  
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     
     # 인증
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # 추가
+        'rest_framework.authentication.SessionAuthentication',
     ],
     
     # 권한
@@ -278,14 +278,15 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     
-    # Throttling (Rate Limiting)
+    # ⭐ Throttling (Rate Limiting) - 완화
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+        'anon': '200/hour',        # 100 → 200으로 증가
+        'user': '2000/hour',       # 1000 → 2000으로 증가
+        'video_meeting': '1000/hour',  # ⭐ 새로 추가
     },
     
     # Filtering
@@ -295,7 +296,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
     
-    # Renderer (프로덕션에서는 JSON만)
+    # Renderer
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ] if ENVIRONMENT == "prod" else [
@@ -496,3 +497,14 @@ CACHES = {
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_CACHE_ALIAS = 'default'
 
+
+# Video Meeting용 커스텀 Throttle
+from rest_framework.throttling import UserRateThrottle
+
+class VideoMeetingThrottle(UserRateThrottle):
+    """
+    화상회의 API용 Rate Limiting
+    더 관대한 제한 적용
+    """
+    scope = 'video_meeting'
+    rate = '1000/hour'  # 시간당 1000회

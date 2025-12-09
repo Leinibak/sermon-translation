@@ -174,10 +174,10 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 {'detail': f'참가 요청 생성 실패: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+        
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """참가 승인"""
+        """⭐ 참가 승인 (WebSocket 알림 추가)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -211,25 +211,32 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.joined_at = timezone.now()
         participant.save()
         
-        # WebSocket 알림
+        print(f"✅ 참가 승인: {participant.user.username}")
+        
+        # ⭐⭐⭐ WebSocket 알림 (반드시 추가!)
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
-        async_to_sync(channel_layer.group_send)(
-            room_group_name,
-            {
-                'type': 'approval_notification',
-                'participant_username': participant.user.username,
-                'message': '참가가 승인되었습니다.'
-            }
-        )
+        try:
+            # 승인된 사용자에게 직접 알림
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'approval_notification',
+                    'participant_username': participant.user.username,
+                    'message': '참가가 승인되었습니다.'
+                }
+            )
+            print(f"📡 승인 알림 전송: {participant.user.username}")
+        except Exception as e:
+            print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
     def reject_participant(self, request, pk=None):
-        """참가 거부"""
+        """⭐ 참가 거부 (WebSocket 알림 추가)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -248,18 +255,24 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.status = 'rejected'
         participant.save()
         
-        # WebSocket 알림
+        print(f"✅ 참가 거부: {participant.user.username}")
+        
+        # ⭐⭐⭐ WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
-        async_to_sync(channel_layer.group_send)(
-            room_group_name,
-            {
-                'type': 'rejection_notification',
-                'participant_username': participant.user.username,
-                'message': '참가가 거부되었습니다.'
-            }
-        )
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'rejection_notification',
+                    'participant_username': participant.user.username,
+                    'message': '참가가 거부되었습니다.'
+                }
+            )
+            print(f"📡 거부 알림 전송: {participant.user.username}")
+        except Exception as e:
+            print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
