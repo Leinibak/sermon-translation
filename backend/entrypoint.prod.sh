@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 # ===========================================
-# FILE: backend/entrypoint.prod.sh (프로덕션 환경용 - 슈퍼유저 로직 제거)
+# FILE: backend/entrypoint.prod.sh (프로덕션 환경용)
 # ===========================================
 
 set -e
@@ -45,9 +45,23 @@ python manage.py migrate --noinput
 echo "📦 정적 파일 수집..."
 python manage.py collectstatic --noinput --clear
 
-# ⚠️ 슈퍼유저 생성 로직이 이 섹션에서 제거되었습니다.
-# 관리자 계정은 수동으로 생성해야 합니다:
-# docker compose exec backend python manage.py createsuperuser
+# 슈퍼유저 생성 (선택사항)
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo "👤 슈퍼유저 확인 중..."
+    python manage.py shell <<EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+username = "$DJANGO_SUPERUSER_USERNAME"
+email = "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
+password = "$DJANGO_SUPERUSER_PASSWORD"
+
+if not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username, email, password)
+    print(f"✅ 슈퍼유저 '{username}' 생성 완료")
+else:
+    print(f"ℹ️ 슈퍼유저 '{username}' 이미 존재")
+EOF
+fi
 
 # ========================================
 # 3. 서버 시작
@@ -58,14 +72,14 @@ echo "========================================"
 echo "🎯 프로덕션 서버 설정"
 echo "========================================"
 echo "📌 Gunicorn (HTTP/WSGI)"
-echo "   - 포트: 8000"
-echo "   - Workers: ${GUNICORN_WORKERS:-4}"
-echo "   - 일반 HTTP API 처리"
+echo "   - 포트: 8000"
+echo "   - Workers: ${GUNICORN_WORKERS:-4}"
+echo "   - 일반 HTTP API 처리"
 echo ""
 echo "📌 Daphne (WebSocket/ASGI)"
-echo "   - 포트: 8001"
-echo "   - WebSocket 연결 처리"
-echo "   - /ws/ 경로 전용"
+echo "   - 포트: 8001"
+echo "   - WebSocket 연결 처리"
+echo "   - /ws/ 경로 전용"
 echo "========================================"
 echo ""
 
@@ -135,16 +149,16 @@ shutdown() {
     echo "🛑 종료 신호 수신. 서버를 안전하게 종료합니다..."
     
     # Gunicorn 종료
-    if kill -0 $GUNICORN_PID 2>/dev/null; then
-        echo "   -> Gunicorn 종료 중 (PID: $GUNICORN_PID)"
-        kill -TERM $GUNICORN_PID
+    if [ -n "$GUNICORN_PID" ] && kill -0 $GUNICORN_PID 2>/dev/null; then
+        echo "   -> Gunicorn 종료 중 (PID: $GUNICORN_PID)"
+        kill -TERM $GUNICORN_PID 2>/dev/null || true
         wait $GUNICORN_PID 2>/dev/null || true
     fi
     
     # Daphne 종료
-    if kill -0 $DAPHNE_PID 2>/dev/null; then
-        echo "   -> Daphne 종료 중 (PID: $DAPHNE_PID)"
-        kill -TERM $DAPHNE_PID
+    if [ -n "$DAPHNE_PID" ] && kill -0 $DAPHNE_PID 2>/dev/null; then
+        echo "   -> Daphne 종료 중 (PID: $DAPHNE_PID)"
+        kill -TERM $DAPHNE_PID 2>/dev/null || true
         wait $DAPHNE_PID 2>/dev/null || true
     fi
     
@@ -152,7 +166,8 @@ shutdown() {
     exit 0
 }
 
-trap shutdown SIGTERM SIGINT
+# SIGTERM, SIGINT 신호 핸들러 등록
+trap shutdown TERM INT
 
 # ========================================
 # 5. 프로세스 모니터링
@@ -162,20 +177,24 @@ monitor_interval=10
 
 while true; do
     # Gunicorn 상태 확인
-    if ! kill -0 $GUNICORN_PID 2>/dev/null; then
+    if [ -n "$GUNICORN_PID" ] && ! kill -0 $GUNICORN_PID 2>/dev/null; then
         echo "❌ Gunicorn이 예기치 않게 종료되었습니다!"
         echo "📋 마지막 로그:"
         tail -n 20 /app/logs/gunicorn-error.log 2>/dev/null || echo "로그 파일 없음"
-        kill -TERM $DAPHNE_PID 2>/dev/null
+        if [ -n "$DAPHNE_PID" ]; then
+            kill -TERM $DAPHNE_PID 2>/dev/null || true
+        fi
         exit 1
     fi
     
     # Daphne 상태 확인
-    if ! kill -0 $DAPHNE_PID 2>/dev/null; then
+    if [ -n "$DAPHNE_PID" ] && ! kill -0 $DAPHNE_PID 2>/dev/null; then
         echo "❌ Daphne이 예기치 않게 종료되었습니다!"
         echo "📋 마지막 로그:"
         tail -n 20 /app/logs/daphne-access.log 2>/dev/null || echo "로그 파일 없음"
-        kill -TERM $GUNICORN_PID 2>/dev/null
+        if [ -n "$GUNICORN_PID" ]; then
+            kill -TERM $GUNICORN_PID 2>/dev/null || true
+        fi
         exit 1
     fi
     
