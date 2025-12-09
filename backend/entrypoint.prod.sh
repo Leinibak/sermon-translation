@@ -120,7 +120,7 @@ echo "🔧 Daphne 시작..."
 daphne -b 0.0.0.0 -p 8001 \
     --verbosity 1 \
     --proxy-headers \
-    --websocket-timeout 3600 \
+    --websocket_timeout 3600 \
     --application-close-timeout 10 \
     --access-log /app/logs/daphne-access.log \
     config.asgi:application &
