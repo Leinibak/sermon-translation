@@ -27,6 +27,21 @@ backend/staticfiles/
 *backup*
 frontend/src/components/*old.jsx
 
+# SSL Certificates (보안상 중요!)
+certbot/
+*.pem
+*.key
+*.crt
+
+# Backup files
+backups/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
 # Django
 *.log
 local_settings.py
