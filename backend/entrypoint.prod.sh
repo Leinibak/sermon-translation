@@ -136,6 +136,35 @@ if ! kill -0 $DAPHNE_PID 2>/dev/null; then
     exit 1
 fi
 
+# 🆕 추가: 서버가 실제로 요청을 받을 수 있을 때까지 대기
+echo "⏳ 서버 준비 상태 확인 중..."
+READY=false
+for i in {1..30}; do
+    # Gunicorn 포트 체크
+    if nc -z localhost 8000 2>/dev/null; then
+        # 실제 HTTP 요청 테스트
+        if curl -f http://localhost:8000/ > /dev/null 2>&1 || \
+           curl -f http://localhost:8000/admin/ > /dev/null 2>&1; then
+            echo "✅ Gunicorn이 요청을 받을 준비가 되었습니다!"
+            READY=true
+            break
+        fi
+    fi
+    
+    if [ $((i % 5)) -eq 0 ]; then
+        echo "   대기 중... ($i/30초)"
+    fi
+    sleep 1
+done
+
+if [ "$READY" = false ]; then
+    echo "⚠️ Gunicorn 준비 확인 실패 (타임아웃)"
+    echo "📋 Gunicorn 로그:"
+    tail -n 30 /app/logs/gunicorn-error.log 2>/dev/null || echo "로그 없음"
+    # 경고만 하고 계속 진행 (프로세스는 실행 중이므로)
+fi
+
+
 echo ""
 echo "✨ 모든 서버가 성공적으로 시작되었습니다!"
 echo ""

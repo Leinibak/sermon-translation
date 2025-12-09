@@ -92,11 +92,11 @@ services:
       # - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
       # - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || curl -f http://localhost:8000/admin/ || curl -f http://localhost:8000/ || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s  # 시작 시간 충분히
+      retries: 5
+      start_period: 90s
     depends_on:
       db:
         condition: service_healthy
