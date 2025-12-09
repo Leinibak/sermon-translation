@@ -234,9 +234,17 @@ while [ $WAITED -lt $MAX_WAIT ]; do
         break
     fi
     
-    # HTTP 헬스체크 시도
+    # HTTP 헬스체크 시도 - 여러 엔드포인트 확인
     if curl -f http://localhost:8000/api/health/ > /dev/null 2>&1; then
-        echo "✅ Backend is responding!"
+        echo "✅ Backend health endpoint is responding!"
+        BACKEND_HEALTHY=true
+        break
+    elif curl -f http://localhost:8000/admin/ > /dev/null 2>&1; then
+        echo "✅ Backend admin endpoint is responding!"
+        BACKEND_HEALTHY=true
+        break
+    elif curl -f http://localhost:8000/ > /dev/null 2>&1; then
+        echo "✅ Backend root endpoint is responding!"
         BACKEND_HEALTHY=true
         break
     fi
@@ -252,8 +260,15 @@ done
 if [ "$BACKEND_HEALTHY" = false ]; then
     echo "❌ Backend health check failed or timed out!"
     echo ""
+    echo "📋 Container status:"
+    docker compose -f $COMPOSE_FILE ps backend
+    echo ""
     echo "📋 Backend logs (last 50 lines):"
     docker compose -f $COMPOSE_FILE logs --tail=50 backend
+    echo ""
+    echo "🔍 Testing connectivity:"
+    echo "   Port 8000: $(nc -zv localhost 8000 2>&1 || echo 'not reachable')"
+    echo "   Port 8001: $(nc -zv localhost 8001 2>&1 || echo 'not reachable')"
     echo ""
     echo "⚠️  Deployment may have issues. Check logs above."
     echo ""
@@ -261,6 +276,11 @@ if [ "$BACKEND_HEALTHY" = false ]; then
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "❌ Deployment cancelled"
+        echo ""
+        echo "💡 Troubleshooting tips:"
+        echo "  1. Check if health endpoint exists: docker compose -f $COMPOSE_FILE exec backend curl http://localhost:8000/api/health/"
+        echo "  2. View detailed logs: docker compose -f $COMPOSE_FILE logs backend"
+        echo "  3. Check container status: docker compose -f $COMPOSE_FILE ps"
         exit 1
     fi
 fi
@@ -270,11 +290,16 @@ echo ""
 echo "🔍 Checking nginx..."
 sleep 5
 
-if curl -f http://localhost/health > /dev/null 2>&1 || curl -f http://localhost/ > /dev/null 2>&1; then
+if curl -f http://localhost/health > /dev/null 2>&1; then
+    echo "✅ Nginx health endpoint is responding!"
+elif curl -f http://localhost/ > /dev/null 2>&1; then
     echo "✅ Nginx is responding!"
 else
     echo "⚠️  Nginx health check warning"
-    echo "ℹ️  This might be normal if SSL is required"
+    echo "ℹ️  This might be normal if:"
+    echo "    - SSL is required (HTTPS only)"
+    echo "    - Nginx is configured for specific domains"
+    echo "    - Health endpoint is not configured"
 fi
 
 echo ""

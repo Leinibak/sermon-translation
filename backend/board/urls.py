@@ -3,15 +3,13 @@
 # ============================================
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PostViewSet
-from .health import health_check  # board/health.py에서 함수 가져오기
+from .views import PostViewSet 
 
 router = DefaultRouter()
 router.register(r'posts', PostViewSet, basename='post')
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('health/', health_check, name='health_check'),
+    path('', include(router.urls)), 
 ]
 
 # 생성되는 URL 패턴:

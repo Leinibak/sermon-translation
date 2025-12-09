@@ -7,10 +7,11 @@ from rest_framework_simplejwt.views import (
 )
 from django.conf import settings
 from django.conf.urls.static import static
+from .views import health_check  # 같은 폴더에서 가져오기
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
+    path('api/health/', health_check, name='health_check'),  # 추가
     # Auth endpoints
     path('api/auth/', include('accounts.urls')),
 
