@@ -46,22 +46,22 @@ echo "📦 정적 파일 수집..."
 python manage.py collectstatic --noinput --clear
 
 # 슈퍼유저 생성 (선택사항)
-if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
-    echo "👤 슈퍼유저 확인 중..."
-    python manage.py shell <<EOF
-from django.contrib.auth import get_user_model
-User = get_user_model()
-username = "$DJANGO_SUPERUSER_USERNAME"
-email = "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
-password = "$DJANGO_SUPERUSER_PASSWORD"
+# if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+#     echo "👤 슈퍼유저 확인 중..."
+#     python manage.py shell <<EOF
+# from django.contrib.auth import get_user_model
+# User = get_user_model()
+# username = "$DJANGO_SUPERUSER_USERNAME"
+# email = "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
+# password = "$DJANGO_SUPERUSER_PASSWORD"
 
-if not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username, email, password)
-    print(f"✅ 슈퍼유저 '{username}' 생성 완료")
-else:
-    print(f"ℹ️ 슈퍼유저 '{username}' 이미 존재")
-EOF
-fi
+# if not User.objects.filter(username=username).exists():
+#     User.objects.create_superuser(username, email, password)
+#     print(f"✅ 슈퍼유저 '{username}' 생성 완료")
+# else:
+#     print(f"ℹ️ 슈퍼유저 '{username}' 이미 존재")
+# EOF
+# fi
 
 # ========================================
 # 3. 서버 시작
