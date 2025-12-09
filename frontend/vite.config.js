@@ -1,5 +1,5 @@
 // ===========================================
-// FILE: vite.config.js (배포 환경) 
+// FILE: vite.config.js (배포  환경) 
 // ===========================================
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
