@@ -12,14 +12,16 @@ RUN npm ci
 # 2️⃣ 소스 복사
 COPY . .
 
+# 4️⃣ Vite 빌드
+RUN npm run build -- --mode production
+
 # 3️⃣ 환경변수 (빌드 시점에 주입)
 ARG VITE_API_URL
 ARG VITE_WS_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
-# 4️⃣ Vite 빌드
-RUN npm run build -- --mode production
+
 
 # ================================================
 # Stage 2: Nginx – Serve static files
