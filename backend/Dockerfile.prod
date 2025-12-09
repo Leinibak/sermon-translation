@@ -22,21 +22,21 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
-    pip install daphne channels channels-redis  # ✅ WebSocket 패키지 추가
+    pip install gunicorn daphne channels channels-redis
 
 # 애플리케이션 코드 복사
 COPY . .
 
-# 정적 파일 디렉토리 생성
-RUN mkdir -p /app/staticfiles /app/media
+# 필요한 디렉토리 생성 및 권한 설정
+RUN mkdir -p /app/staticfiles /app/media /app/logs && \
+    chmod -R 755 /app/staticfiles /app/media && \
+    chmod 777 /app/logs
 
-RUN mkdir -p /staticfiles/fonts \
-    && chmod -R 755 /staticfiles
-    
-RUN mkdir -p /app/logs && chmod 777 /app/logs
+# entrypoint 스크립트 권한 설정
+RUN chmod +x /app/entrypoint.prod.sh
 
 # 포트 노출
-EXPOSE 8000
+EXPOSE 8000 8001
 
-# Daphne ASGI 서버 실행
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
+# Entrypoint 설정
+ENTRYPOINT ["/app/entrypoint.prod.sh"]

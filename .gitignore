@@ -19,10 +19,12 @@ README.md.temp
 
 backend/*.sqlite3
 backend/media/
+backend/logs/
 # backend/static/
 backend/staticfiles/
 *.env.* 
 *copy*
+*backup*
 frontend/src/components/*old.jsx
 
 # Django

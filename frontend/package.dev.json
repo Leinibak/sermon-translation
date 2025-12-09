@@ -18,11 +18,11 @@
     "react-router-dom": "^7.9.4",
     "web-vitals": "^2.1.4"
   },
-  "scripts": {
-    "start": "HOST=0.0.0.0 react-scripts start",
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview"
+    "scripts": {
+    "start": "react-scripts start",
+    "dev": "vite --config vite.config.dev.js --host 0.0.0.0",
+    "build": "vite build --config vite.config.js",
+    "preview": "vite preview --config vite.config.js"
   },
   "eslintConfig": {
     "extends": [
