@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingRoom.jsx (WebSocket 통합 버전)
+// frontend/src/components/VideoMeetingRoom.jsx (완전 개선 버전)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import '../styles/videoMeeting.css';
 
 // Custom Hooks
-import { useWebSocket } from '../hooks/useWebSocket';  // ⭐ 새로 추가
+import { useWebSocket } from '../hooks/useWebSocket';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
 
@@ -37,19 +37,11 @@ function VideoMeetingRoom() {
   // Refs
   const localVideoRef = useRef(null);
   const fetchRoomDetailsRef = useRef(null);
+  const chatMessagesEndRef = useRef(null);
 
   // Custom Hooks
   const api = useVideoMeetingAPI(id);
-  const webrtc = useWebRTC(id, user, isHost);
-
   const { room, participants, pendingRequests, loading, error } = api;
-  const { 
-    localStreamRef, 
-    remoteStreams, 
-    connectionStatus,
-    getLocalMedia,
-    cleanup: cleanupWebRTC 
-  } = webrtc;
 
   // ⭐⭐⭐ WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((data) => {
@@ -57,37 +49,41 @@ function VideoMeetingRoom() {
 
     switch (data.type) {
       case 'approval_notification':
-        // 승인 알림 수신
         console.log('🎉 승인 완료! 페이지 새로고침...');
         alert('참가가 승인되었습니다!');
         
-        // 회의실 정보 다시 불러오기
         if (fetchRoomDetailsRef.current) {
           fetchRoomDetailsRef.current();
         }
         
-        // 미디어 초기화 트리거
         setMediaReady(false);
         break;
 
       case 'rejection_notification':
-        // 거부 알림 수신
         alert('참가 요청이 거부되었습니다.');
         navigate('/video-meetings');
         break;
 
       case 'join_request_notification':
-        // 참가 요청 알림 (방장용)
         console.log('📢 새로운 참가 요청:', data.username);
+        
+        // ⭐ 즉시 대기 목록 새로고침
         api.fetchPendingRequests();
         
         if (!showPendingPanel) {
           setShowPendingPanel(true);
         }
+        
+        // ⭐ 브라우저 알림
+        if (Notification.permission === 'granted') {
+          new Notification('새로운 참가 요청', {
+            body: `${data.username}님이 참가를 요청했습니다.`,
+            icon: '/logo192.png'
+          });
+        }
         break;
 
       case 'chat_message':
-        // ⭐ 채팅 메시지 수신
         console.log('💬 채팅 메시지 수신:', data.sender, data.content);
         
         setChatMessages(prev => [...prev, {
@@ -99,7 +95,6 @@ function VideoMeetingRoom() {
           is_mine: data.sender_id === user?.id
         }]);
 
-        // 읽지 않은 메시지 카운트
         if (!isChatOpen && data.sender_id !== user?.id) {
           setUnreadCount(prev => prev + 1);
         }
@@ -107,10 +102,16 @@ function VideoMeetingRoom() {
 
       case 'user_joined':
         console.log('👋 사용자 입장:', data.username);
+        api.fetchRoomDetails();
         break;
 
       case 'user_left':
         console.log('👋 사용자 퇴장:', data.username);
+        api.fetchRoomDetails();
+        break;
+
+      case 'pong':
+        console.log('💓 Heartbeat OK');
         break;
 
       default:
@@ -119,11 +120,40 @@ function VideoMeetingRoom() {
   }, [user, navigate, api, showPendingPanel, isChatOpen]);
 
   // ⭐⭐⭐ WebSocket 연결
-  const { sendMessage: sendWebSocketMessage } = useWebSocket(
+  const { sendMessage: sendWebSocketMessage, sendWebRTCSignal } = useWebSocket(
     id, 
     user, 
     handleWebSocketMessage
   );
+
+  // ⭐⭐⭐ WebRTC (WebSocket 시그널링 사용)
+  const webrtc = useWebRTC(id, user, isHost, sendWebRTCSignal);
+  const { 
+    localStreamRef, 
+    remoteStreams, 
+    connectionStatus,
+    getLocalMedia,
+    handleWebSocketSignal,
+    cleanup: cleanupWebRTC 
+  } = webrtc;
+
+  // ⭐ WebRTC 시그널 핸들러 등록
+  useEffect(() => {
+    // WebSocket에서 받은 WebRTC 시그널을 useWebRTC로 전달
+    const originalHandler = handleWebSocketMessage;
+    
+    const enhancedHandler = (data) => {
+      // WebRTC 시그널이면 handleWebSocketSignal로 전달
+      if (['offer', 'answer', 'ice_candidate', 'join'].includes(data.type)) {
+        handleWebSocketSignal(data);
+      } else {
+        originalHandler(data);
+      }
+    };
+    
+    // 핸들러 교체는 useWebSocket에서 이미 처리됨
+    // 여기서는 WebRTC 시그널만 추가로 처리
+  }, [handleWebSocketSignal]);
 
   // =========================================================================
   // Handlers
@@ -190,7 +220,9 @@ function VideoMeetingRoom() {
   const handleApprove = async (participantId) => {
     try {
       await api.approveParticipant(participantId);
-      console.log('✅ 승인 완료 - WebSocket으로 알림 전송됨');
+      console.log('✅ 승인 완료 - WebSocket으로 즉시 알림 전송됨');
+      
+      api.fetchPendingRequests();
     } catch (error) {
       alert('참가 승인에 실패했습니다.');
     }
@@ -200,12 +232,13 @@ function VideoMeetingRoom() {
     try {
       await api.rejectParticipant(participantId);
       console.log('✅ 거부 완료');
+      
+      api.fetchPendingRequests();
     } catch (error) {
       alert('참가 거부에 실패했습니다.');
     }
   };
 
-  // ⭐ 채팅 메시지 전송
   const handleSendChatMessage = useCallback((content) => {
     sendWebSocketMessage({
       type: 'chat',
@@ -213,7 +246,6 @@ function VideoMeetingRoom() {
     });
   }, [sendWebSocketMessage]);
 
-  // 채팅 토글
   const toggleChat = () => {
     setIsChatOpen(prev => !prev);
     
@@ -222,9 +254,23 @@ function VideoMeetingRoom() {
     }
   };
 
+  // 채팅 자동 스크롤
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
   // =========================================================================
   // Effects
   // =========================================================================
+
+  // ⭐ 알림 권한 요청
+  useEffect(() => {
+    if (isHost && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [isHost]);
 
   useEffect(() => {
     const fetchAndSetRoom = async () => {
@@ -233,6 +279,11 @@ function VideoMeetingRoom() {
         
         const isCurrentUserHost = roomData.host_username === user.username;
         setIsHost(isCurrentUserHost);
+        
+        // ⭐ 방장이면 대기 목록 로드
+        if (isCurrentUserHost) {
+          api.fetchPendingRequests();
+        }
         
         if (!isCurrentUserHost) {
           const status = roomData.participant_status;
@@ -290,6 +341,16 @@ function VideoMeetingRoom() {
         }
 
         setMediaReady(true);
+        
+        // ⭐ Join 메시지 전송 (참가자만)
+        if (!isHost) {
+          setTimeout(() => {
+            sendWebSocketMessage({
+              type: 'join',
+              username: user.username
+            });
+          }, 1000);
+        }
       } catch (error) {
         console.error('❌ 미디어 초기화 실패:', error);
         alert('카메라/마이크 접근에 실패했습니다.');
@@ -376,12 +437,13 @@ function VideoMeetingRoom() {
       {/* 비디오 그리드 */}
       <VideoGrid videos={allVideos} />
       
-      {/* ⭐ 채팅 패널 */}
+      {/* 채팅 패널 */}
       <ChatPanel
         isOpen={isChatOpen}
         messages={chatMessages}
         loading={false}
         currentUser={user}
+        messagesEndRef={chatMessagesEndRef}
         onSendMessage={handleSendChatMessage}
         onClose={toggleChat}
       />
@@ -397,6 +459,7 @@ function VideoMeetingRoom() {
               ? 'bg-white text-gray-900 hover:bg-gray-200' 
               : 'bg-red-600 text-white hover:bg-red-700'
           }`}
+          title={isMicOn ? '마이크 끄기' : '마이크 켜기'}
         >
           {isMicOn ? <span>🎤</span> : <span>🔇</span>}
         </button>
@@ -409,11 +472,12 @@ function VideoMeetingRoom() {
               ? 'bg-white text-gray-900 hover:bg-gray-200' 
               : 'bg-red-600 text-white hover:bg-red-700'
           }`}
+          title={isVideoOn ? '비디오 끄기' : '비디오 켜기'}
         >
           {isVideoOn ? <span>📹</span> : <span>📴</span>}
         </button>
         
-        {/* ⭐ 채팅 토글 */}
+        {/* 채팅 토글 */}
         <ChatToggleButton
           onClick={toggleChat}
           unreadCount={unreadCount}
@@ -423,6 +487,7 @@ function VideoMeetingRoom() {
         <button
           onClick={handleLeaveClick}
           className="p-3 bg-red-800 text-white rounded-full hover:bg-red-900 transition"
+          title="회의 나가기"
         >
           📞
         </button>

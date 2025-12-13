@@ -1,4 +1,4 @@
-// frontend/src/hooks/useVideoMeetingAPI.js (개선 버전)
+// frontend/src/hooks/useVideoMeetingAPI.js (완전 버전)
 import { useState, useCallback } from 'react';
 import axios from '../api/axios';
 
@@ -46,10 +46,11 @@ export function useVideoMeetingAPI(roomId) {
       const response = await axios.get(`/video-meetings/${roomId}/pending_requests/`);
       const pending = response.data;
       
+      console.log(`📋 대기 요청: ${pending.length}개`);
       setPendingRequests(pending);
       return pending;
     } catch (error) {
-      console.error('❌ 대기 요청 폴링 실패:', error);
+      console.error('❌ 대기 요청 로딩 실패:', error);
       return [];
     }
   }, [roomId]);
@@ -109,7 +110,6 @@ export function useVideoMeetingAPI(roomId) {
     }
   }, [roomId]);
 
-  // ⭐ 새로 추가: 회의 종료
   const endMeeting = useCallback(async () => {
     try {
       await axios.post(`/video-meetings/${roomId}/end/`);
@@ -121,27 +121,80 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   // =========================================================================
-  // Signal Polling
+  // Chat Messages
   // =========================================================================
   
-  const pollSignals = useCallback(async () => {
+  const fetchChatMessages = useCallback(async () => {
     try {
-      const response = await axios.get(`/video-meetings/${roomId}/get_signals/`);
-      const signals = response.data;
-      
-      if (signals && signals.length > 0) {
-        // 시간순 정렬
-        const sorted = signals.sort((a, b) => 
-          new Date(a.created_at) - new Date(b.created_at)
-        );
-        return sorted;
-      }
-      return [];
+      const response = await axios.get(`/video-meetings/${roomId}/chat/messages`);
+      return response.data;
     } catch (error) {
-      if (error.response?.status !== 404 && error.response?.status !== 403) {
-        console.error('❌ 시그널 폴링 실패:', error);
-      }
-      return null; // null이면 폴링 중단 신호
+      console.error('❌ 채팅 메시지 로딩 실패:', error);
+      return [];
+    }
+  }, [roomId]);
+
+  const sendChatMessage = useCallback(async (content) => {
+    try {
+      const response = await axios.post(
+        `/video-meetings/${roomId}/chat/send`,
+        { content }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('❌ 채팅 메시지 전송 실패:', error);
+      throw error;
+    }
+  }, [roomId]);
+
+  // =========================================================================
+  // Reactions
+  // =========================================================================
+  
+  const sendReaction = useCallback(async (reactionType) => {
+    try {
+      const response = await axios.post(
+        `/video-meetings/${roomId}/reactions/send`,
+        { reaction_type: reactionType }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('❌ 반응 전송 실패:', error);
+      throw error;
+    }
+  }, [roomId]);
+
+  // =========================================================================
+  // Raise Hand
+  // =========================================================================
+  
+  const raiseHand = useCallback(async () => {
+    try {
+      const response = await axios.post(`/video-meetings/${roomId}/raise-hand`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ 손들기 실패:', error);
+      throw error;
+    }
+  }, [roomId]);
+
+  const lowerHand = useCallback(async () => {
+    try {
+      const response = await axios.post(`/video-meetings/${roomId}/lower-hand`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ 손내리기 실패:', error);
+      throw error;
+    }
+  }, [roomId]);
+
+  const fetchRaisedHands = useCallback(async () => {
+    try {
+      const response = await axios.get(`/video-meetings/${roomId}/raised-hands`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ 손든 사용자 목록 로딩 실패:', error);
+      return [];
     }
   }, [roomId]);
 
@@ -156,7 +209,12 @@ export function useVideoMeetingAPI(roomId) {
     approveParticipant,
     rejectParticipant,
     leaveRoom,
-    endMeeting, // ⭐ 새로 추가
-    pollSignals,
+    endMeeting,
+    fetchChatMessages,
+    sendChatMessage,
+    sendReaction,
+    raiseHand,
+    lowerHand,
+    fetchRaisedHands,
   };
 }
