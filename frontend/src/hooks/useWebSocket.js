@@ -1,172 +1,148 @@
-// frontend/src/hooks/useWebSocket.js (완전 개선 버전)
+// frontend/src/hooks/useWebSocket.js (완전한 버전)
 import { useEffect, useRef, useCallback } from 'react';
 
-/**
- * 통합 WebSocket Hook
- * - 채팅, 승인 알림, WebRTC 시그널링 모두 처리
- * - 자동 재연결
- * - Heartbeat (연결 유지)
- */
-export function useWebSocket(roomId, user, onMessage) {
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const reconnectAttempts = useRef(0);
-  const messageQueue = useRef([]);
-  const isConnectedRef = useRef(false);
-  const heartbeatIntervalRef = useRef(null);
-  const lastPongRef = useRef(Date.now());
+const WS_RECONNECT_DELAY = 3000;
+const WS_HEARTBEAT_INTERVAL = 30000;
+
+export function useWebSocket(roomId, currentUser, onMessage) {
+  const ws = useRef(null);
+  const reconnectTimeout = useRef(null);
+  const heartbeatInterval = useRef(null);
+  const isIntentionalClose = useRef(false);
+  const messageHandlerRef = useRef(onMessage);
+
+  // 메시지 핸들러 업데이트
+  useEffect(() => {
+    messageHandlerRef.current = onMessage;
+  }, [onMessage]);
 
   // WebSocket 연결
   const connect = useCallback(() => {
-    if (!roomId || !user) {
-      console.warn('⚠️ roomId 또는 user 없음');
+    if (!roomId || !currentUser?.username) {
+      console.log('⚠️ WebSocket 연결 조건 미충족');
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/video-meeting/${roomId}/`;
-
-    console.log('🔌 WebSocket 연결 시도:', wsUrl);
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      console.log('✅ WebSocket 이미 연결됨');
+      return;
+    }
 
     try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/video-meeting/${roomId}/`;
+      
+      console.log(`🔌 WebSocket 연결 시도: ${wsUrl}`);
+      
+      ws.current = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
+      ws.current.onopen = () => {
         console.log('✅ WebSocket 연결 성공');
-        isConnectedRef.current = true;
-        reconnectAttempts.current = 0;
-        lastPongRef.current = Date.now();
-
-        // Join 메시지 전송
-        ws.send(JSON.stringify({
-          type: 'join',
-          username: user.username
-        }));
-
-        // 대기 중인 메시지 전송
-        while (messageQueue.current.length > 0) {
-          const msg = messageQueue.current.shift();
-          ws.send(JSON.stringify(msg));
-          console.log('📤 대기 메시지 전송:', msg.type);
+        
+        // Heartbeat 시작
+        if (heartbeatInterval.current) {
+          clearInterval(heartbeatInterval.current);
         }
-
-        // Heartbeat 시작 (30초마다)
-        heartbeatIntervalRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-            
-            // Pong 응답 확인 (60초 이내)
-            if (Date.now() - lastPongRef.current > 60000) {
-              console.warn('⚠️ Pong 응답 없음 - 재연결 시도');
-              ws.close();
-            }
+        
+        heartbeatInterval.current = setInterval(() => {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({ type: 'ping' }));
           }
-        }, 30000);
+        }, WS_HEARTBEAT_INTERVAL);
       };
 
-      ws.onmessage = (event) => {
+      ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           
-          // Pong 응답 처리
-          if (data.type === 'pong') {
-            lastPongRef.current = Date.now();
-            return;
-          }
-          
-          console.log('📨 WebSocket 메시지:', data.type);
-
-          // 메시지 콜백 호출
-          if (onMessage) {
-            onMessage(data);
+          if (messageHandlerRef.current) {
+            messageHandlerRef.current(data);
           }
         } catch (error) {
-          console.error('❌ 메시지 파싱 실패:', error);
+          console.error('❌ WebSocket 메시지 파싱 실패:', error);
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('❌ WebSocket 오류:', error);
+      ws.current.onerror = (error) => {
+        console.error('❌ WebSocket 에러:', error);
       };
 
-      ws.onclose = (event) => {
+      ws.current.onclose = (event) => {
         console.log('🔌 WebSocket 연결 종료:', event.code, event.reason);
-        isConnectedRef.current = false;
-
-        // Heartbeat 중지
-        if (heartbeatIntervalRef.current) {
-          clearInterval(heartbeatIntervalRef.current);
-          heartbeatIntervalRef.current = null;
+        
+        if (heartbeatInterval.current) {
+          clearInterval(heartbeatInterval.current);
+          heartbeatInterval.current = null;
         }
 
-        // 정상 종료가 아니면 자동 재연결 (최대 5회)
-        if (event.code !== 1000 && reconnectAttempts.current < 5) {
-          reconnectAttempts.current++;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+        // 의도적 종료가 아니면 재연결
+        if (!isIntentionalClose.current) {
+          console.log(`🔄 ${WS_RECONNECT_DELAY / 1000}초 후 재연결 시도...`);
           
-          console.log(`🔄 재연결 시도 ${reconnectAttempts.current}/5 (${delay}ms 후)`);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeout.current = setTimeout(() => {
             connect();
-          }, delay);
-        } else if (reconnectAttempts.current >= 5) {
-          console.error('❌ 최대 재연결 횟수 초과');
-          alert('서버 연결이 끊어졌습니다. 페이지를 새로고침해주세요.');
+          }, WS_RECONNECT_DELAY);
         }
       };
     } catch (error) {
       console.error('❌ WebSocket 연결 실패:', error);
     }
-  }, [roomId, user, onMessage]);
+  }, [roomId, currentUser]);
 
   // 메시지 전송
   const sendMessage = useCallback((message) => {
-    const ws = wsRef.current;
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log('📤 메시지 전송:', message.type);
-      ws.send(JSON.stringify(message));
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      try {
+        ws.current.send(JSON.stringify(message));
+        console.log('📤 WebSocket 메시지 전송:', message.type);
+      } catch (error) {
+        console.error('❌ 메시지 전송 실패:', error);
+      }
     } else {
-      console.warn('⚠️ WebSocket 연결 안됨 - 큐에 추가');
-      messageQueue.current.push(message);
+      console.warn('⚠️ WebSocket이 연결되지 않음');
     }
   }, []);
 
-  // WebRTC 시그널 전송 (HTTP 대신 WebSocket 사용)
-  const sendWebRTCSignal = useCallback((toUserId, type, payload) => {
-    sendMessage({
-      type: type, // 'offer', 'answer', 'ice_candidate'
-      to_user_id: toUserId,
-      ...payload
-    });
-  }, [sendMessage]);
+  // ⭐ WebRTC 시그널 전송 (Offer, Answer, ICE Candidate)
+  const sendWebRTCSignal = useCallback((toPeerId, type, data) => {
+    const message = {
+      type,
+      to_user_id: toPeerId,
+      from_user_id: currentUser?.username,
+      ...data
+    };
 
-  // 연결
+    sendMessage(message);
+  }, [currentUser, sendMessage]);
+
+  // WebSocket 연결 시작
   useEffect(() => {
     connect();
 
     return () => {
-      console.log('🧹 WebSocket 정리');
+      console.log('🧹 WebSocket 정리...');
       
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
+      isIntentionalClose.current = true;
+      
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
       }
       
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+      if (heartbeatInterval.current) {
+        clearInterval(heartbeatInterval.current);
       }
-
-      if (wsRef.current) {
-        wsRef.current.close(1000, 'Component unmounted');
+      
+      if (ws.current) {
+        ws.current.close(1000, 'Component unmounting');
+        ws.current = null;
       }
     };
   }, [connect]);
 
-  return { 
-    sendMessage, 
+  return {
+    ws: ws.current,
+    sendMessage,
     sendWebRTCSignal,
-    isConnected: isConnectedRef.current 
+    isConnected: ws.current?.readyState === WebSocket.OPEN
   };
 }
