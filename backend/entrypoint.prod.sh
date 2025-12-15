@@ -87,6 +87,18 @@ echo ""
 GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
 GUNICORN_THREADS=${GUNICORN_THREADS:-2}
 GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
+GUNICORN_MAX_REQUESTS=${GUNICORN_MAX_REQUESTS:-1000}
+GUNICORN_MAX_REQUESTS_JITTER=${GUNICORN_MAX_REQUESTS_JITTER:-100}
+
+# Daphne 설정
+DAPHNE_WORKERS=${DAPHNE_WORKERS:-2}
+
+echo "📊 Configuration:"
+echo "   Gunicorn Workers: $GUNICORN_WORKERS"
+echo "   Gunicorn Threads: $GUNICORN_THREADS"
+echo "   Gunicorn Timeout: $GUNICORN_TIMEOUT"
+echo "   Daphne Workers: $DAPHNE_WORKERS"
+echo ""
 
 # Gunicorn 시작 (백그라운드)
 echo "🔧 Gunicorn 시작..."

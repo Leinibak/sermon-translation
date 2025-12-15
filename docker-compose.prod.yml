@@ -1,7 +1,9 @@
-# docker-compose.prod.yml
+# docker-compose.prod.yml (개선 버전)
 
 services:
+  # ==========================================================================
   # PostgreSQL 데이터베이스
+  # ==========================================================================
   db:
     image: postgres:15-alpine
     container_name: webboard_db_prod
@@ -10,8 +12,14 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+      # ⭐ 성능 최적화
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_WORK_MEM=16MB
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # ⭐ 백업 디렉토리 추가
+      - ./backups/postgres:/backups
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -21,19 +29,40 @@ services:
       start_period: 10s
     networks:
       - webboard_network
+    # ⭐ 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
+  # ==========================================================================
   # Redis (WebSocket 메시징 & 캐싱)
+  # ==========================================================================
   redis:
     image: redis:7-alpine
     container_name: webboard_redis_prod
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass ${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
+      # ⭐ Redis 설정 파일 (선택사항)
+      # - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -43,22 +72,37 @@ services:
       start_period: 5s
     networks:
       - webboard_network
+    # ⭐ 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Django 백엔드
+  # ==========================================================================
+  # Django 백엔드 (Gunicorn + Daphne)
+  # ==========================================================================
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
+      args:
+        - PYTHON_VERSION=3.11
     container_name: webboard_backend_prod
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
       - ./backend/logs:/app/logs
+      # ⭐ 코드 업데이트 없이 환경변수만 변경 시
+      - ./.env.production:/app/.env.production:ro
     environment:
       # Django 환경변수
       - DJANGO_ENV=prod
@@ -74,25 +118,34 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       
-      # CORS
+      # CORS & CSRF
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
       
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       
       # Gunicorn 설정
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
       - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
-      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
+      - GUNICORN_MAX_REQUESTS=${GUNICORN_MAX_REQUESTS:-1000}
+      - GUNICORN_MAX_REQUESTS_JITTER=${GUNICORN_MAX_REQUESTS_JITTER:-100}
       
-      # # 슈퍼유저 (선택사항)
-      # - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
-      # - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
-      # - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      # ⭐ Daphne 설정 추가
+      - DAPHNE_WORKERS=${DAPHNE_WORKERS:-2}
+      
+      # ⭐ 로깅 레벨
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # 슈퍼유저 (선택사항)
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ && nc -z localhost 8001 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -106,20 +159,32 @@ services:
     networks:
       - webboard_network
     expose:
-      - "8000"
-      - "8001"
+      - "8000"  # Gunicorn (HTTP/REST API)
+      - "8001"  # Daphne (WebSocket)
+    # ⭐ 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
+  # ==========================================================================
   # React 프론트엔드
+  # ==========================================================================
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
+        - NODE_VERSION=20
         - VITE_API_URL=${VITE_API_URL:-https://jounsori.org/api}
         - VITE_WS_URL=${VITE_WS_URL:-wss://jounsori.org/ws}
     container_name: webboard_frontend_prod
@@ -131,13 +196,24 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    # ⭐ 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
+  # ==========================================================================
   # Nginx 리버스 프록시
+  # ==========================================================================
   nginx:
     image: nginx:alpine
     container_name: webboard_nginx
@@ -145,17 +221,29 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      # Nginx 설정
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # 정적 파일
       - static_volume:/staticfiles:ro
       - media_volume:/media:ro
       - ./fonts:/usr/share/nginx/html/fonts:ro
+      
+      # SSL 인증서
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+      
+      # 로그
       - ./nginx/logs:/var/log/nginx
+      
+      # ⭐ Nginx 캐시 디렉토리 (선택사항)
+      - nginx_cache:/var/cache/nginx
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
     restart: always
     networks:
       - webboard_network
@@ -165,19 +253,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    # ⭐ 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     logging:
       driver: "json-file"
       options:
         max-size: "50m"
         max-file: "5"
 
+  # ==========================================================================
   # Certbot (SSL 인증서 갱신)
+  # ==========================================================================
   certbot:
     image: certbot/certbot
     container_name: webboard_certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+      - ./certbot/logs:/var/log/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'"
     restart: unless-stopped
     networks:
@@ -188,16 +288,94 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ==========================================================================
+  # ⭐ Prometheus (모니터링 - 선택사항)
+  # ==========================================================================
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: webboard_prometheus
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--storage.tsdb.path=/prometheus'
+  #     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+  #     - '--web.console.templates=/usr/share/prometheus/consoles'
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus_data:/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   restart: unless-stopped
+  #   networks:
+  #     - webboard_network
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+  # ==========================================================================
+  # ⭐ Grafana (대시보드 - 선택사항)
+  # ==========================================================================
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: webboard_grafana
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+  #     - GF_SERVER_ROOT_URL=https://jounsori.org/grafana
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #     - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+  #     - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+  #   ports:
+  #     - "3001:3000"
+  #   depends_on:
+  #     - prometheus
+  #   restart: unless-stopped
+  #   networks:
+  #     - webboard_network
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
 volumes:
   postgres_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/postgres
+  
   redis_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/redis
+  
   static_volume:
     driver: local
+  
   media_volume:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/media
+  
+  nginx_cache:
+    driver: local
+  
+  # prometheus_data:
+  #   driver: local
+  
+  # grafana_data:
+  #   driver: local
 
 networks:
   webboard_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
