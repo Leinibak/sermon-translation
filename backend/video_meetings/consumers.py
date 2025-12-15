@@ -1,4 +1,4 @@
-# backend/video_meetings/consumers.py (개선 버전)
+# backend/video_meetings/consumers.py (수정 버전)
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -12,53 +12,71 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         """WebSocket 연결 수립"""
-        self.room_id = self.scope['url_route']['kwargs']['room_id']
-        self.room_group_name = f'video_room_{self.room_id}'
-        self.user = self.scope.get('user')
-        
-        if not self.user or not self.user.is_authenticated:
-            logger.warning(f"❌ 비인증 사용자 연결 시도: Room {self.room_id}")
-            await self.close(code=4001)
-            return
-        
-        self.user_id = str(self.user.id)
-        self.username = self.user.username
-        
-        # 그룹에 참가
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-        
-        await self.accept()
-        logger.info(f"✅ WebSocket 연결: {self.username} → Room {self.room_id}")
-        
-        # 현재 참가자 목록 전송
-        await self.send_current_participants()
+        try:
+            self.room_id = self.scope['url_route']['kwargs']['room_id']
+            self.room_group_name = f'video_room_{self.room_id}'
+            self.user = self.scope.get('user')
+            
+            # ⭐ 초기화 (에러 방지)
+            self.user_id = None
+            self.username = None
+            
+            # ⭐ 인증 확인 강화
+            if not self.user or not self.user.is_authenticated:
+                logger.warning(f"❌ 비인증 사용자 연결 시도: Room {self.room_id}")
+                await self.close(code=4001)
+                return
+            
+            self.user_id = str(self.user.id)
+            self.username = self.user.username
+            
+            logger.info(f"🔗 WebSocket 연결 시도: {self.username} → Room {self.room_id}")
+            
+            # 그룹에 참가
+            await self.channel_layer.group_add(
+                self.room_group_name,
+                self.channel_name
+            )
+            
+            await self.accept()
+            logger.info(f"✅ WebSocket 연결 성공: {self.username} → Room {self.room_id}")
+            
+            # 현재 참가자 목록 전송
+            await self.send_current_participants()
+            
+        except Exception as e:
+            logger.error(f"❌ 연결 오류: {e}", exc_info=True)
+            await self.close(code=4000)
     
     async def disconnect(self, close_code):
         """WebSocket 연결 종료"""
-        if not hasattr(self, 'room_group_name'):
-            return
-        
-        logger.info(f"❌ WebSocket 종료: {self.username} (코드: {close_code})")
-        
-        # 퇴장 알림
-        if hasattr(self, 'user_id'):
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'user_left',
-                    'user_id': self.user_id,
-                    'username': self.username
-                }
-            )
-        
-        # 그룹에서 제거
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        try:
+            # ⭐ 속성 존재 확인
+            username = getattr(self, 'username', 'Unknown')
+            user_id = getattr(self, 'user_id', None)
+            room_group_name = getattr(self, 'room_group_name', None)
+            
+            logger.info(f"❌ WebSocket 종료: {username} (코드: {close_code})")
+            
+            # 퇴장 알림
+            if user_id and room_group_name:
+                await self.channel_layer.group_send(
+                    room_group_name,
+                    {
+                        'type': 'user_left',
+                        'user_id': user_id,
+                        'username': username
+                    }
+                )
+            
+            # 그룹에서 제거
+            if room_group_name:
+                await self.channel_layer.group_discard(
+                    room_group_name,
+                    self.channel_name
+                )
+        except Exception as e:
+            logger.error(f"❌ 연결 종료 오류: {e}", exc_info=True)
     
     async def receive(self, text_data):
         """메시지 수신 및 처리"""
@@ -89,6 +107,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 await self.handle_lower_hand(data)
             elif message_type == 'ping':
                 await self.handle_ping()
+            else:
+                logger.warning(f"⚠️ 알 수 없는 메시지 타입: {message_type}")
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON 파싱 실패: {e}")
@@ -107,9 +127,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         signal_type = data.get('type')
         to_user_id = data.get('to_user_id')
         
-        logger.info(f"📡 WebRTC 시그널: {signal_type} from {self.username} to {to_user_id}")
+        logger.info(f"📡 WebRTC 시그널: {signal_type} from {self.username} to {to_user_id or 'all'}")
         
-        # ⭐ 즉시 그룹 브로드캐스트 (모든 참가자에게)
+        # ⭐ 즉시 그룹 브로드캐스트
         await self.channel_layer.group_send(
             self.room_group_name,
             {
