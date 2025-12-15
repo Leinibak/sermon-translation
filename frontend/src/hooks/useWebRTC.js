@@ -1,4 +1,4 @@
-// frontend/src/hooks/useWebRTC.js (완전 개선 버전)
+// frontend/src/hooks/useWebRTC.js (완전 수정 버전)
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 const ICE_SERVERS = {
@@ -19,6 +19,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   const peerConnections = useRef({});
   const pendingCandidates = useRef({});
   const isCreatingConnection = useRef({});
+  const processedSignals = useRef(new Set()); // ⭐ 추가: 중복 시그널 방지
   
   // ⭐ sendWebRTCSignal을 항상 최신으로 유지
   const sendSignalRef = useRef(sendWebRTCSignal);
@@ -34,11 +35,15 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   const getLocalMedia = useCallback(async () => {
     if (localStreamRef.current) {
       const tracks = localStreamRef.current.getTracks();
-      const isActive = tracks.some(track => track.readyState === 'live');
+      const isActive = tracks.every(track => track.readyState === 'live');
       
       if (isActive) {
         console.log('✅ 기존 스트림 재사용');
         return localStreamRef.current;
+      } else {
+        console.log('⚠️ 기존 스트림 비활성 - 새로 생성');
+        tracks.forEach(track => track.stop());
+        localStreamRef.current = null;
       }
     }
 
@@ -77,7 +82,15 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     // Race condition 방지
     if (isCreatingConnection.current[peerId]) {
       console.log(`⏳ 연결 생성 대기: ${peerId}`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 최대 3초 대기
+      for (let i = 0; i < 30; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (!isCreatingConnection.current[peerId]) {
+          break;
+        }
+      }
+      
       return peerConnections.current[peerId];
     }
     
@@ -123,8 +136,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       
       tracks.forEach(track => {
         try {
-          pc.addTrack(track, localStreamRef.current);
-          console.log(`✅ ${track.kind} track 추가 (enabled: ${track.enabled})`);
+          const sender = pc.addTrack(track, localStreamRef.current);
+          console.log(`✅ ${track.kind} track 추가 (id: ${track.id})`);
         } catch (e) {
           console.error(`❌ Track 추가 실패:`, e);
         }
@@ -146,55 +159,96 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         }
       };
 
-      // ⭐ Track 수신 핸들러
+      // ⭐ Track 수신 핸들러 (개선)
       pc.ontrack = (event) => {
         console.log(`\n${'='.repeat(60)}`);
         console.log(`🎥 Remote Track 수신!`);
         console.log(`   From: ${peerId}`);
         console.log(`   Kind: ${event.track.kind}`);
+        console.log(`   Track ID: ${event.track.id}`);
         console.log(`   Stream ID: ${event.streams[0]?.id}`);
-        console.log(`   Tracks: ${event.streams[0]?.getTracks().length}`);
+        console.log(`   Streams: ${event.streams.length}`);
         console.log(`${'='.repeat(60)}\n`);
         
-        if (event.streams.length > 0) {
-          const remoteStream = event.streams[0];
-          
-          // ⭐ 스트림 활성 상태 확인
-          const videoTrack = remoteStream.getVideoTracks()[0];
-          const audioTrack = remoteStream.getAudioTracks()[0];
-          
-          console.log('📊 Remote Stream 상태:');
-          console.log(`   Video: ${videoTrack ? videoTrack.enabled : 'none'}`);
-          console.log(`   Audio: ${audioTrack ? audioTrack.enabled : 'none'}`);
-          
-          setRemoteStreams(prev => {
-            const existingIndex = prev.findIndex(p => p.peerId === peerId);
-            
-            if (existingIndex >= 0) {
-              console.log(`♻️ Remote Stream 업데이트`);
-              const updated = [...prev];
-              updated[existingIndex] = { 
-                ...updated[existingIndex], 
-                stream: remoteStream,
-                isMuted: !audioTrack?.enabled,
-                isVideoOff: !videoTrack?.enabled
-              };
-              return updated;
-            }
-            
-            console.log(`🆕 Remote Stream 추가`);
-            return [
-              ...prev, 
-              { 
-                peerId, 
-                username: peerId,
-                stream: remoteStream,
-                isMuted: !audioTrack?.enabled,
-                isVideoOff: !videoTrack?.enabled
-              }
-            ];
-          });
+        if (event.streams.length === 0) {
+          console.error('❌ Stream이 없음');
+          return;
         }
+        
+        const remoteStream = event.streams[0];
+        
+        // ⭐ 스트림 활성 상태 확인
+        const videoTrack = remoteStream.getVideoTracks()[0];
+        const audioTrack = remoteStream.getAudioTracks()[0];
+        
+        console.log('📊 Remote Stream 상태:');
+        console.log(`   Video: ${videoTrack ? `enabled=${videoTrack.enabled}` : 'none'}`);
+        console.log(`   Audio: ${audioTrack ? `enabled=${audioTrack.enabled}` : 'none'}`);
+        
+        // ⭐ Track 이벤트 리스너
+        if (videoTrack) {
+          videoTrack.onended = () => {
+            console.log(`📹 Video track 종료 (${peerId})`);
+          };
+          videoTrack.onmute = () => {
+            console.log(`🔇 Video muted (${peerId})`);
+            setRemoteStreams(prev => prev.map(s => 
+              s.peerId === peerId ? {...s, isVideoOff: true} : s
+            ));
+          };
+          videoTrack.onunmute = () => {
+            console.log(`🔊 Video unmuted (${peerId})`);
+            setRemoteStreams(prev => prev.map(s => 
+              s.peerId === peerId ? {...s, isVideoOff: false} : s
+            ));
+          };
+        }
+        
+        if (audioTrack) {
+          audioTrack.onended = () => {
+            console.log(`🎤 Audio track 종료 (${peerId})`);
+          };
+          audioTrack.onmute = () => {
+            console.log(`🔇 Audio muted (${peerId})`);
+            setRemoteStreams(prev => prev.map(s => 
+              s.peerId === peerId ? {...s, isMuted: true} : s
+            ));
+          };
+          audioTrack.onunmute = () => {
+            console.log(`🔊 Audio unmuted (${peerId})`);
+            setRemoteStreams(prev => prev.map(s => 
+              s.peerId === peerId ? {...s, isMuted: false} : s
+            ));
+          };
+        }
+        
+        setRemoteStreams(prev => {
+          const existingIndex = prev.findIndex(p => p.peerId === peerId);
+          
+          if (existingIndex >= 0) {
+            console.log(`♻️ Remote Stream 업데이트`);
+            const updated = [...prev];
+            updated[existingIndex] = { 
+              ...updated[existingIndex], 
+              stream: remoteStream,
+              isMuted: !audioTrack?.enabled,
+              isVideoOff: !videoTrack?.enabled
+            };
+            return updated;
+          }
+          
+          console.log(`🆕 Remote Stream 추가`);
+          return [
+            ...prev, 
+            { 
+              peerId, 
+              username: peerId,
+              stream: remoteStream,
+              isMuted: !audioTrack?.enabled,
+              isVideoOff: !videoTrack?.enabled
+            }
+          ];
+        });
       };
 
       // ⭐ ICE 연결 상태
@@ -266,15 +320,20 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             
             // ⭐ ref를 통해 최신 함수 호출
             if (sendSignalRef.current) {
-              sendSignalRef.current(peerId, 'offer', {
+              const success = sendSignalRef.current(peerId, 'offer', {
                 sdp: pc.localDescription
               });
-              console.log(`✅✅ Offer 전송 완료!`);
+              
+              if (success) {
+                console.log(`✅✅ Offer 전송 완료!`);
+              } else {
+                console.error(`❌ Offer 전송 실패 - WebSocket 연결 없음`);
+              }
             }
           } catch (e) {
             console.error(`❌ Offer 생성/전송 실패:`, e);
           }
-        }, 1000);
+        }, 1500); // ⭐ 대기 시간 증가
       }
       
       return pc;
@@ -287,11 +346,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   }, []); // ⭐ 의존성 제거 (ref 사용)
 
   // =========================================================================
-  // WebSocket Signal Handler
+  // WebSocket Signal Handler (개선 버전)
   // =========================================================================
   
   const handleWebSocketSignal = useCallback(async (data) => {
-    const { type, from_user_id: peerId, to_user_id } = data;
+    const { type, from_user_id: peerId, to_user_id, id: signalId } = data;
 
     // 자신의 시그널 무시
     if (peerId === currentUser?.username) {
@@ -301,6 +360,22 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     // 수신자 확인
     if (to_user_id && to_user_id !== currentUser?.username) {
       return;
+    }
+
+    // ⭐ 중복 시그널 방지 (선택사항)
+    if (signalId && processedSignals.current.has(signalId)) {
+      console.log('⚠️ 중복 시그널 무시:', signalId);
+      return;
+    }
+    
+    if (signalId) {
+      processedSignals.current.add(signalId);
+      
+      // 메모리 관리: 1000개 이상이면 오래된 것 제거
+      if (processedSignals.current.size > 1000) {
+        const toDelete = Array.from(processedSignals.current).slice(0, 500);
+        toDelete.forEach(id => processedSignals.current.delete(id));
+      }
     }
 
     console.log(`\n${'='.repeat(60)}`);
@@ -325,7 +400,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           } else {
             console.log(`✅ 기존 연결 유지 (${existingPc.connectionState})`);
           }
-        }, 1000); // ⭐ 대기 시간 증가
+        }, 1500); // ⭐ 대기 시간 증가
       }
       return;
     }
@@ -344,7 +419,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }
 
     if (!pc) {
-      console.warn(`⚠️ Peer Connection 없음`);
+      console.warn(`⚠️ Peer Connection 없음 (${type})`);
       return;
     }
 
@@ -369,10 +444,15 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           
           // ⭐ ref를 통해 최신 함수 호출
           if (sendSignalRef.current) {
-            sendSignalRef.current(peerId, 'answer', {
+            const success = sendSignalRef.current(peerId, 'answer', {
               sdp: pc.localDescription
             });
-            console.log(`✅✅ Answer 전송 완료!`);
+            
+            if (success) {
+              console.log(`✅✅ Answer 전송 완료!`);
+            } else {
+              console.error(`❌ Answer 전송 실패`);
+            }
           }
           break;
 
@@ -447,6 +527,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     // 상태 초기화
     pendingCandidates.current = {};
     isCreatingConnection.current = {};
+    processedSignals.current.clear();
     setRemoteStreams([]);
     setConnectionStatus({});
     
