@@ -181,7 +181,7 @@ export function useVideoMeetingAPI(roomId) {
 
     try {
       const response = await axios.post(
-        `/video-meetings/${roomId}/chat/send`,
+        `/video-meetings/${roomId}/chat/send/`,
         { content }
       );
       return response.data;
