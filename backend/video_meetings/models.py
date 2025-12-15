@@ -93,7 +93,6 @@ class VideoRoom(models.Model):
     def __str__(self):
         return f'{self.title} (방장: {self.host.username})'
 
-
 class RoomParticipant(models.Model):
     """회의 참가자"""
     
@@ -138,6 +137,8 @@ class RoomParticipant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
+        # ⭐⭐⭐ 이 제약 조건이 문제의 원인!
+        # 같은 방에 같은 사용자가 여러 번 참가 요청을 할 수 없음
         unique_together = ['room', 'user']
         ordering = ['created_at']
         verbose_name = '참가자'

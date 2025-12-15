@@ -1,508 +1,625 @@
-// frontend/src/components/VideoMeetingRoom.jsx (완전 복원 버전)
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Loader } from 'lucide-react';
+// frontend/src/components/VideoMeetingList.jsx (수정 버전)
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Video, 
+  Plus, 
+  Users, 
+  Clock, 
+  Calendar,
+  Loader,
+  AlertCircle,
+  LogIn,
+  RefreshCw,
+  XCircle,
+  MoreVertical
+} from 'lucide-react';
+import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 
-import '../styles/videoMeeting.css';
-
-// Custom Hooks
-import { useWebSocket } from '../hooks/useWebSocket';
-import { useWebRTC } from '../hooks/useWebRTC';
-import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
-
-// UI Components
-import { RoomHeader } from './VideoMeeting/RoomHeader';
-import { PendingRequestsPanel } from './VideoMeeting/PendingRequestsPanel';
-import { VideoGrid } from './VideoMeeting/VideoGrid';
-import { HostLeaveModal } from './VideoMeeting/HostLeaveModal';
-import { ChatPanel, ChatToggleButton } from './VideoMeeting/ChatPanel';
-
-function VideoMeetingRoom() {
-  const { id } = useParams();
+function VideoMeetingList() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // State
-  const [isHost, setIsHost] = useState(false);
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [showPendingPanel, setShowPendingPanel] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [mediaReady, setMediaReady] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
-  // Refs
-  const localVideoRef = useRef(null);
-  const fetchRoomDetailsRef = useRef(null);
-  const chatMessagesEndRef = useRef(null);
+  // 회의실 생성 폼 상태
+  const [newRoom, setNewRoom] = useState({
+    title: '',
+    description: '',
+    max_participants: 10,
+    password: '',
+    scheduled_time: ''
+  });
 
-  // Custom Hooks
-  const api = useVideoMeetingAPI(id);
-  const { room, participants, pendingRequests, loading, error } = api;
+  // =========================================================================
+  // API 함수들
+  // =========================================================================
 
-  // ⭐⭐⭐ WebSocket 메시지 핸들러
-  const handleWebSocketMessage = useCallback((data) => {
-    console.log('📨 WebSocket 메시지:', data.type);
-
-    switch (data.type) {
-      case 'approval_notification':
-        console.log('🎉 승인 완료! 페이지 새로고침...');
-        alert('참가가 승인되었습니다!');
-        
-        if (fetchRoomDetailsRef.current) {
-          fetchRoomDetailsRef.current();
-        }
-        
-        setMediaReady(false);
-        break;
-
-      case 'rejection_notification':
-        alert('참가 요청이 거부되었습니다.');
-        navigate('/video-meetings');
-        break;
-
-      case 'join_request_notification':
-        console.log('📢 새로운 참가 요청:', data.username);
-        
-        // ⭐ 즉시 대기 목록 새로고침
-        api.fetchPendingRequests();
-        
-        if (!showPendingPanel) {
-          setShowPendingPanel(true);
-        }
-        
-        // ⭐ 브라우저 알림
-        if (Notification.permission === 'granted') {
-          new Notification('새로운 참가 요청', {
-            body: `${data.username}님이 참가를 요청했습니다.`,
-            icon: '/logo192.png'
-          });
-        }
-        break;
-
-      case 'chat_message':
-        console.log('💬 채팅 메시지 수신:', data.sender, data.content);
-        
-        setChatMessages(prev => [...prev, {
-          id: data.message_id,
-          sender_id: data.sender_id,
-          sender_username: data.sender,
-          content: data.content,
-          created_at: data.created_at,
-          is_mine: data.sender_id === user?.id
-        }]);
-
-        if (!isChatOpen && data.sender_id !== user?.id) {
-          setUnreadCount(prev => prev + 1);
-        }
-        break;
-
-      case 'user_joined':
-        console.log('👋 사용자 입장:', data.username);
-        api.fetchRoomDetails();
-        break;
-
-      case 'user_left':
-        console.log('👋 사용자 퇴장:', data.username);
-        api.fetchRoomDetails();
-        break;
-
-      case 'pong':
-        console.log('💓 Heartbeat OK');
-        break;
-
-      default:
-        console.log('⚠️ 처리되지 않은 메시지 타입:', data.type);
-    }
-  }, [user, navigate, api, showPendingPanel, isChatOpen]);
-
-  // ⭐⭐⭐ WebSocket 연결
-  const { sendMessage: sendWebSocketMessage, sendWebRTCSignal } = useWebSocket(
-    id, 
-    user, 
-    handleWebSocketMessage
-  );
-
-  // ⭐⭐⭐ WebRTC (sendWebRTCSignal을 파라미터로 전달)
-  const webrtc = useWebRTC(id, user, isHost, sendWebRTCSignal);
-  const { 
-    localStreamRef, 
-    remoteStreams, 
-    connectionStatus,
-    getLocalMedia,
-    handleWebSocketSignal,
-    cleanup: cleanupWebRTC 
-  } = webrtc;
-
-  // ⭐ WebRTC 시그널 핸들러 등록
-  useEffect(() => {
-    // WebSocket에서 받은 WebRTC 시그널을 useWebRTC로 전달
-    const originalHandler = handleWebSocketMessage;
-    
-    const enhancedHandler = (data) => {
-      // WebRTC 시그널이면 handleWebSocketSignal로 전달
-      if (['offer', 'answer', 'ice_candidate', 'join'].includes(data.type)) {
-        handleWebSocketSignal(data);
+  const fetchRooms = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await axios.get('/video-meetings/');
+      console.log('📋 API 응답:', response.data);
+      
+      let roomsData;
+      if (Array.isArray(response.data)) {
+        roomsData = response.data;
+      } else if (response.data.results && Array.isArray(response.data.results)) {
+        roomsData = response.data.results;
       } else {
-        originalHandler(data);
+        console.error('❌ 예상치 못한 응답 형태:', response.data);
+        roomsData = [];
       }
-    };
-    
-    // 핸들러는 이미 등록되어 있으므로 추가 작업 불필요
-  }, [handleWebSocketSignal, handleWebSocketMessage]);
-
-  // =========================================================================
-  // Handlers
-  // =========================================================================
-
-  const handleLeaveClick = () => {
-    if (isHost && remoteStreams.length > 0) {
-      setShowLeaveModal(true);
-    } else {
-      handleLeaveOnly();
-    }
-  };
-
-  const handleLeaveOnly = async () => {
-    console.log('👋 회의실 나가기...');
-    
-    cleanupWebRTC();
-    
-    try {
-      await api.leaveRoom();
-    } catch (error) {
-      console.error('❌ 나가기 실패:', error);
-    } finally {
-      navigate('/video-meetings');
-    }
-  };
-
-  const handleEndMeeting = async () => {
-    console.log('🛑 회의 종료...');
-    
-    cleanupWebRTC();
-    
-    try {
-      await api.endMeeting();
-      alert('회의가 종료되었습니다. 모든 참가자가 퇴장됩니다.');
-    } catch (error) {
-      console.error('❌ 회의 종료 실패:', error);
-      alert('회의 종료에 실패했습니다.');
-    } finally {
-      navigate('/video-meetings');
-    }
-  };
-
-  const toggleMic = () => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !isMicOn;
-        setIsMicOn(!isMicOn);
-      }
-    }
-  };
-
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !isVideoOn;
-        setIsVideoOn(!isVideoOn);
-      }
-    }
-  };
-
-  const handleApprove = async (participantId) => {
-    try {
-      await api.approveParticipant(participantId);
-      console.log('✅ 승인 완료 - WebSocket으로 즉시 알림 전송됨');
       
-      api.fetchPendingRequests();
-    } catch (error) {
-      alert('참가 승인에 실패했습니다.');
+      console.log('📋 회의실 목록:', roomsData.length, '개');
+      setRooms(roomsData);
+    } catch (err) {
+      console.error('❌ 회의실 목록 로딩 실패:', err);
+      setError('회의실 목록을 불러올 수 없습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleReject = async (participantId) => {
+  const createRoom = async () => {
+    if (!newRoom.title.trim()) {
+      alert('회의실 제목을 입력해주세요.');
+      return;
+    }
+
     try {
-      await api.rejectParticipant(participantId);
-      console.log('✅ 거부 완료');
+      setCreatingRoom(true);
       
-      api.fetchPendingRequests();
-    } catch (error) {
-      alert('참가 거부에 실패했습니다.');
+      const requestData = {
+        title: newRoom.title.trim(),
+        max_participants: parseInt(newRoom.max_participants) || 10,
+      };
+
+      if (newRoom.description && newRoom.description.trim()) {
+        requestData.description = newRoom.description.trim();
+      }
+
+      if (newRoom.password && newRoom.password.trim()) {
+        requestData.password = newRoom.password.trim();
+      }
+
+      if (newRoom.scheduled_time) {
+        requestData.scheduled_time = newRoom.scheduled_time;
+      }
+
+      console.log('📤 회의실 생성 요청:', requestData);
+
+      const response = await axios.post('/video-meetings/', requestData);
+
+      console.log('✅ 회의실 생성:', response.data);
+      
+      navigate(`/video-meetings/${response.data.id}`);
+    } catch (err) {
+      console.error('❌ 회의실 생성 실패:', err);
+      
+      if (err.response?.data) {
+        const errorMessages = Object.entries(err.response.data)
+          .map(([field, messages]) => {
+            if (Array.isArray(messages)) {
+              return `${field}: ${messages.join(', ')}`;
+            }
+            return `${field}: ${messages}`;
+          })
+          .join('\n');
+        
+        console.error('📋 에러 상세:', err.response.data);
+        alert(`회의실 생성 실패:\n${errorMessages}`);
+      } else {
+        alert('회의실 생성에 실패했습니다.');
+      }
+    } finally {
+      setCreatingRoom(false);
     }
   };
 
-  const handleSendChatMessage = useCallback((content) => {
-    sendWebSocketMessage({
-      type: 'chat',
-      content: content
-    });
-  }, [sendWebSocketMessage]);
+  const joinRoom = async (roomId, participantStatus) => {
+    try {
+      if (participantStatus === 'approved') {
+        console.log('✅ 승인된 상태 - 즉시 입장');
+        navigate(`/video-meetings/${roomId}`);
+        return;
+      }
 
-  const toggleChat = () => {
-    setIsChatOpen(prev => !prev);
-    
-    if (!isChatOpen) {
-      setUnreadCount(0);
+      if (participantStatus === 'pending') {
+        console.log('⏳ 대기 중 - 대기 화면으로 이동');
+        navigate(`/video-meetings/${roomId}`);
+        return;
+      }
+
+      console.log('📢 참가 요청:', roomId);
+      
+      const response = await axios.post(`/video-meetings/${roomId}/join_request/`);
+      console.log('✅ 참가 요청 완료:', response.data);
+      
+      console.log(`🚀 회의실 페이지로 이동: /video-meetings/${roomId}`);
+      navigate(`/video-meetings/${roomId}`);
+      
+    } catch (err) {
+      console.error('❌ 참가 요청 실패:', err);
+      
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        alert('참가 요청에 실패했습니다.');
+      }
     }
   };
 
-  // 채팅 자동 스크롤
-  useEffect(() => {
-    if (chatMessagesEndRef.current) {
-      chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // ⭐ 새로 추가: 회의 종료 함수
+  const endMeeting = async (roomId, roomTitle) => {
+    const confirmEnd = window.confirm(
+      `"${roomTitle}" 회의를 종료하시겠습니까?\n\n모든 참가자가 자동으로 퇴장됩니다.`
+    );
+
+    if (!confirmEnd) return;
+
+    try {
+      console.log('🛑 회의 종료 요청:', roomId);
+      
+      await axios.post(`/video-meetings/${roomId}/end/`);
+      
+      console.log('✅ 회의 종료 완료');
+      alert('회의가 종료되었습니다.');
+      
+      // 목록 새로고침
+      await fetchRooms();
+    } catch (err) {
+      console.error('❌ 회의 종료 실패:', err);
+      
+      if (err.response?.data?.detail) {
+        alert(err.response.data.detail);
+      } else {
+        alert('회의 종료에 실패했습니다.');
+      }
     }
-  }, [chatMessages]);
+  };
 
   // =========================================================================
   // Effects
   // =========================================================================
 
-  // ⭐ 알림 권한 요청
   useEffect(() => {
-    if (isHost && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, [isHost]);
+    fetchRooms();
 
-  // ⭐ 회의실 정보 로드
-  useEffect(() => {
-    const fetchAndSetRoom = async () => {
-      try {
-        const roomData = await api.fetchRoomDetails();
-        
-        const isCurrentUserHost = roomData.host_username === user.username;
-        setIsHost(isCurrentUserHost);
-        
-        // ⭐ 방장이면 대기 목록 로드
-        if (isCurrentUserHost) {
-          api.fetchPendingRequests();
-        }
-        
-        if (!isCurrentUserHost) {
-          const status = roomData.participant_status;
-          
-          if (status === 'rejected') {
-            alert('참가 요청이 거부되었습니다.');
-            navigate('/video-meetings');
-            return;
-          }
-          
-          if (room && room.participant_status !== 'approved' && status === 'approved') {
-            console.log('🎉 승인 완료! 미디어 초기화 트리거');
-            setMediaReady(false);
-          }
-        }
-      } catch (error) {
-        if (error.response?.status === 404) {
-          alert('회의실을 찾을 수 없습니다.');
-          navigate('/video-meetings');
-        }
+    const interval = setInterval(() => {
+      if (!showCreateModal) {
+        fetchRooms();
       }
-    };
-    
-    fetchAndSetRoom();
-    fetchRoomDetailsRef.current = fetchAndSetRoom;
-    
-    return () => {
-      console.log('🔄 컴포넌트 언마운트');
-      cleanupWebRTC();
-    };
-  }, [api, user, navigate, room, cleanupWebRTC]);
+    }, 5000);
 
-  // ⭐ 미디어 초기화
-  useEffect(() => {
-    if (!room || mediaReady || !user) return;
-    
-    const isApproved = room.participant_status === 'approved' || isHost;
-    if (!isApproved) {
-      console.log('⏳ 승인 대기 중...');
-      return;
-    }
+    return () => clearInterval(interval);
+  }, [showCreateModal]);
 
-    console.log('🚀 WebRTC 초기화');
-    
-    const initializeMedia = async () => {
-      try {
-        const stream = await getLocalMedia();
-        
-        if (!stream) {
-          alert('마이크와 카메라 권한이 필요합니다.');
-          return;
-        }
+  // =========================================================================
+  // Handlers
+  // =========================================================================
 
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
+  const handleCreateRoom = () => {
+    setShowCreateModal(true);
+    setNewRoom({
+      title: '',
+      description: '',
+      max_participants: 10,
+      password: '',
+      scheduled_time: ''
+    });
+  };
 
-        setMediaReady(true);
-        
-        // ⭐ Join 메시지 전송 (참가자만)
-        if (!isHost) {
-          setTimeout(() => {
-            sendWebSocketMessage({
-              type: 'join',
-              username: user.username
-            });
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('❌ 미디어 초기화 실패:', error);
-        alert('카메라/마이크 접근에 실패했습니다.');
-      }
-    };
-    
-    initializeMedia();
-  }, [room, user, isHost, mediaReady, getLocalMedia, sendWebSocketMessage]);
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setNewRoom({
+      title: '',
+      description: '',
+      max_participants: 10,
+      password: '',
+      scheduled_time: ''
+    });
+  };
+
+  const handleSubmitCreate = (e) => {
+    e.preventDefault();
+    createRoom();
+  };
+
+  const handleRefresh = () => {
+    fetchRooms();
+  };
 
   // =========================================================================
   // Render
   // =========================================================================
-  
-  if (loading) {
+
+  if (loading && rooms.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-900">
-        <Loader className="animate-spin w-10 h-10 text-white" />
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <Loader className="w-10 h-10 text-blue-600 animate-spin" />
       </div>
     );
   }
-
-  if (error || !room) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">
-        <p>{error || '회의실을 로드할 수 없습니다.'}</p>
-      </div>
-    );
-  }
-
-  // ⭐ 승인 대기 화면
-  if (!isHost && room.participant_status === 'pending') {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-900 text-white">
-        <Loader className="animate-spin w-12 h-12 mb-6" />
-        <h2 className="text-2xl font-bold mb-2">참가 승인 대기 중...</h2>
-        <p className="text-gray-400 mb-2">방장의 승인을 기다리고 있습니다.</p>
-        <p className="text-sm text-gray-500">승인되면 자동으로 회의실에 입장합니다.</p>
-        <button
-          onClick={() => navigate('/video-meetings')}
-          className="mt-6 px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition"
-        >
-          뒤로 가기
-        </button>
-      </div>
-    );
-  }
-
-  const allVideos = [
-    {
-      peerId: user?.username,
-      username: `${user?.username} (나)`,
-      stream: localStreamRef.current,
-      isLocal: true,
-      isMuted: !isMicOn,
-      isVideoOff: !isVideoOn,
-      ref: localVideoRef,
-    },
-    ...remoteStreams,
-  ].filter(v => v.stream || v.isLocal);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col relative">
-      
-      {/* 헤더 */}
-      <RoomHeader
-        title={room.title}
-        participantCount={allVideos.length}
-        connectionStatus={connectionStatus}
-        isHost={isHost}
-        pendingCount={pendingRequests.length}
-        onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
-      />
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* 헤더 */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <Video className="w-8 h-8 mr-3 text-blue-600" />
+                화상 회의
+              </h1>
+              <p className="text-gray-600 mt-2">
+                온라인 화상 회의를 생성하고 참가하세요
+              </p>
+            </div>
 
-      {/* 대기 요청 패널 */}
-      {isHost && showPendingPanel && (
-        <PendingRequestsPanel
-          requests={pendingRequests}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onClose={() => setShowPendingPanel(false)}
-        />
-      )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition flex items-center disabled:opacity-50"
+              >
+                <RefreshCw className={`w-5 h-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                새로고침
+              </button>
 
-      {/* 비디오 그리드 */}
-      <VideoGrid videos={allVideos} />
-      
-      {/* 채팅 패널 */}
-      <ChatPanel
-        isOpen={isChatOpen}
-        messages={chatMessages}
-        loading={false}
-        currentUser={user}
-        messagesEndRef={chatMessagesEndRef}
-        onSendMessage={handleSendChatMessage}
-        onClose={toggleChat}
-      />
-      
-      {/* 컨트롤 바 */}
-      <div className="bg-gray-800 border-t border-gray-700 px-6 py-3 flex justify-center items-center gap-4">
-        
-        {/* 마이크 */}
-        <button
-          onClick={toggleMic}
-          className={`p-3 rounded-full transition ${
-            isMicOn 
-              ? 'bg-white text-gray-900 hover:bg-gray-200' 
-              : 'bg-red-600 text-white hover:bg-red-700'
-          }`}
-          title={isMicOn ? '마이크 끄기' : '마이크 켜기'}
-        >
-          {isMicOn ? <span>🎤</span> : <span>🔇</span>}
-        </button>
-        
-        {/* 비디오 */}
-        <button
-          onClick={toggleVideo}
-          className={`p-3 rounded-full transition ${
-            isVideoOn 
-              ? 'bg-white text-gray-900 hover:bg-gray-200' 
-              : 'bg-red-600 text-white hover:bg-red-700'
-          }`}
-          title={isVideoOn ? '비디오 끄기' : '비디오 켜기'}
-        >
-          {isVideoOn ? <span>📹</span> : <span>📴</span>}
-        </button>
-        
-        {/* 채팅 토글 */}
-        <ChatToggleButton
-          onClick={toggleChat}
-          unreadCount={unreadCount}
-        />
-        
-        {/* 나가기 */}
-        <button
-          onClick={handleLeaveClick}
-          className="p-3 bg-red-800 text-white rounded-full hover:bg-red-900 transition"
-          title="회의 나가기"
-        >
-          📞
-        </button>
+              <button
+                onClick={handleCreateRoom}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center font-medium shadow-sm"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                회의실 생성
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded flex items-start">
+              <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5" />
+              <div>
+                <p className="text-red-800 font-medium">오류</p>
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 회의실 목록 */}
+        {!Array.isArray(rooms) || rooms.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <Video className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              진행 중인 회의가 없습니다
+            </h3>
+            <p className="text-gray-600 mb-6">
+              새로운 회의실을 생성하거나 초대받은 회의에 참가하세요
+            </p>
+            <button
+              onClick={handleCreateRoom}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition inline-flex items-center font-medium"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              첫 회의실 만들기
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {rooms.map((room) => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                currentUser={user}
+                onJoin={joinRoom}
+                onEnd={endMeeting}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 방장 퇴장 모달 */}
-      <HostLeaveModal
-        isOpen={showLeaveModal}
-        onClose={() => setShowLeaveModal(false)}
-        onLeaveOnly={handleLeaveOnly}
-        onEndMeeting={handleEndMeeting}
-      />
+      {/* 회의실 생성 모달 */}
+      {showCreateModal && (
+        <CreateRoomModal
+          newRoom={newRoom}
+          setNewRoom={setNewRoom}
+          onSubmit={handleSubmitCreate}
+          onClose={handleCloseModal}
+          creating={creatingRoom}
+        />
+      )}
     </div>
   );
 }
 
-export default VideoMeetingRoom;
+/**
+ * ⭐ 회의실 카드 컴포넌트 (종료 기능 추가)
+ */
+function RoomCard({ room, currentUser, onJoin, onEnd }) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const getStatusBadge = () => {
+    if (room.is_host) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+          방장
+        </span>
+      );
+    }
+
+    switch (room.participant_status) {
+      case 'approved':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            참가 중
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            승인 대기
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getButtonText = () => {
+    if (room.is_host || room.participant_status === 'approved') {
+      return '입장하기';
+    }
+    if (room.participant_status === 'pending') {
+      return '대기 화면';
+    }
+    return '참가 요청';
+  };
+
+  const getButtonIcon = () => {
+    if (room.is_host || room.participant_status === 'approved') {
+      return <LogIn className="w-4 h-4 mr-1.5" />;
+    }
+    return <Users className="w-4 h-4 mr-1.5" />;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 overflow-hidden">
+      <div className="p-6">
+        {/* 헤더 */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">
+              {room.title}
+            </h3>
+            <p className="text-sm text-gray-600">
+              방장: {room.host_username}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {getStatusBadge()}
+            
+            {/* ⭐ 방장 전용: 더보기 메뉴 */}
+            {room.is_host && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+
+                {showMenu && (
+                  <>
+                    {/* 오버레이 */}
+                    <div 
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowMenu(false)}
+                    />
+                    
+                    {/* 메뉴 */}
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onEnd(room.id, room.title);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition flex items-center"
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        회의 종료
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 설명 */}
+        {room.description && (
+          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+            {room.description}
+          </p>
+        )}
+
+        {/* 정보 */}
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center text-sm text-gray-600">
+            <Users className="w-4 h-4 mr-2 text-gray-400" />
+            <span>
+              {room.participant_count} / {room.max_participants}명
+            </span>
+          </div>
+
+          {room.scheduled_time && (
+            <div className="flex items-center text-sm text-gray-600">
+              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+              <span>
+                {new Date(room.scheduled_time).toLocaleString('ko-KR')}
+              </span>
+            </div>
+          )}
+
+          {room.started_at && (
+            <div className="flex items-center text-sm text-gray-600">
+              <Clock className="w-4 h-4 mr-2 text-gray-400" />
+              <span>
+                {new Date(room.started_at).toLocaleTimeString('ko-KR')} 시작
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 액션 버튼 */}
+        <button
+          onClick={() => onJoin(room.id, room.participant_status)}
+          className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center ${
+            room.is_host || room.participant_status === 'approved'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : room.participant_status === 'pending'
+              ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+          }`}
+        >
+          {getButtonIcon()}
+          {getButtonText()}
+        </button>
+      </div>
+
+      {/* 하단 상태 바 */}
+      <div className={`px-6 py-2 text-xs font-medium ${
+        room.status === 'active'
+          ? 'bg-green-50 text-green-700'
+          : room.status === 'ended'
+          ? 'bg-gray-50 text-gray-500'
+          : 'bg-gray-50 text-gray-600'
+      }`}>
+        {room.status === 'active' 
+          ? '● 진행 중' 
+          : room.status === 'ended'
+          ? '○ 종료됨'
+          : '○ 대기 중'
+        }
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 회의실 생성 모달
+ */
+function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-lg w-full p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          새 회의실 만들기
+        </h2>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          {/* 제목 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              회의실 제목 *
+            </label>
+            <input
+              type="text"
+              value={newRoom.title}
+              onChange={(e) => setNewRoom({ ...newRoom, title: e.target.value })}
+              placeholder="예: 주간 팀 회의"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {/* 설명 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              설명 (선택)
+            </label>
+            <textarea
+              value={newRoom.description}
+              onChange={(e) => setNewRoom({ ...newRoom, description: e.target.value })}
+              placeholder="회의에 대한 간단한 설명을 입력하세요"
+              rows={3}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* 최대 참가자 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              최대 참가자 수
+            </label>
+            <input
+              type="number"
+              value={newRoom.max_participants}
+              onChange={(e) => setNewRoom({ ...newRoom, max_participants: parseInt(e.target.value) })}
+              min={2}
+              max={50}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* 예약 시간 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              예약 시간 (선택)
+            </label>
+            <input
+              type="datetime-local"
+              value={newRoom.scheduled_time}
+              onChange={(e) => setNewRoom({ ...newRoom, scheduled_time: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* 버튼 */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={creating}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={creating || !newRoom.title.trim()}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {creating ? (
+                <>
+                  <Loader className="w-5 h-5 mr-2 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5 mr-2" />
+                  생성하기
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default VideoMeetingList;

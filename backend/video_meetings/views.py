@@ -31,6 +31,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
     """화상회의방 ViewSet"""
     queryset = VideoRoom.objects.all()
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Pagination 비활성화
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -46,22 +47,40 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         ).order_by('-created_at')
     
     def perform_create(self, serializer):
-        """방 생성 시 방장 자동 설정"""
-        serializer.save(host=self.request.user)
-    
-    def retrieve(self, request, *args, **kwargs):
-        """회의실 상세 조회"""
-        room = self.get_object()
-        
-        # 방장이 처음 입장하면 자동으로 active 상태로 변경
-        if room.host == request.user and room.status == 'waiting':
-            room.status = 'active'
-            room.started_at = timezone.now()
-            room.save()
-            print(f"🎬 방장 입장 - 회의 자동 시작: {room.title}")
-        
-        serializer = self.get_serializer(room)
-        return Response(serializer.data)
+        """
+        회의실 생성 시 방장 자동 설정
+        ⭐ 빈 문자열 처리 개선
+        """
+        try:
+            # ⭐ 빈 문자열을 None으로 변환
+            validated_data = serializer.validated_data.copy()
+            
+            # description이 빈 문자열이면 제거
+            if 'description' in validated_data and not validated_data['description']:
+                validated_data['description'] = ''
+            
+            # password가 빈 문자열이면 제거
+            if 'password' in validated_data and not validated_data['password']:
+                validated_data.pop('password', None)
+            
+            # scheduled_time이 빈 문자열이면 제거
+            if 'scheduled_time' in validated_data and not validated_data['scheduled_time']:
+                validated_data.pop('scheduled_time', None)
+            
+            # max_participants 기본값 설정
+            if 'max_participants' not in validated_data or validated_data['max_participants'] is None:
+                validated_data['max_participants'] = 10
+            
+            print(f"✅ 회의실 생성 데이터: {validated_data}")
+            
+            # 회의실 생성 (host는 현재 사용자)
+            room = serializer.save(host=self.request.user, **validated_data)
+            
+            print(f"✅ 회의실 생성 완료: {room.id} - {room.title}")
+            
+        except Exception as e:
+            print(f"❌ 회의실 생성 실패: {str(e)}")
+            raise
     
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -81,28 +100,35 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(room)
         return Response(serializer.data)
     
+
     @action(detail=True, methods=['post'])
     def end(self, request, pk=None):
-        """회의 종료"""
+        """회의 종료 (방장만 가능)"""
         room = self.get_object()
         
+        # 권한 확인
         if room.host != request.user:
             return Response(
                 {'detail': '방장만 회의를 종료할 수 있습니다.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # ⭐ 상태 업데이트
         room.status = 'ended'
         room.ended_at = timezone.now()
         room.save()
         
+        print(f'✅ 회의 종료: {room.title} (상태: {room.status})')
+        
         # 모든 참가자 퇴장 처리
-        room.participants.filter(status='approved').update(
+        updated_count = room.participants.filter(status='approved').update(
             status='left',
             left_at=timezone.now()
         )
         
-        # WebSocket 알림 (선택사항)
+        print(f'📤 {updated_count}명의 참가자 퇴장 처리 완료')
+        
+        # WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -111,59 +137,140 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 room_group_name,
                 {
                     'type': 'meeting_ended',
-                    'message': '회의가 종료되었습니다.'
+                    'message': '회의가 종료되었습니다.',
+                    'ended_by': request.user.username
                 }
             )
+            print('📡 회의 종료 알림 전송 완료')
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = self.get_serializer(room)
         return Response(serializer.data)
-    
+        
+    @action(detail=True, methods=['post'])  # ⭐ 누락된 데코레이터 추가!
+    def reject_participant(self, request, pk=None):
+        """⭐ 참가 거부 (WebSocket 알림 수정)"""
+        room = self.get_object()
+        
+        if room.host != request.user:
+            return Response(
+                {'detail': '방장만 참가를 거부할 수 있습니다.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        participant_id = request.data.get('participant_id')
+        participant = get_object_or_404(
+            RoomParticipant,
+            id=participant_id,
+            room=room
+        )
+        
+        participant.status = 'rejected'
+        participant.save()
+        
+        print(f"✅ 참가 거부: {participant.user.username}")
+        
+        # WebSocket 알림
+        channel_layer = get_channel_layer()
+        room_group_name = f'video_room_{room.id}'
+        
+        try:
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'rejection_notification',
+                    'participant_username': participant.user.username,
+                    'message': '참가가 거부되었습니다.'
+                }
+            )
+            print(f"📡 거부 알림 전송 완료: {participant.user.username}")
+        except Exception as e:
+            print(f"⚠️ WebSocket 알림 실패: {e}")
+        
+        serializer = ParticipantSerializer(participant)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['post'])
     def join_request(self, request, pk=None):
         """회의 참가 요청"""
         room = self.get_object()
         user = request.user
         
+        # ⭐ 방장은 자동 참가 (요청 불필요)
         if room.host == user:
             return Response(
                 {'detail': '방장은 자동으로 참가됩니다.'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_200_OK
             )
         
-        # 기존 요청 확인
+        # ⭐ 기존 요청 확인 (개선)
         existing = room.participants.filter(user=user).first()
+        
         if existing:
+            # 이미 승인된 경우
             if existing.status == 'approved':
-                return Response(
-                    {'detail': '이미 승인되었습니다.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                serializer = ParticipantSerializer(existing)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            
+            # 대기 중인 경우
             elif existing.status == 'pending':
                 serializer = ParticipantSerializer(existing)
                 return Response(serializer.data, status=status.HTTP_200_OK)
+            
+            # 거부된 경우 - 새로 요청 가능하도록 상태 변경
+            elif existing.status == 'rejected':
+                existing.status = 'pending'
+                existing.save()
+                
+                serializer = ParticipantSerializer(existing)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            # 퇴장한 경우 - 재참가 요청
+            elif existing.status == 'left':
+                existing.status = 'pending'
+                existing.joined_at = None
+                existing.left_at = None
+                existing.save()
+                
+                serializer = ParticipantSerializer(existing)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        # ⭐ 최대 참가자 수 확인 (대기 중인 사람은 제외)
+        approved_count = room.participants.filter(status='approved').count()
+        if approved_count >= room.max_participants:
+            return Response(
+                {'detail': '최대 참가자 수를 초과했습니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         try:
-            participant, created = RoomParticipant.objects.get_or_create(
+            # ⭐ 새 참가 요청 생성
+            participant = RoomParticipant.objects.create(
                 room=room,
                 user=user,
-                defaults={'status': 'pending'}
+                status='pending'
             )
             
-            # WebSocket 알림
+            print(f"✅ 참가 요청 생성: {user.username} → {room.title}")
+            
+            # ⭐ WebSocket 알림
             channel_layer = get_channel_layer()
             room_group_name = f'video_room_{room.id}'
             
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'join_request_notification',
-                    'participant_id': participant.id,
-                    'username': user.username,
-                    'message': f'{user.username}님이 참가를 요청했습니다.'
-                }
-            )
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    room_group_name,
+                    {
+                        'type': 'join_request_notification',
+                        'participant_id': participant.id,
+                        'username': user.username,
+                        'message': f'{user.username}님이 참가를 요청했습니다.'
+                    }
+                )
+                print(f"📡 참가 요청 알림 전송 완료")
+            except Exception as e:
+                print(f"⚠️ WebSocket 알림 실패: {e}")
             
             serializer = ParticipantSerializer(participant)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -213,7 +320,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         
         print(f"✅ 참가 승인: {participant.user.username}")
         
-        # ⭐⭐⭐ WebSocket 알림 (반드시 추가!)
+        # ⭐⭐⭐ WebSocket 알림 (반드시 전송!)
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
@@ -227,16 +334,14 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'message': '참가가 승인되었습니다.'
                 }
             )
-            print(f"📡 승인 알림 전송: {participant.user.username}")
+            print(f"📡 승인 알림 전송 완료: {participant.user.username}")
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'])
-    def reject_participant(self, request, pk=None):
-        """⭐ 참가 거부 (WebSocket 알림 추가)"""
+        """⭐ 참가 거부 (WebSocket 알림 수정)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -270,7 +375,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'message': '참가가 거부되었습니다.'
                 }
             )
-            print(f"📡 거부 알림 전송: {participant.user.username}")
+            print(f"📡 거부 알림 전송 완료: {participant.user.username}")
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
         

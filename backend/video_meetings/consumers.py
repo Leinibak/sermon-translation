@@ -1,4 +1,4 @@
-# backend/video_meetings/consumers.py (완전 개선 버전)
+# backend/video_meetings/consumers.py (완전 수정 버전)
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -8,7 +8,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class VideoMeetingConsumer(AsyncWebsocketConsumer):
-    """개선된 WebSocket Consumer - 모든 시그널링 통합"""
+    """WebSocket Consumer - 모든 시그널링 통합"""
     
     async def connect(self):
         """WebSocket 연결 수립"""
@@ -72,7 +72,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             
             logger.debug(f"📨 메시지 수신: {message_type} from {self.username}")
             
-            # ⭐ WebRTC 시그널링 처리 (즉시 전달, DB 저장 없음)
+            # ⭐ WebRTC 시그널링 처리 (즉시 전달)
             if message_type in ['offer', 'answer', 'ice_candidate']:
                 await self.handle_webrtc_signal(data)
             
@@ -96,21 +96,20 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.error(f"❌ 메시지 처리 오류: {e}", exc_info=True)
     
     # =========================================================================
-    # ⭐ WebRTC 시그널링 핸들러 (개선 - 즉시 전달)
+    # ⭐ WebRTC 시그널링 핸들러
     # =========================================================================
     
     async def handle_webrtc_signal(self, data):
         """
         WebRTC 시그널링 처리 (Offer, Answer, ICE Candidate)
-        - 즉시 WebSocket으로 전달 (DB 저장 없음)
-        - 지연 최소화
+        - 즉시 WebSocket으로 전달
         """
         signal_type = data.get('type')
         to_user_id = data.get('to_user_id')
         
         logger.info(f"📡 WebRTC 시그널: {signal_type} from {self.username} to {to_user_id}")
         
-        # ⭐ 즉시 그룹 브로드캐스트 (지연 없음)
+        # ⭐ 즉시 그룹 브로드캐스트
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -148,10 +147,10 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         if not content or len(content) > 1000:
             return
         
-        # DB에 저장
+        # DB에 저장 (선택사항)
         message_id = await self.save_chat_message(content)
         
-        # 즉시 브로드캐스트
+        # ⭐ 즉시 브로드캐스트 (모든 참가자에게)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -246,15 +245,21 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def webrtc_signal(self, event):
         """⭐ WebRTC 시그널 전달 (즉시)"""
         to_user_id = event.get('to_user_id')
+        from_user_id = event.get('from_user_id')
+        
+        # 자신의 시그널은 무시
+        if from_user_id == self.username:
+            return
         
         # 수신자 확인 (브로드캐스트 또는 특정 사용자)
         if to_user_id and to_user_id != self.username:
             return
         
-        # 즉시 전송
+        # ⭐ 즉시 전송
         await self.send(text_data=json.dumps({
             'type': event['signal_type'],
-            'from_user_id': event['from_user_id'],
+            'from_user_id': from_user_id,
+            'to_user_id': to_user_id,
             **event['data']
         }))
     
@@ -289,7 +294,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         }))
     
     async def approval_notification(self, event):
-        """참가 승인 알림"""
+        """⭐ 참가 승인 알림 (수정)"""
+        # 해당 참가자에게만 전송
         if event.get('participant_username') == self.username:
             await self.send(text_data=json.dumps({
                 'type': 'approval_notification',
@@ -298,7 +304,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
     
     async def rejection_notification(self, event):
-        """참가 거부 알림"""
+        """⭐ 참가 거부 알림 (수정)"""
+        # 해당 참가자에게만 전송
         if event.get('participant_username') == self.username:
             await self.send(text_data=json.dumps({
                 'type': 'rejection_notification',
@@ -307,7 +314,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
     
     async def join_request_notification(self, event):
-        """참가 요청 알림 (방장용)"""
+        """⭐ 참가 요청 알림 (방장용)"""
         is_host = await self.check_is_host()
         
         if is_host:
@@ -318,6 +325,13 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'message': event['message']
             }))
     
+    async def meeting_ended(self, event):
+        """⭐ 회의 종료 알림"""
+        await self.send(text_data=json.dumps({
+            'type': 'meeting_ended',
+            'message': event['message'],
+            'ended_by': event.get('ended_by')
+        }))
     # =========================================================================
     # 유틸리티 메서드
     # =========================================================================

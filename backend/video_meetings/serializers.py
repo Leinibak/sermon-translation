@@ -107,19 +107,57 @@ class VideoRoomDetailSerializer(serializers.ModelSerializer):
 
 
 class VideoRoomCreateSerializer(serializers.ModelSerializer):
+    """회의실 생성용 Serializer"""
+    
     class Meta:
         model = VideoRoom
         fields = [
-            'title', 'description', 'max_participants',
-            'password', 'scheduled_time'
+            'title', 
+            'description', 
+            'max_participants',
+            'password', 
+            'scheduled_time'
         ]
+        # ⭐ 모든 필드를 선택적으로 설정
+        extra_kwargs = {
+            'description': {'required': False, 'allow_blank': True},
+            'password': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'scheduled_time': {'required': False, 'allow_null': True},
+            'max_participants': {'required': False, 'default': 10}
+        }
     
     def validate_max_participants(self, value):
+        """최대 참가자 수 유효성 검사"""
+        if value is None:
+            return 10  # 기본값
+        
         if value < 2:
             raise serializers.ValidationError('최소 2명 이상이어야 합니다.')
         if value > 50:
             raise serializers.ValidationError('최대 50명까지만 가능합니다.')
         return value
+    
+    def validate_title(self, value):
+        """제목 유효성 검사"""
+        if not value or not value.strip():
+            raise serializers.ValidationError('제목은 필수입니다.')
+        
+        if len(value.strip()) > 200:
+            raise serializers.ValidationError('제목은 200자를 초과할 수 없습니다.')
+        
+        return value.strip()
+    
+    def validate_description(self, value):
+        """설명 유효성 검사"""
+        if value and len(value.strip()) > 1000:
+            raise serializers.ValidationError('설명은 1000자를 초과할 수 없습니다.')
+        return value.strip() if value else ''
+    
+    def validate_password(self, value):
+        """비밀번호 유효성 검사"""
+        if value and len(value) > 50:
+            raise serializers.ValidationError('비밀번호는 50자를 초과할 수 없습니다.')
+        return value.strip() if value else ''
 
 
 class SignalMessageSerializer(serializers.ModelSerializer):

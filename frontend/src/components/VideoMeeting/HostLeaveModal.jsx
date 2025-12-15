@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeeting/HostLeaveModal.jsx
+// frontend/src/components/VideoMeeting/HostLeaveModal.jsx (Prop 이름 수정)
 import React from 'react';
 import { AlertTriangle, LogOut, XCircle } from 'lucide-react';
 

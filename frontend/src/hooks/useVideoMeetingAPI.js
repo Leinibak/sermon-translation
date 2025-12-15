@@ -1,4 +1,4 @@
-// frontend/src/hooks/useVideoMeetingAPI.js (완전 버전)
+// frontend/src/hooks/useVideoMeetingAPI.js (완전 수정 버전)
 import { useState, useCallback } from 'react';
 import axios from '../api/axios';
 
@@ -14,6 +14,15 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const fetchRoomDetails = useCallback(async () => {
+    // ⭐⭐⭐ roomId 검증 강화
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID:', roomId);
+      const error = new Error('유효하지 않은 Room ID');
+      setError('유효하지 않은 Room ID');
+      setLoading(false);
+      throw error;
+    }
+
     try {
       const response = await axios.get(`/video-meetings/${roomId}/`);
       const roomData = response.data;
@@ -35,13 +44,18 @@ export function useVideoMeetingAPI(roomId) {
     } finally {
       setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId]); // ⭐ roomId를 의존성에 포함
 
   // =========================================================================
   // Pending Requests
   // =========================================================================
   
   const fetchPendingRequests = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      return [];
+    }
+
     try {
       const response = await axios.get(`/video-meetings/${roomId}/pending_requests/`);
       const pending = response.data;
@@ -60,6 +74,11 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const approveParticipant = useCallback(async (participantId) => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       const response = await axios.post(
         `/video-meetings/${roomId}/approve_participant/`, 
@@ -82,6 +101,11 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId, fetchRoomDetails]);
 
   const rejectParticipant = useCallback(async (participantId) => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       await axios.post(
         `/video-meetings/${roomId}/reject_participant/`, 
@@ -101,6 +125,11 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const leaveRoom = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       await axios.post(`/video-meetings/${roomId}/leave/`);
       console.log('✅ 회의실 나가기 완료');
@@ -111,6 +140,11 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   const endMeeting = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       await axios.post(`/video-meetings/${roomId}/end/`);
       console.log('✅ 회의 종료 완료');
@@ -125,6 +159,11 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const fetchChatMessages = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      return [];
+    }
+
     try {
       const response = await axios.get(`/video-meetings/${roomId}/chat/messages`);
       return response.data;
@@ -135,6 +174,11 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   const sendChatMessage = useCallback(async (content) => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       const response = await axios.post(
         `/video-meetings/${roomId}/chat/send`,
@@ -152,6 +196,11 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const sendReaction = useCallback(async (reactionType) => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       const response = await axios.post(
         `/video-meetings/${roomId}/reactions/send`,
@@ -169,6 +218,11 @@ export function useVideoMeetingAPI(roomId) {
   // =========================================================================
   
   const raiseHand = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       const response = await axios.post(`/video-meetings/${roomId}/raise-hand`);
       return response.data;
@@ -179,6 +233,11 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   const lowerHand = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      throw new Error('유효하지 않은 Room ID');
+    }
+
     try {
       const response = await axios.post(`/video-meetings/${roomId}/lower-hand`);
       return response.data;
@@ -189,6 +248,11 @@ export function useVideoMeetingAPI(roomId) {
   }, [roomId]);
 
   const fetchRaisedHands = useCallback(async () => {
+    if (!roomId || roomId === 'undefined' || roomId === 'null') {
+      console.error('❌ 유효하지 않은 Room ID');
+      return [];
+    }
+
     try {
       const response = await axios.get(`/video-meetings/${roomId}/raised-hands`);
       return response.data;
