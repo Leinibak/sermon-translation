@@ -119,8 +119,8 @@ function VideoMeetingRoom() {
     console.log(`   User: ${user.username}`);
     console.log(`${'='.repeat(60)}\n`);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//localhost:8000/ws/video-meeting/${roomId}/`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';        
+    const wsUrl = `${protocol}://${window.location.host}/ws/video-meeting/${roomId}/`; 
 
     try {
       const socket = new WebSocket(wsUrl);
