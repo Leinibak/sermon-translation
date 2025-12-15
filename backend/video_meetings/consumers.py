@@ -1,4 +1,4 @@
-# backend/video_meetings/consumers.py (완전 수정 버전)
+# backend/video_meetings/consumers.py (개선 버전)
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -109,7 +109,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         
         logger.info(f"📡 WebRTC 시그널: {signal_type} from {self.username} to {to_user_id}")
         
-        # ⭐ 즉시 그룹 브로드캐스트
+        # ⭐ 즉시 그룹 브로드캐스트 (모든 참가자에게)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -130,6 +130,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         """참가 알림 처리"""
         logger.info(f"👋 사용자 입장: {self.username}")
         
+        # 모든 참가자에게 입장 알림
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -147,7 +148,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         if not content or len(content) > 1000:
             return
         
-        # DB에 저장 (선택사항)
+        # ⭐ DB에 저장
         message_id = await self.save_chat_message(content)
         
         # ⭐ 즉시 브로드캐스트 (모든 참가자에게)
@@ -224,7 +225,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     # =========================================================================
     
     async def user_joined(self, event):
-        """참가 알림"""
+        """참가 알림 - 자신 제외 모든 사용자에게 전송"""
         if event['user_id'] != self.user_id:
             await self.send(text_data=json.dumps({
                 'type': 'user_joined',
@@ -243,7 +244,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
     
     async def webrtc_signal(self, event):
-        """⭐ WebRTC 시그널 전달 (즉시)"""
+        """⭐ WebRTC 시그널 전달 (개선)"""
         to_user_id = event.get('to_user_id')
         from_user_id = event.get('from_user_id')
         
@@ -251,7 +252,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         if from_user_id == self.username:
             return
         
-        # 수신자 확인 (브로드캐스트 또는 특정 사용자)
+        # ⭐ 수신자가 지정되어 있으면 해당 사용자에게만 전송
+        # 수신자가 없으면(브로드캐스트) 모든 사용자에게 전송
         if to_user_id and to_user_id != self.username:
             return
         
@@ -264,14 +266,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         }))
     
     async def chat_message(self, event):
-        """채팅 메시지 알림"""
+        """채팅 메시지 알림 - 모든 사용자에게 전송"""
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message_id': event['message_id'],
             'sender': event['sender'],
             'sender_id': event['sender_id'],
             'content': event['content'],
-            'created_at': event['created_at']
+            'created_at': event['created_at'],
+            'is_mine': event['sender_id'] == self.user_id  # ⭐ 추가
         }))
     
     async def reaction(self, event):
@@ -294,8 +297,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         }))
     
     async def approval_notification(self, event):
-        """⭐ 참가 승인 알림 (수정)"""
-        # 해당 참가자에게만 전송
+        """⭐ 참가 승인 알림 (해당 사용자에게만)"""
         if event.get('participant_username') == self.username:
             await self.send(text_data=json.dumps({
                 'type': 'approval_notification',
@@ -304,8 +306,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
     
     async def rejection_notification(self, event):
-        """⭐ 참가 거부 알림 (수정)"""
-        # 해당 참가자에게만 전송
+        """⭐ 참가 거부 알림 (해당 사용자에게만)"""
         if event.get('participant_username') == self.username:
             await self.send(text_data=json.dumps({
                 'type': 'rejection_notification',
@@ -314,7 +315,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
     
     async def join_request_notification(self, event):
-        """⭐ 참가 요청 알림 (방장용)"""
+        """⭐ 참가 요청 알림 (방장에게만)"""
         is_host = await self.check_is_host()
         
         if is_host:
@@ -332,6 +333,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
             'ended_by': event.get('ended_by')
         }))
+    
     # =========================================================================
     # 유틸리티 메서드
     # =========================================================================
