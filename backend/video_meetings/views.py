@@ -281,10 +281,10 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 {'detail': f'참가 요청 생성 실패: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """⭐ 참가 승인 (WebSocket 알림 개선)"""
+        """참가 승인 (로그 강화)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -314,30 +314,61 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # ⭐ 승인 처리
         participant.status = 'approved'
         participant.joined_at = timezone.now()
         participant.save()
         
-        print(f"✅ 참가 승인: {participant.user.username}")
+        print(f"\n{'='*60}")
+        print(f"✅ 참가 승인 완료")
+        print(f"   User: {participant.user.username}")
+        print(f"   User ID: {participant.user.id}")
+        print(f"   Room: {room.title}")
+        print(f"   Room ID: {room.id}")
+        print(f"{'='*60}\n")
         
-        # ⭐⭐⭐ WebSocket 알림 (수정)
+        # ⭐ WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
         try:
-            # ⭐ user.id를 participant_user_id로 전달
+            print(f"📡 WebSocket 알림 전송 시작")
+            print(f"   Group: {room_group_name}")
+            print(f"   Target User ID: {participant.user.id}")
+            print(f"   Target Username: {participant.user.username}")
+            
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
                     'type': 'approval_notification',
-                    'participant_user_id': str(participant.user.id),  # ⭐ 수정
+                    'participant_user_id': str(participant.user.id),  # ⭐ 문자열 변환
                     'participant_username': participant.user.username,
-                    'message': '참가가 승인되었습니다.'
+                    'message': '참가가 승인되었습니다.',
+                    'room_id': str(room.id),
+                    'host_username': room.host.username
                 }
             )
-            print(f"📡 승인 알림 전송 완료: {participant.user.username} (user_id: {participant.user.id})")
+            
+            print(f"✅ WebSocket 알림 전송 완료")
+            
+            # ⭐ 잠시 대기 후 방장에게도 알림
+            time.sleep(0.5)
+            
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'new_participant_approved',
+                    'participant_username': participant.user.username,
+                    'participant_user_id': str(participant.user.id)
+                }
+            )
+            
+            print(f"📡 방장에게 알림 전송 완료")
+            
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
+            import traceback
+            traceback.print_exc()
         
         serializer = ParticipantSerializer(participant)
         return Response(serializer.data)

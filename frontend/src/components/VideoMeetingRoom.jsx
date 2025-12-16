@@ -157,10 +157,9 @@ function VideoMeetingRoom() {
   }, [user]);
 
   // =========================================================================
-  // WebSocket Connection (개선 버전)
+  // ⭐⭐⭐ WebSocket 연결 개선
   // =========================================================================
- // ⭐⭐⭐ WebSocket 연결 개선
-  const connectWebSocket = useCallback(() => {
+   const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') {
       console.error('❌ roomId 또는 user 없음');
       return;
@@ -254,7 +253,7 @@ function VideoMeetingRoom() {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 WebSocket 메시지:', data.type, 'from:', data.from_user_id || data.username);
+          console.log('📨 WebSocket 메시지:', data.type);
 
           // ⭐⭐⭐ WebRTC 시그널 처리
           if (['offer', 'answer', 'ice_candidate'].includes(data.type)) {
@@ -347,60 +346,19 @@ function VideoMeetingRoom() {
             return;
           }
 
-          // ⭐⭐⭐ 승인 알림 처리 (개선)
+          // ⭐⭐⭐ 승인 알림 처리 (완전 수정)
           if (data.type === 'approval_notification') {
-            console.log('🎉 참가 승인됨!');
+            console.log('\n' + '='.repeat(60));
+            console.log('🎉🎉🎉 참가 승인 알림 수신!');
             console.log('   Message:', data.message);
             console.log('   Room ID:', data.room_id);
             console.log('   Host:', data.host_username);
+            console.log('   My Username:', user.username);
+            console.log('='.repeat(60) + '\n');
             
-            // ⭐ 1단계: 즉시 UI 업데이트 (승인 상태 표시)
-            setRoom(prev => ({
-              ...prev,
-              participant_status: 'approved'
-            }));
+            // ⭐ 1단계: 즉시 승인 처리 함수 호출
+            handleApprovalReceived(data, socket);
             
-            // ⭐ 2단계: 미디어 초기화
-            console.log('🎥 미디어 초기화 시작...');
-            
-            const initApprovedMedia = async () => {
-              try {
-                // 미디어가 없으면 초기화
-                if (!localStreamRef.current) {
-                  await initializeMedia();
-                  console.log('✅ 미디어 초기화 완료');
-                }
-                
-                // ⭐ 3단계: 잠시 대기 후 방 정보 갱신
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                const updatedRoom = await fetchRoomDetails();
-                console.log('✅ 방 정보 갱신 완료');
-                console.log('   Status:', updatedRoom.participant_status);
-                
-                // ⭐ 4단계: Join 메시지 전송 (WebSocket이 열려있을 때만)
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
-                if (socket.readyState === WebSocket.OPEN) {
-                  socket.send(JSON.stringify({
-                    type: 'join',
-                    username: user.username
-                  }));
-                  console.log('📤 Join 메시지 전송 (승인 후)');
-                } else {
-                  console.warn('⚠️ WebSocket 연결 안됨 - 재연결 시도');
-                  // WebSocket 재연결
-                  setTimeout(() => {
-                    connectWebSocket();
-                  }, 1000);
-                }
-              } catch (error) {
-                console.error('❌ 승인 후 초기화 실패:', error);
-                alert('미디어 초기화에 실패했습니다. 페이지를 새로고침해주세요.');
-              }
-            };
-            
-            initApprovedMedia();
             return;
           }
 
@@ -496,6 +454,96 @@ function VideoMeetingRoom() {
     }
   }, [roomId, user, navigate, fetchRoomDetails, fetchPendingRequests, addChatMessage]);
   
+  // ⭐⭐⭐ 승인 처리 전용 함수 (새로 추가)
+  const handleApprovalReceived = async (data, socket) => {
+    console.log('\n' + '='.repeat(60));
+    console.log('🚀 승인 후 초기화 시작');
+    console.log('='.repeat(60) + '\n');
+    
+    try {
+      // 1단계: UI 상태 즉시 업데이트
+      setRoom(prev => {
+        console.log('✅ 1단계: Room 상태 업데이트 (pending → approved)');
+        return {
+          ...prev,
+          participant_status: 'approved'
+        };
+      });
+      
+      // 2단계: 짧은 대기 (상태 업데이트 반영)
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 3단계: 미디어 초기화
+      console.log('🎥 2단계: 미디어 초기화 시작');
+      
+      if (!localStreamRef.current) {
+        try {
+          await initializeMedia();
+          console.log('✅ 미디어 초기화 완료');
+        } catch (error) {
+          console.error('❌ 미디어 초기화 실패:', error);
+          alert('카메라/마이크 접근에 실패했습니다.\n\n페이지를 새로고침해주세요.');
+          return;
+        }
+      } else {
+        console.log('✅ 미디어 이미 준비됨');
+      }
+      
+      // 4단계: 짧은 대기
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 5단계: 방 정보 갱신
+      console.log('📋 3단계: 방 정보 갱신');
+      const updatedRoom = await fetchRoomDetails();
+      console.log('✅ 방 정보 갱신 완료');
+      console.log('   Status:', updatedRoom.participant_status);
+      
+      // 6단계: 약간 더 대기 (방 정보 반영)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 7단계: Join 메시지 전송
+      if (socket.readyState === WebSocket.OPEN) {
+        console.log('📤 4단계: Join 메시지 전송');
+        
+        socket.send(JSON.stringify({
+          type: 'join',
+          username: user.username
+        }));
+        
+        console.log('✅ Join 메시지 전송 완료');
+        
+        // ⭐ 8단계: WebSocket Ready 상태 설정
+        setTimeout(() => {
+          setWsReady(true);
+          console.log('✅ WebSocket 완전 준비됨');
+        }, 500);
+        
+      } else {
+        console.warn('⚠️ WebSocket 연결 상태 이상:', socket.readyState);
+        console.log('🔄 WebSocket 재연결 시도');
+        
+        // WebSocket 재연결
+        setTimeout(() => {
+          connectWebSocket();
+        }, 1000);
+      }
+      
+      console.log('\n' + '='.repeat(60));
+      console.log('🎉 승인 후 초기화 완료!');
+      console.log('='.repeat(60) + '\n');
+      
+    } catch (error) {
+      console.error('\n' + '='.repeat(60));
+      console.error('❌ 승인 후 초기화 실패:', error);
+      console.error('='.repeat(60) + '\n');
+      
+      alert(
+        '초기화에 실패했습니다.\n\n' +
+        '페이지를 새로고침(F5)해주세요.'
+      );
+    }
+  };
+
   // =========================================================================
   // Media Initialization
   // =========================================================================
@@ -526,7 +574,6 @@ function VideoMeetingRoom() {
   // =========================================================================
   // Effects
   // =========================================================================
-
   // 1. 초기 로딩
   useEffect(() => {
     if (!roomId || roomId === 'undefined') {
@@ -554,69 +601,60 @@ function VideoMeetingRoom() {
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
   // 2. 승인 후 초기화 (개선 버전)
-  // ⭐⭐⭐ Effect 개선: 중복 연결 방지
-    useEffect(() => {
-      if (!room || !user) return;
+  // ⭐⭐⭐ Effect 2: 초기 연결 (방장 또는 이미 승인된 경우만)
+  useEffect(() => {
+    if (!room || !user) return;
 
-      const isApproved = room.participant_status === 'approved' || room.is_host;
+    const isApproved = room.participant_status === 'approved' || room.is_host;
+    
+    // ⭐ 조건 단순화: 승인되었고, WebSocket도 없고, 미디어도 없으면 초기화
+    if (isApproved && !wsConnected && !wsRef.current && !localStreamRef.current) {
+      console.log('\n' + '='.repeat(60));
+      console.log('✅ 초기 연결 조건 충족');
+      console.log('   Is Approved:', isApproved);
+      console.log('   Is Host:', room.is_host);
+      console.log('   Status:', room.participant_status);
+      console.log('='.repeat(60) + '\n');
       
-      console.log(`\n${'='.repeat(60)}`);
-      console.log('🔍 초기화 조건 확인');
-      console.log(`   Is Approved: ${isApproved}`);
-      console.log(`   WS Connected: ${wsConnected}`);
-      console.log(`   WS Ready: ${wsReady}`);
-      console.log(`   WS Ref: ${!!wsRef.current}`);
-      console.log(`   Local Stream: ${!!localStreamRef.current}`);
-      console.log(`${'='.repeat(60)}\n`);
-      
-      // ⭐ 승인되었고, WebSocket도 없고, 로컬 스트림도 없으면 초기화
-      if (isApproved && !wsConnected && !wsRef.current && !localStreamRef.current) {
-        console.log('✅ 초기화 조건 충족 - 시작');
-        
-        const initialize = async () => {
-          try {
-            // 1. 미디어 먼저
-            console.log('🎥 Step 1: 미디어 초기화');
-            await initializeMedia();
-            
-            // 2. 약간 대기
-            console.log('⏳ Step 2: 대기 (500ms)');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // 3. WebSocket 연결
-            console.log('🔌 Step 3: WebSocket 연결');
-            connectWebSocket();
-            
-            console.log('✅ 초기화 완료');
-          } catch (error) {
-            console.error('❌ 초기화 실패:', error);
-          }
-        };
-        
-        initialize();
-      } else {
-        console.log('⚠️ 초기화 조건 미충족');
-        if (isApproved) {
-          console.log('   승인됨 ✓');
-          if (wsConnected) console.log('   ⚠️ 이미 WebSocket 연결됨');
-          if (localStreamRef.current) console.log('   ⚠️ 이미 미디어 스트림 있음');
-        } else {
-          console.log('   ⚠️ 승인 대기 중');
+      const initialize = async () => {
+        try {
+          // 1. 미디어 먼저
+          console.log('🎥 미디어 초기화');
+          await initializeMedia();
+          
+          // 2. 약간 대기
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 3. WebSocket 연결
+          console.log('🔌 WebSocket 연결');
+          connectWebSocket();
+          
+          console.log('✅ 초기화 완료');
+        } catch (error) {
+          console.error('❌ 초기화 실패:', error);
         }
-      }
+      };
+      
+      initialize();
+    }
 
-      // ⭐ 방장 전용: 대기 요청 폴링
-      if (room.is_host && isApproved && wsReady) {
-        console.log('👑 방장 모드: 대기 요청 폴링 시작');
-        fetchPendingRequests();
-        const interval = setInterval(fetchPendingRequests, 3000);
-        return () => {
-          console.log('🛑 대기 요청 폴링 종료');
-          clearInterval(interval);
-        };
-      }
-    }, [room, user, wsConnected, wsReady, connectWebSocket, initializeMedia, fetchPendingRequests]);
-
+    // ⭐ 방장 전용: 대기 요청 폴링
+    if (room.is_host && isApproved && wsReady) {
+      console.log('👑 방장 모드: 대기 요청 폴링 시작');
+      fetchPendingRequests();
+      const interval = setInterval(fetchPendingRequests, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [
+    room?.participant_status, 
+    room?.is_host, 
+    user, 
+    wsConnected, 
+    wsReady, 
+    initializeMedia, 
+    connectWebSocket, 
+    fetchPendingRequests
+  ]);
 
   // 3. 채팅 초기 로드 (수정)
   useEffect(() => {
@@ -769,7 +807,6 @@ function VideoMeetingRoom() {
   // =========================================================================
   // Render
   // =========================================================================
-
   if (roomLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-900">
