@@ -1,4 +1,5 @@
 # backend/video_meetings/consumers.py (수정 버전)
+import asyncio
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -307,17 +308,59 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     # ⭐⭐⭐ 승인 알림 (수정)
     async def approval_notification(self, event):
-        """참가 승인 알림 - 해당 사용자에게만"""
+        """⭐⭐⭐ 참가 승인 알림 - 해당 사용자에게만 (개선)"""
         participant_user_id = event.get('participant_user_id')
         
+        # ⭐ 정확한 비교 (문자열 변환)
         if str(self.user.id) == str(participant_user_id):
             logger.info(f"🎉 승인 알림 전송: {self.username}")
+            
             await self.send(text_data=json.dumps({
                 'type': 'approval_notification',
                 'approved': True,
-                'message': event['message']
+                'message': event['message'],
+                'room_id': event.get('room_id'),
+                'participant_username': event.get('participant_username'),  # ⭐ 추가
+                'host_username': event.get('host_username'),
+                'timestamp': datetime.now().isoformat()
             }))
-    
+            
+            # ⭐ 추가: 승인 후 잠시 대기 후 참가자 목록 전송
+            await asyncio.sleep(1)
+            await self.send_current_participants()
+        else:
+            logger.debug(f"⚠️ 승인 알림 대상 아님: {self.username} (user_id: {self.user.id}) vs {participant_user_id}")    
+            
+    # async def new_participant_approved(self, event):
+    #     """⭐ 새로 추가: 방장에게 새 참가자 알림"""
+    #     participant_username = event.get('participant_username')
+    #     host_username = event.get('host_username')
+        
+    #     # 방장에게만 전송
+    #     if self.username == host_username:
+    #         logger.info(f"👑 방장에게 새 참가자 알림: {participant_username}")
+            
+    #         await self.send(text_data=json.dumps({
+    #             'type': 'new_participant_approved',
+    #             'participant_username': participant_username,
+    #             'timestamp': datetime.now().isoformat()
+    #         }))
+
+    async def new_participant_approved(self, event):
+        """⭐ 새 참가자 승인 알림 (방장용)"""
+        # 방장인지 확인
+        is_host = await self.check_is_host()
+        
+        if is_host:
+            await self.send(text_data=json.dumps({
+                'type': 'new_participant_approved',
+                'participant_username': event['participant_username'],
+                'participant_user_id': event['participant_user_id'],
+                'message': f"{event['participant_username']}님이 참가했습니다."
+            }))
+            print(f"📡 방장에게 알림 전송: {event['participant_username']}")
+
+
     async def rejection_notification(self, event):
         """참가 거부 알림"""
         participant_user_id = event.get('participant_user_id')

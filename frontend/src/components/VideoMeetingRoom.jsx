@@ -595,7 +595,14 @@ function VideoMeetingRoom() {
         
         initialize();
       } else {
-        console.log('⚠️ 초기화 조건 미충족 - 대기');
+        console.log('⚠️ 초기화 조건 미충족');
+        if (isApproved) {
+          console.log('   승인됨 ✓');
+          if (wsConnected) console.log('   ⚠️ 이미 WebSocket 연결됨');
+          if (localStreamRef.current) console.log('   ⚠️ 이미 미디어 스트림 있음');
+        } else {
+          console.log('   ⚠️ 승인 대기 중');
+        }
       }
 
       // ⭐ 방장 전용: 대기 요청 폴링
