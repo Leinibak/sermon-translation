@@ -31,7 +31,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   // =========================================================================
   // Local Media
   // =========================================================================
-  
   const getLocalMedia = useCallback(async () => {
     if (localStreamRef.current) {
       const tracks = localStreamRef.current.getTracks();
@@ -49,8 +48,18 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
     try {
       console.log('🎥 미디어 스트림 요청...');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
+      
+      // ⭐ 모바일 환경 감지
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      // ⭐ 모바일 최적화 설정
+      const constraints = {
+        video: isMobile ? {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user',
+          frameRate: { ideal: 24, max: 30 }  // ⭐ 모바일 프레임레이트 제한
+        } : {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'user'
@@ -58,18 +67,48 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        },
-      });
+          autoGainControl: true,
+          sampleRate: isMobile ? 16000 : 48000  // ⭐ 모바일 오디오 최적화
+        }
+      };
+      
+      console.log('📱 디바이스 타입:', isMobile ? 'Mobile' : 'Desktop');
+      console.log('🎛️ Constraints:', constraints);
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       localStreamRef.current = stream;
       console.log('✅ 미디어 준비 완료');
       console.log(`   Video tracks: ${stream.getVideoTracks().length}`);
       console.log(`   Audio tracks: ${stream.getAudioTracks().length}`);
       
+      // ⭐ Track 상태 모니터링 (모바일 중요)
+      stream.getTracks().forEach(track => {
+        track.onended = () => {
+          console.warn(`⚠️ Track ended: ${track.kind}`);
+          // 자동 재시작 시도 (모바일에서 중요)
+          if (isMobile) {
+            console.log('🔄 Track 재시작 시도 (모바일)');
+            setTimeout(() => {
+              getLocalMedia().catch(e => console.error('재시작 실패:', e));
+            }, 1000);
+          }
+        };
+      });
+      
       return stream;
     } catch (err) {
       console.error('❌ 미디어 접근 실패:', err);
+      
+      // ⭐ 사용자 친화적 에러 메시지
+      if (err.name === 'NotAllowedError') {
+        alert('카메라와 마이크 권한을 허용해주세요.\n\n설정 > 사이트 설정에서 권한을 변경할 수 있습니다.');
+      } else if (err.name === 'NotFoundError') {
+        alert('카메라 또는 마이크를 찾을 수 없습니다.');
+      } else {
+        alert('미디어 장치에 접근할 수 없습니다: ' + err.message);
+      }
+      
       throw err;
     }
   }, []);
