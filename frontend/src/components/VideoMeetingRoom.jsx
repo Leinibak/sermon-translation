@@ -48,6 +48,8 @@ function VideoMeetingRoom() {
   const reconnectAttemptsRef = useRef(0);
   const wsRef = useRef(null); // ⭐ 추가: 최신 ws 참조
 
+  const peerConnections = useRef({}); // 각 참가자별 RTCPeerConnection 객체를 저장
+  
   // =========================================================================
   // UI States
   // =========================================================================
@@ -159,7 +161,7 @@ function VideoMeetingRoom() {
   // =========================================================================
   // ⭐⭐⭐ WebSocket 연결 개선
   // =========================================================================
-   const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') {
       console.error('❌ roomId 또는 user 없음');
       return;
@@ -276,7 +278,7 @@ function VideoMeetingRoom() {
               setTimeout(() => {
                 console.log(`🔧 Peer Connection 생성 (Initiator): ${data.username}`);
                 if (typeof createPeerConnection === 'function') {
-                  createPeerConnection(data.username, true);
+                  // createPeerConnection(data.username, true);
                 } else {
                   console.error('❌ createPeerConnection 함수 없음');
                 }
@@ -373,7 +375,7 @@ function VideoMeetingRoom() {
             setTimeout(() => {
               if (typeof createPeerConnection === 'function') {
                 console.log(`🔧 Peer Connection 생성 (방장 → ${data.participant_username})`);
-                createPeerConnection(data.participant_username, true);
+                // createPeerConnection(data.participant_username, true);
               }
             }, 2000); // ⭐ 2초 대기 (참가자가 준비될 시간)
             
@@ -527,7 +529,16 @@ function VideoMeetingRoom() {
           connectWebSocket();
         }, 1000);
       }
-      
+      // ⭐⭐⭐ 방장에게 WebRTC 준비 완료 알림 (가장 중요)
+      if (!room?.is_host) {
+        console.log('📢 참가자: join_ready 시그널 전송 → 방장');
+
+        sendWebRTCSignal(
+          data.host_username, // 방장 username
+          'join_ready',
+          {}
+        );
+      }
       console.log('\n' + '='.repeat(60));
       console.log('🎉 승인 후 초기화 완료!');
       console.log('='.repeat(60) + '\n');
