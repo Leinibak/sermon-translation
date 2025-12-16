@@ -157,17 +157,29 @@ function VideoMeetingRoom() {
   // =========================================================================
   // WebSocket Connection (개선 버전)
   // =========================================================================
+ // ⭐⭐⭐ WebSocket 연결 개선
   const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') {
       console.error('❌ roomId 또는 user 없음');
       return;
     }
 
-    // 기존 연결 정리
-    if (wsRef.current?.readyState === WebSocket.OPEN || 
-        wsRef.current?.readyState === WebSocket.CONNECTING) {
-      console.log('⚠️ 이미 연결 중 - 기존 연결 종료');
-      wsRef.current.close();
+    // ⭐ 기존 연결 정리 개선
+    if (wsRef.current) {
+      const currentState = wsRef.current.readyState;
+      console.log(`⚠️ 기존 WebSocket 상태: ${currentState}`);
+      
+      if (currentState === WebSocket.OPEN || currentState === WebSocket.CONNECTING) {
+        console.log('⚠️ 이미 연결 중 - 기존 연결 유지');
+        return; // ⭐ 중복 연결 방지 - 즉시 리턴
+      }
+      
+      // 기존 연결 정리
+      try {
+        wsRef.current.close(1000, 'Reconnecting');
+      } catch (e) {
+        console.error('연결 종료 오류:', e);
+      }
       wsRef.current = null;
     }
 
@@ -180,7 +192,6 @@ function VideoMeetingRoom() {
     const isHttps = window.location.protocol === 'https:';
     const wsProtocol = isHttps ? 'wss' : 'ws';
     
-    // ⭐ 토큰 가져오기
     const token = localStorage.getItem('access_token');
     
     if (!token) {
@@ -190,7 +201,6 @@ function VideoMeetingRoom() {
       return;
     }
     
-    // ⭐ URL에 토큰 추가
     const wsUrl = `${wsProtocol}://${window.location.host}/ws/video-meeting/${roomId}/?token=${token}`;
 
     try {
@@ -202,20 +212,24 @@ function VideoMeetingRoom() {
         setWsConnected(true);
         reconnectAttemptsRef.current = 0;
 
-        // ⭐ Join 메시지 전송 후 완전히 준비된 상태로 표시
+        // ⭐ Join 메시지 전송 개선
         setTimeout(() => {
           if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-              type: 'join',
-              username: user.username
-            }));
-            console.log('📤 Join 메시지 전송 완료');
-            
-            // ⭐ 추가 대기 후 완전 준비
-            setTimeout(() => {
-              setWsReady(true);
-              console.log('✅ WebSocket 완전 준비됨');
-            }, 1000);
+            try {
+              socket.send(JSON.stringify({
+                type: 'join',
+                username: user.username
+              }));
+              console.log('📤 Join 메시지 전송 완료');
+              
+              // ⭐ 추가 대기 후 완전 준비
+              setTimeout(() => {
+                setWsReady(true);
+                console.log('✅ WebSocket 완전 준비됨');
+              }, 1000);
+            } catch (e) {
+              console.error('❌ Join 메시지 전송 실패:', e);
+            }
           }
         }, 500);
       };
@@ -225,7 +239,109 @@ function VideoMeetingRoom() {
           const data = JSON.parse(event.data);
           console.log('📨 WebSocket 메시지:', data.type, 'from:', data.from_user_id || data.username);
 
-          // ... 메시지 처리 로직은 동일 ...
+          // ⭐ WebRTC 시그널 처리
+          if (['offer', 'answer', 'ice_candidate'].includes(data.type)) {
+            handleWebSocketSignal(data);
+            return;
+          }
+
+          // user_joined 처리
+          if (data.type === 'user_joined') {
+            console.log(`👋 ${data.username}님이 입장했습니다`);
+            
+            // 참가자 목록 갱신
+            fetchRoomDetails();
+            return;
+          }
+
+          // user_left 처리
+          if (data.type === 'user_left') {
+            console.log(`👋 ${data.username}님이 퇴장했습니다`);
+            
+            // Remote Stream 제거
+            setRemoteStreams(prev => prev.filter(s => s.username !== data.username));
+            return;
+          }
+
+          // participants_list 처리
+          if (data.type === 'participants_list') {
+            console.log('📋 참가자 목록:', data.participants);
+            return;
+          }
+
+          // 채팅 메시지
+          if (data.type === 'chat_message') {
+            addChatMessage(data);
+            return;
+          }
+
+          // 반응
+          if (data.type === 'reaction') {
+            const reactionId = Date.now() + Math.random();
+            setReactions(prev => [...prev, {
+              id: reactionId,
+              emoji: data.reaction,
+              username: data.username
+            }]);
+            
+            // 3초 후 제거
+            setTimeout(() => {
+              setReactions(prev => prev.filter(r => r.id !== reactionId));
+            }, 3000);
+            return;
+          }
+
+          // 손들기
+          if (data.type === 'hand_raise') {
+            if (data.action === 'raise') {
+              setRaisedHands(prev => {
+                if (prev.some(h => h.username === data.username)) {
+                  return prev;
+                }
+                return [...prev, {
+                  username: data.username,
+                  user_id: data.user_id,
+                  raised_at: new Date().toISOString()
+                }];
+              });
+            } else if (data.action === 'lower') {
+              setRaisedHands(prev => prev.filter(h => h.username !== data.username));
+            }
+            return;
+          }
+
+          // 승인 알림
+          if (data.type === 'approval_notification') {
+            console.log('🎉 참가 승인됨!');
+            alert('참가가 승인되었습니다!');
+            fetchRoomDetails();
+            return;
+          }
+
+          // 거부 알림
+          if (data.type === 'rejection_notification') {
+            console.log('❌ 참가 거부됨');
+            alert('참가가 거부되었습니다.');
+            navigate('/video-meetings');
+            return;
+          }
+
+          // 참가 요청 알림 (방장용)
+          if (data.type === 'join_request_notification') {
+            console.log('📢 새 참가 요청:', data.username);
+            fetchPendingRequests();
+            return;
+          }
+
+          // 회의 종료
+          if (data.type === 'meeting_ended') {
+            console.log('🛑 회의 종료됨');
+            alert(data.message);
+            navigate('/video-meetings');
+            return;
+          }
+
+          console.log('⚠️ 처리되지 않은 메시지 타입:', data.type);
           
         } catch (e) {
           console.error('❌ 메시지 처리 오류:', e);
@@ -242,7 +358,7 @@ function VideoMeetingRoom() {
         setWsReady(false);
         wsRef.current = null;
 
-        // ⭐ 인증 실패 시 로그인 페이지로
+        // 인증 실패 시 로그인 페이지로
         if (event.code === 4001) {
           console.error('❌ 인증 실패 - 로그인 필요');
           alert('인증이 만료되었습니다. 다시 로그인해주세요.');
@@ -330,26 +446,21 @@ function VideoMeetingRoom() {
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
   // 2. 승인 후 초기화 (개선 버전)
+  // ⭐⭐⭐ Effect 개선: 중복 연결 방지
   useEffect(() => {
     if (!room || !user) return;
 
     const isApproved = room.participant_status === 'approved' || room.is_host;
     
-    if (isApproved && !wsConnected) {
+    if (isApproved && !wsConnected && !wsRef.current) {
       console.log('✅ 승인됨 - 초기화 시작');
       console.log('   Status:', room.participant_status);
       console.log('   Is Host:', room.is_host);
       
-      // 순차적 초기화
       const initialize = async () => {
         try {
-          // 1. 미디어 먼저
           await initializeMedia();
-          
-          // 2. 짧은 대기 후 WebSocket 연결
           await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // 3. WebSocket 연결
           connectWebSocket();
         } catch (error) {
           console.error('❌ 초기화 실패:', error);
@@ -359,13 +470,13 @@ function VideoMeetingRoom() {
       initialize();
     }
 
-    // 방장: 대기 요청 폴링
     if (room.is_host && isApproved) {
       fetchPendingRequests();
       const interval = setInterval(fetchPendingRequests, 3000);
       return () => clearInterval(interval);
     }
   }, [room, user, wsConnected, connectWebSocket, initializeMedia, fetchPendingRequests]);
+
 
   // 3. 채팅 초기 로드 (수정)
   useEffect(() => {
