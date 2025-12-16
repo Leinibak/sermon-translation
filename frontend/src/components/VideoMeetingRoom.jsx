@@ -356,10 +356,94 @@ function VideoMeetingRoom() {
             console.log('   Room ID:', data.room_id);
             console.log('   Host:', data.host_username);
             console.log('   My Username:', user.username);
+            console.log('   Should Initialize:', data.should_initialize);
             console.log('='.repeat(60) + '\n');
             
-            // ⭐ 1단계: 즉시 승인 처리 함수 호출
-            handleApprovalReceived(data, socket);
+            // ⭐ 즉시 상태 업데이트
+            setRoom(prev => ({
+              ...prev,
+              participant_status: 'approved'
+            }));
+            
+            // ⭐ 짧은 대기 후 초기화
+            setTimeout(async () => {
+              try {
+                console.log('🚀 승인 후 초기화 시작...');
+                
+                // 1. 미디어 초기화
+                if (!localStreamRef.current) {
+                  console.log('🎥 미디어 초기화');
+                  await initializeMedia();
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // 2. 방 정보 갱신
+                console.log('📋 방 정보 갱신');
+                await fetchRoomDetails();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 3. Join 메시지 전송
+                if (socket.readyState === WebSocket.OPEN) {
+                  console.log('📤 Join 메시지 전송');
+                  socket.send(JSON.stringify({
+                    type: 'join',
+                    username: user.username
+                  }));
+                  
+                  // ⭐ WebSocket Ready 상태 설정
+                  setTimeout(() => {
+                    setWsReady(true);
+                    console.log('✅ WebSocket 완전 준비됨');
+                  }, 500);
+                }
+                
+                console.log('✅ 승인 후 초기화 완료!');
+                
+              } catch (error) {
+                console.error('❌ 승인 후 초기화 실패:', error);
+                alert('초기화에 실패했습니다. 페이지를 새로고침해주세요.');
+              }
+            }, 800); // ⭐ 0.8초 대기
+            
+            return;
+          }
+
+          // ⭐⭐⭐ 새로 추가: 방장이 새 참가자 감지
+          if (data.type === 'new_participant_approved') {
+            console.log(`👑 방장: 새 참가자 승인됨 - ${data.participant_username}`);
+            
+            // 참가자 목록 갱신
+            fetchRoomDetails();
+            
+            // ⭐ 대기 후 Peer Connection 생성 (참가자가 준비될 시간)
+            setTimeout(() => {
+              if (typeof createPeerConnection === 'function') {
+                console.log(`🔧 Peer Connection 생성 (방장 → ${data.participant_username})`);
+                createPeerConnection(data.participant_username, true);
+              }
+            }, 2000); // ⭐ 2초 대기
+            
+            return;
+          }
+
+          // ⭐⭐⭐ user_joined 처리 (참가자 → 방장)
+          if (data.type === 'user_joined') {
+            console.log(`👋 ${data.username}님이 입장했습니다`);
+            
+            // 참가자 목록 갱신
+            fetchRoomDetails();
+            
+            // ⭐ 방장: 신규 참가자와 연결 생성
+            if (room?.is_host && data.username !== user?.username) {
+              console.log(`👑 방장이 신규 참가자 감지: ${data.username}`);
+              
+              setTimeout(() => {
+                console.log(`🔧 Peer Connection 생성 (Initiator): ${data.username}`);
+                if (typeof createPeerConnection === 'function') {
+                  createPeerConnection(data.username, true);
+                }
+              }, 1500);
+            }
             
             return;
           }

@@ -338,10 +338,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       peerConnections.current[peerId] = pc;
       console.log(`✅ Peer Connection 저장 완료`);
 
-      // ⭐ Initiator: Offer 생성
+      // ⭐ Initiator: Offer 생성 (타이밍 개선)
       if (isInitiator) {
         console.log(`🎬 Initiator: Offer 생성 시작`);
         
+        // ⭐ 더 긴 대기 시간 (참가자가 준비될 시간)
         setTimeout(async () => {
           try {
             console.log(`📊 Peer Connection 상태 체크:`);
@@ -349,8 +350,14 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             console.log(`   ICE Connection State: ${pc.iceConnectionState}`);
             console.log(`   Connection State: ${pc.connectionState}`);
             
+            // ⭐ 연결이 이미 진행 중이면 스킵
             if (pc.signalingState !== 'stable') {
               console.warn(`⚠️ Signaling state not stable: ${pc.signalingState}`);
+              return;
+            }
+            
+            if (pc.iceConnectionState === 'connected' || pc.connectionState === 'connected') {
+              console.log(`✅ 이미 연결됨 - Offer 생성 스킵`);
               return;
             }
             
@@ -377,14 +384,40 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
                 console.log(`✅✅ Offer 전송 완료!`);
               } else {
                 console.error(`❌ Offer 전송 실패 - WebSocket 연결 없음`);
+                
+                // ⭐ 재시도 로직 추가
+                console.log(`🔄 Offer 전송 재시도...`);
+                setTimeout(() => {
+                  if (sendSignalRef.current) {
+                    sendSignalRef.current(peerId, 'offer', {
+                      sdp: pc.localDescription
+                    });
+                  }
+                }, 1000);
               }
             }
           } catch (e) {
             console.error(`❌ Offer 생성/전송 실패:`, e);
+            
+            // ⭐ 재시도 로직
+            console.log(`🔄 Offer 생성 재시도 (3초 후)...`);
+            setTimeout(() => {
+              if (pc.signalingState === 'stable') {
+                console.log(`🔄 재시도 실행`);
+                // 재귀 호출 대신 직접 생성
+                pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
+                  .then(offer => pc.setLocalDescription(offer))
+                  .then(() => {
+                    if (sendSignalRef.current) {
+                      sendSignalRef.current(peerId, 'offer', { sdp: pc.localDescription });
+                    }
+                  })
+                  .catch(err => console.error('재시도 실패:', err));
+              }
+            }, 3000);
           }
-        }, 1500); // ⭐ 대기 시간 증가
+        }, 2000); // ⭐ 2초로 증가 (기존 1.5초)
       }
-      
       return pc;
     } catch (e) {
       console.error('❌ Peer Connection 생성 오류:', e);

@@ -284,7 +284,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """참가 승인 (로그 강화)"""
+        """참가 승인 (로그 강화 + 알림 개선)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -327,43 +327,56 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         print(f"   Room ID: {room.id}")
         print(f"{'='*60}\n")
         
-        # ⭐ WebSocket 알림
+        # ⭐⭐⭐ WebSocket 알림 개선
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
         try:
             print(f"📡 WebSocket 알림 전송 시작")
             print(f"   Group: {room_group_name}")
-            print(f"   Target User ID: {participant.user.id}")
-            print(f"   Target Username: {participant.user.username}")
+            print(f"   Target User: {participant.user.username} (ID: {participant.user.id})")
             
+            # ⭐ 1. 참가자 본인에게 승인 알림
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
                     'type': 'approval_notification',
-                    'participant_user_id': str(participant.user.id),  # ⭐ 문자열 변환
+                    'participant_user_id': str(participant.user.id),
                     'participant_username': participant.user.username,
-                    'message': '참가가 승인되었습니다.',
+                    'message': '참가가 승인되었습니다. 잠시 후 자동으로 입장됩니다.',
                     'room_id': str(room.id),
                     'host_username': room.host.username
                 }
             )
+            print(f"✅ 1. 승인 알림 전송 완료 → {participant.user.username}")
             
-            print(f"✅ WebSocket 알림 전송 완료")
+            # ⭐ 2. 짧은 대기 (참가자가 준비할 시간)
+            time.sleep(0.3)
             
-            # ⭐ 잠시 대기 후 방장에게도 알림
-            time.sleep(0.5)
-            
+            # ⭐ 3. 방장에게 새 참가자 알림
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
                     'type': 'new_participant_approved',
                     'participant_username': participant.user.username,
-                    'participant_user_id': str(participant.user.id)
+                    'participant_user_id': str(participant.user.id),
+                    'host_username': room.host.username
                 }
             )
+            print(f"✅ 2. 방장 알림 전송 완료")
             
-            print(f"📡 방장에게 알림 전송 완료")
+            # ⭐ 4. 전체 참가자에게 입장 알림 (선택사항)
+            time.sleep(0.2)
+            async_to_sync(channel_layer.group_send)(
+                room_group_name,
+                {
+                    'type': 'user_joined',
+                    'user_id': str(participant.user.id),
+                    'username': participant.user.username,
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+            print(f"✅ 3. 전체 입장 알림 전송 완료")
             
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
