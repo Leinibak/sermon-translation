@@ -31,6 +31,7 @@ function VideoMeetingRoom() {
     error: roomError,
     fetchRoomDetails,
     fetchPendingRequests,
+    removeRemoteStream,  
     approveParticipant,
     rejectParticipant,
     leaveRoom,
@@ -253,19 +254,30 @@ function VideoMeetingRoom() {
             // 참가자 목록 갱신
             fetchRoomDetails();
             
-            // ⭐ 방장이면 즉시 Offer 생성
+            // ⭐ 방장: 신규 참가자와 연결 생성
             if (room?.is_host) {
               console.log(`👑 방장이 신규 참가자 감지: ${data.username}`);
-              console.log(`🎬 Offer 생성 시작...`);
+              console.log(`🎬 Offer 생성 준비...`);
               
-              // 약간 대기 후 Peer Connection 생성
               setTimeout(() => {
-                console.log(`🔧 Peer Connection 생성: ${data.username}`);
-                // useWebRTC hook의 createPeerConnection 호출
+                console.log(`🔧 Peer Connection 생성 (Initiator): ${data.username}`);
                 if (typeof createPeerConnection === 'function') {
                   createPeerConnection(data.username, true);
+                } else {
+                  console.error('❌ createPeerConnection 함수 없음');
                 }
               }, 1500);
+            }
+            // ⭐ 참가자: 방장과 연결 생성 (비-Initiator)
+            else if (data.username !== user?.username) {
+              console.log(`👤 참가자 모드: ${data.username} 입장 감지`);
+              
+              // 방장이 아니고, 입장한 사람도 자신이 아닌 경우
+              // (다른 참가자가 먼저 입장했을 수 있음)
+              setTimeout(() => {
+                console.log(`🔧 다른 참가자와 Peer Connection 준비`);
+                // 방장이 Offer를 보낼 때까지 대기
+              }, 1000);
             }
             return;
           }
@@ -273,7 +285,7 @@ function VideoMeetingRoom() {
           // user_left 처리
           if (data.type === 'user_left') {
             console.log(`👋 ${data.username}님이 퇴장했습니다`);
-            setRemoteStreams(prev => prev.filter(s => s.username !== data.username));
+            removeRemoteStream(data.username);
             return;
           }
 
@@ -323,25 +335,35 @@ function VideoMeetingRoom() {
           // ⭐⭐⭐ 승인 알림 (수정)
           if (data.type === 'approval_notification') {
             console.log('🎉 참가 승인됨!');
-            alert('참가가 승인되었습니다! 회의실에 입장합니다.');
+            console.log('   Message:', data.message);
             
-            // ⭐ 즉시 방 정보 갱신
-            fetchRoomDetails().then(() => {
-              console.log('✅ 방 정보 갱신 완료 - 미디어 초기화 시작');
+            // ⭐ 방 정보 갱신
+            fetchRoomDetails().then(async (updatedRoom) => {
+              console.log('✅ 방 정보 갱신 완료');
+              console.log('   Status:', updatedRoom.participant_status);
               
-              // ⭐ 미디어 초기화 트리거
-              setMediaReady(false);
+              // ⭐ 미디어가 없으면 초기화
+              if (!localStreamRef.current) {
+                console.log('🎥 미디어 초기화 시작...');
+                try {
+                  await initializeMedia();
+                  console.log('✅ 미디어 초기화 완료');
+                } catch (error) {
+                  console.error('❌ 미디어 초기화 실패:', error);
+                  return;
+                }
+              }
               
-              // ⭐ 약간 대기 후 Join 메시지 전송
+              // ⭐ Join 메시지 전송 (방장에게 알림)
               setTimeout(() => {
                 if (socket.readyState === WebSocket.OPEN) {
                   socket.send(JSON.stringify({
                     type: 'join',
                     username: user.username
                   }));
-                  console.log('📤 Join 메시지 재전송 (승인 후)');
+                  console.log('📤 Join 메시지 전송 (승인 후)');
                 }
-              }, 1000);
+              }, 1500);
             });
             return;
           }

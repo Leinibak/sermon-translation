@@ -305,18 +305,28 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         
         setTimeout(async () => {
           try {
+            console.log(`📊 Peer Connection 상태 체크:`);
+            console.log(`   Signaling State: ${pc.signalingState}`);
+            console.log(`   ICE Connection State: ${pc.iceConnectionState}`);
+            console.log(`   Connection State: ${pc.connectionState}`);
+            
             if (pc.signalingState !== 'stable') {
               console.warn(`⚠️ Signaling state not stable: ${pc.signalingState}`);
               return;
             }
             
+            console.log(`📝 Creating Offer...`);
             const offer = await pc.createOffer({
               offerToReceiveAudio: true,
               offerToReceiveVideo: true
             });
             
+            console.log(`✅ Offer created`);
+            console.log(`   Type: ${offer.type}`);
+            console.log(`   SDP length: ${offer.sdp.length}`);
+            
             await pc.setLocalDescription(offer);
-            console.log(`✅ Local Description set (Offer)`);
+            console.log(`✅ Local Description set`);
             
             // ⭐ ref를 통해 최신 함수 호출
             if (sendSignalRef.current) {
@@ -391,16 +401,31 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       
       if (isHost) {
         console.log(`👑 방장이 User Joined 수신 - 피어 연결 시작`);
+        console.log(`   Current Peer: ${peerId}`);
+        console.log(`   Current User: ${currentUser?.username}`);
         
         setTimeout(async () => {
           const existingPc = peerConnections.current[peerId];
           
+          console.log(`🔍 기존 연결 확인:`);
+          console.log(`   Exists: ${!!existingPc}`);
+          console.log(`   State: ${existingPc?.connectionState}`);
+          
           if (!existingPc || existingPc.connectionState === 'failed' || existingPc.connectionState === 'closed') {
-            await createPeerConnection(peerId, true);
+            console.log(`🆕 새로운 Peer Connection 생성 (Initiator)`);
+            const newPc = await createPeerConnection(peerId, true);
+            
+            if (newPc) {
+              console.log(`✅ Peer Connection 생성 완료`);
+            } else {
+              console.error(`❌ Peer Connection 생성 실패`);
+            }
           } else {
             console.log(`✅ 기존 연결 유지 (${existingPc.connectionState})`);
           }
-        }, 1500); // ⭐ 대기 시간 증가
+        }, 1500);
+      } else {
+        console.log(`👤 참가자는 User Joined 무시 (방장이 Offer를 보낼 것)`);
       }
       return;
     }
@@ -534,6 +559,23 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log('✅ 정리 완료\n');
   }, []);
 
+  // ✅ removeRemoteStream 함수 추가
+  const removeRemoteStream = useCallback((peerId) => {
+    console.log(`🗑️ Remote Stream 제거: ${peerId}`);
+    
+    setRemoteStreams(prev => prev.filter(s => s.peerId !== peerId));
+    
+    // Peer Connection도 정리
+    if (peerConnections.current[peerId]) {
+      try {
+        peerConnections.current[peerId].close();
+      } catch (e) {
+        console.error('연결 종료 오류:', e);
+      }
+      delete peerConnections.current[peerId];
+    }
+  }, []);
+
   return {
     localStreamRef,
     peerConnections,
@@ -542,6 +584,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     getLocalMedia,
     createPeerConnection,
     handleWebSocketSignal,
+    removeRemoteStream, 
     cleanup,
   };
 }
