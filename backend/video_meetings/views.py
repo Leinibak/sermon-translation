@@ -193,50 +193,66 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def join_request(self, request, pk=None):
-        """회의 참가 요청"""
+        """⭐⭐⭐ 회의 참가 요청 (재참가 처리 개선)"""
         room = self.get_object()
         user = request.user
         
-        # ⭐ 방장은 자동 참가 (요청 불필요)
+        # 방장은 자동 참가
         if room.host == user:
             return Response(
                 {'detail': '방장은 자동으로 참가됩니다.'},
                 status=status.HTTP_200_OK
             )
         
-        # ⭐ 기존 요청 확인 (개선)
+        # ⭐ 기존 참가 기록 확인
         existing = room.participants.filter(user=user).first()
         
         if existing:
+            print(f"🔍 기존 참가 기록 발견: {user.username} (상태: {existing.status})")
+            
             # 이미 승인된 경우
             if existing.status == 'approved':
+                print(f"✅ 이미 승인됨 - 즉시 반환")
                 serializer = ParticipantSerializer(existing)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             
             # 대기 중인 경우
             elif existing.status == 'pending':
+                print(f"⏳ 대기 중 - 기존 요청 반환")
                 serializer = ParticipantSerializer(existing)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             
-            # 거부된 경우 - 새로 요청 가능하도록 상태 변경
-            elif existing.status == 'rejected':
-                existing.status = 'pending'
-                existing.save()
+            # ⭐⭐⭐ 거부/퇴장 상태 → 재참가 요청으로 변경
+            elif existing.status in ['rejected', 'left']:
+                print(f"🔄 재참가 요청: {existing.status} → pending")
                 
-                serializer = ParticipantSerializer(existing)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-            # 퇴장한 경우 - 재참가 요청
-            elif existing.status == 'left':
                 existing.status = 'pending'
                 existing.joined_at = None
                 existing.left_at = None
                 existing.save()
                 
+                # 방장에게 알림
+                channel_layer = get_channel_layer()
+                room_group_name = f'video_room_{room.id}'
+                
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        room_group_name,
+                        {
+                            'type': 'join_request_notification',
+                            'participant_id': existing.id,
+                            'username': user.username,
+                            'message': f'{user.username}님이 다시 참가를 요청했습니다.'
+                        }
+                    )
+                    print(f"📡 재참가 요청 알림 전송 완료")
+                except Exception as e:
+                    print(f"⚠️ WebSocket 알림 실패: {e}")
+                
                 serializer = ParticipantSerializer(existing)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response(serializer.data, status=status.HTTP_200_OK)
         
-        # ⭐ 최대 참가자 수 확인 (대기 중인 사람은 제외)
+        # ⭐ 최대 참가자 수 확인
         approved_count = room.participants.filter(status='approved').count()
         if approved_count >= room.max_participants:
             return Response(
@@ -252,9 +268,9 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status='pending'
             )
             
-            print(f"✅ 참가 요청 생성: {user.username} → {room.title}")
+            print(f"✅ 새 참가 요청 생성: {user.username}")
             
-            # ⭐ WebSocket 알림
+            # 방장에게 알림
             channel_layer = get_channel_layer()
             room_group_name = f'video_room_{room.id}'
             
@@ -284,7 +300,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """참가 승인 (로그 강화 + 알림 개선)"""
+        """⭐⭐⭐ 참가 승인 (타이밍 개선)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -324,36 +340,34 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         print(f"   User: {participant.user.username}")
         print(f"   User ID: {participant.user.id}")
         print(f"   Room: {room.title}")
-        print(f"   Room ID: {room.id}")
         print(f"{'='*60}\n")
         
-        # ⭐⭐⭐ WebSocket 알림 개선
+        # ⭐⭐⭐ WebSocket 알림 (순차적으로 전송)
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
         try:
-            print(f"📡 WebSocket 알림 전송 시작")
-            print(f"   Group: {room_group_name}")
-            print(f"   Target User: {participant.user.username} (ID: {participant.user.id})")
-            
-            # ⭐ 1. 참가자 본인에게 승인 알림
+            # ⭐ 1단계: 참가자 본인에게 승인 알림 (즉시)
+            print(f"📡 1단계: 승인 알림 → {participant.user.username}")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
                     'type': 'approval_notification',
                     'participant_user_id': str(participant.user.id),
                     'participant_username': participant.user.username,
-                    'message': '참가가 승인되었습니다. 잠시 후 자동으로 입장됩니다.',
+                    'message': '참가가 승인되었습니다.',
                     'room_id': str(room.id),
-                    'host_username': room.host.username
+                    'host_username': room.host.username,
+                    'should_initialize': True
                 }
             )
-            print(f"✅ 1. 승인 알림 전송 완료 → {participant.user.username}")
+            print(f"✅ 1단계 완료")
             
-            # ⭐ 2. 짧은 대기 (참가자가 준비할 시간)
-            time.sleep(0.3)
+            # ⭐ 2단계: 짧은 대기 (참가자가 초기화할 시간)
+            time.sleep(2.0)  # ⭐ 2초 대기 (중요!)
             
-            # ⭐ 3. 방장에게 새 참가자 알림
+            # ⭐ 3단계: 방장에게 알림
+            print(f"📡 2단계: 방장 알림")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
@@ -363,10 +377,11 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'host_username': room.host.username
                 }
             )
-            print(f"✅ 2. 방장 알림 전송 완료")
+            print(f"✅ 2단계 완료")
             
-            # ⭐ 4. 전체 참가자에게 입장 알림 (선택사항)
-            time.sleep(0.2)
+            # ⭐ 4단계: 전체 알림 (선택사항)
+            time.sleep(0.5)
+            print(f"📡 3단계: 전체 알림")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
@@ -376,7 +391,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'timestamp': datetime.now().isoformat()
                 }
             )
-            print(f"✅ 3. 전체 입장 알림 전송 완료")
+            print(f"✅ 3단계 완료")
             
         except Exception as e:
             print(f"⚠️ WebSocket 알림 실패: {e}")
@@ -388,7 +403,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def leave(self, request, pk=None):
-        """회의 퇴장"""
+        """⭐⭐⭐ 회의 퇴장 (상태만 변경, 레코드 유지)"""
         room = self.get_object()
         user = request.user
         
@@ -398,12 +413,15 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             user=user
         )
         
+        # ⭐ 상태만 변경 (레코드는 유지)
         participant.status = 'left'
         participant.left_at = timezone.now()
         participant.save()
         
-        return Response({'detail': '퇴장했습니다.'})
-    
+        print(f"👋 {user.username} 퇴장 처리 완료 (레코드 유지)")
+        
+        return Response({'detail': '퇴장했습니다.'})    
+
     @action(detail=True, methods=['get'])
     def pending_requests(self, request, pk=None):
         """승인 대기중인 참가 요청 목록"""
