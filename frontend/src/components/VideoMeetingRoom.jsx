@@ -278,7 +278,7 @@ function VideoMeetingRoom() {
               setTimeout(() => {
                 console.log(`🔧 Peer Connection 생성 (Initiator): ${data.username}`);
                 if (typeof createPeerConnection === 'function') {
-                  // createPeerConnection(data.username, true);
+                  createPeerConnection(data.username, true);
                 } else {
                   console.error('❌ createPeerConnection 함수 없음');
                 }
@@ -375,7 +375,7 @@ function VideoMeetingRoom() {
             setTimeout(() => {
               if (typeof createPeerConnection === 'function') {
                 console.log(`🔧 Peer Connection 생성 (방장 → ${data.participant_username})`);
-                // createPeerConnection(data.participant_username, true);
+                createPeerConnection(data.participant_username, true);
               }
             }, 2000); // ⭐ 2초 대기 (참가자가 준비될 시간)
             
