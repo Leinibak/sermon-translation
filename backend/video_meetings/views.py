@@ -10,6 +10,8 @@ from django.db.models import Q
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
+import time  # ⭐ 추가!
+from datetime import datetime  # ⭐ 추가!
 
 from .models import (
     VideoRoom, RoomParticipant, SignalMessage,

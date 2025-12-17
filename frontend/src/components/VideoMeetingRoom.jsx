@@ -267,24 +267,40 @@ function VideoMeetingRoom() {
           handleWebSocketSignal(data);
           return;
         }
-
+        
         // ============================================================
-        // ⭐⭐⭐ 승인 알림 처리 (가장 중요!)
+        // ⭐⭐⭐ 승인 알림 처리 (방 ID 검증 추가)
         // ============================================================
         if (data.type === 'approval_notification') {
           console.log('\n' + '='.repeat(80));
           console.log('🎉🎉🎉 참가 승인 알림 수신!');
           console.log('   Message:', data.message);
           console.log('   Host:', data.host_username);
-          console.log('   Room:', data.room_id);
+          console.log('   Room ID (from message):', data.room_id);
+          console.log('   Room ID (current):', roomId);
+          console.log('   Participant User ID:', data.participant_user_id);
+          console.log('   Current User ID:', user?.id);
           console.log('='.repeat(80) + '\n');
+          
+          // ⭐ 방 ID 검증 (가장 중요!)
+          if (data.room_id !== roomId) {
+            console.error('❌ 방 ID 불일치 - 승인 알림 무시');
+            console.error(`   Expected: ${roomId}`);
+            console.error(`   Received: ${data.room_id}`);
+            return;
+          }
+          
+          // ⭐ 사용자 ID 검증
+          if (String(data.participant_user_id) !== String(user?.id)) {
+            console.log('⚠️ 다른 사용자의 승인 알림 - 무시');
+            return;
+          }
           
           // 초기화 시작
           setTimeout(async () => {
             try {
               console.log('🚀 1단계: 미디어 초기화');
               
-              // 미디어가 없으면 초기화
               if (!localStreamRef.current) {
                 await getLocalMedia();
                 
@@ -303,7 +319,7 @@ function VideoMeetingRoom() {
               
               await new Promise(resolve => setTimeout(resolve, 800));
               
-              // ⭐⭐⭐ 가장 중요: join_ready 전송
+              // ⭐⭐⭐ join_ready 전송
               console.log('🚀 3단계: join_ready 시그널 전송');
               console.log('   Target:', data.host_username);
               console.log('   From:', user.username);
@@ -312,7 +328,8 @@ function VideoMeetingRoom() {
                 const readyMessage = {
                   type: 'join_ready',
                   from_username: user.username,
-                  to_username: data.host_username
+                  to_username: data.host_username,
+                  room_id: roomId  // ⭐ 방 ID 포함
                 };
                 
                 console.log('📤 전송 메시지:', readyMessage);

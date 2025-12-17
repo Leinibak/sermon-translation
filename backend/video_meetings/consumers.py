@@ -351,18 +351,26 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         else:
             logger.debug(f"⚠️ join_ready 대상 아님: {self.username} vs {to_user_id}")
         
-
-    # ⭐⭐⭐ 승인 알림 (수정)
+    # ⭐⭐⭐ 승인 알림 (수정 버전)
     async def approval_notification(self, event):
-        """⭐⭐⭐ 참가 승인 알림 - 개선 버전"""
+        """⭐⭐⭐ 참가 승인 알림 - 검증 강화 버전"""
         participant_user_id = event.get('participant_user_id')
         participant_username = event.get('participant_username')
+        room_id = event.get('room_id')
         
         logger.info(f"\n{'='*60}")
         logger.info(f"📬 approval_notification 수신")
+        logger.info(f"   Room ID: {room_id} (current: {self.room_id})")
         logger.info(f"   Participant: {participant_username} (ID: {participant_user_id})")
         logger.info(f"   Current User: {self.username} (ID: {self.user.id})")
         logger.info(f"{'='*60}\n")
+        
+        # ⭐ 방 ID 검증
+        if str(room_id) != str(self.room_id):
+            logger.warning(f"⚠️ 방 ID 불일치 - 알림 무시")
+            logger.warning(f"   Expected: {self.room_id}")
+            logger.warning(f"   Received: {room_id}")
+            return
         
         # ⭐ 정확한 비교 (문자열 변환)
         if str(self.user.id) == str(participant_user_id):
@@ -372,7 +380,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'type': 'approval_notification',
                 'approved': True,
                 'message': event['message'],
-                'room_id': event.get('room_id'),
+                'room_id': str(room_id),
                 'host_username': event.get('host_username'),
                 'timestamp': datetime.now().isoformat(),
                 'participant_username': participant_username,
@@ -383,8 +391,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.info(f"✅ 승인 알림 전송 완료!")
             
         else:
-            logger.debug(f"⚠️ 승인 대상 아님")
-    
+            logger.debug(f"⚠️ 승인 대상 아님 ({self.user.id} != {participant_user_id})")
+
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""
         # 방장인지 확인
