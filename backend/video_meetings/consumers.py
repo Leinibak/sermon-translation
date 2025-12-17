@@ -360,39 +360,59 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.debug(f"⚠️ 방장 아님: {self.username} vs {to_user_id}")
 
     async def approval_notification(self, event):
-        """참가 승인 알림"""
+        """⭐⭐⭐ 참가 승인 알림 (개선 버전)"""
         participant_user_id = event.get('participant_user_id')
         room_id = event.get('room_id')
         
-        logger.info(f"📬 approval_notification")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"📬 approval_notification 수신")
         logger.info(f"   Room: {room_id} (current: {self.room_id})")
-        logger.info(f"   Participant: {participant_user_id}")
-        logger.info(f"   Current User: {self.user.id}")
+        logger.info(f"   Participant ID: {participant_user_id} (type: {type(participant_user_id)})")
+        logger.info(f"   Current User ID: {self.user.id} (type: {type(self.user.id)})")
+        logger.info(f"{'='*60}\n")
         
         # ⭐ 방 ID 검증
         if str(room_id) != str(self.room_id):
             logger.warning(f"⚠️ 방 ID 불일치 - 알림 무시")
             return
         
-        # ⭐ 사용자 ID 검증
-        if str(self.user.id) == str(participant_user_id):
-            logger.info(f"🎉 승인 대상자 - 알림 전송")
+        # ⭐ 사용자 ID 검증 (타입 안전 비교)
+        try:
+            participant_id_int = int(participant_user_id)
+            current_user_id_int = int(self.user.id)
             
-            await self.send(text_data=json.dumps({
-                'type': 'approval_notification',
-                'approved': True,
-                'message': event['message'],
-                'room_id': str(room_id),
-                'host_username': event.get('host_username'),
-                'timestamp': datetime.now().isoformat(),
-                'participant_username': event.get('participant_username'),
-                'participant_user_id': str(participant_user_id),
-                'should_initialize': True
-            }))
-            
-            logger.info(f"✅ 승인 알림 전송 완료")
-        else:
-            logger.debug(f"⚠️ 승인 대상 아님")
+            if participant_id_int == current_user_id_int:
+                logger.info(f"🎉 승인 대상자 확인 - 알림 전송")
+                
+                # ⭐ 알림 전송 (여러 번 전송으로 안정성 확보)
+                notification = {
+                    'type': 'approval_notification',
+                    'approved': True,
+                    'message': event['message'],
+                    'room_id': str(room_id),
+                    'host_username': event.get('host_username'),
+                    'timestamp': event.get('timestamp') or datetime.now().isoformat(),
+                    'participant_username': event.get('participant_username'),
+                    'participant_user_id': participant_user_id,
+                    'should_initialize': True
+                }
+                
+                # 첫 번째 전송
+                await self.send(text_data=json.dumps(notification))
+                logger.info(f"✅ 승인 알림 전송 완료 (1차)")
+                
+                # 약간의 지연 후 재전송
+                await asyncio.sleep(0.3)
+                await self.send(text_data=json.dumps(notification))
+                logger.info(f"✅ 승인 알림 전송 완료 (2차)")
+                
+            else:
+                logger.debug(f"⚠️ 승인 대상 아님 ({participant_id_int} vs {current_user_id_int})")
+                
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ ID 비교 오류: {e}")
+            logger.error(f"   participant_user_id: {participant_user_id} ({type(participant_user_id)})")
+            logger.error(f"   self.user.id: {self.user.id} ({type(self.user.id)})")
             
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""

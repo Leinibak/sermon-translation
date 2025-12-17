@@ -661,7 +661,7 @@ function VideoMeetingRoom() {
   // =========================================================================
   // Effects
   // =========================================================================
-  // 1. 초기 로딩
+  // 1. 초기 로딩 (변경 없음)
   useEffect(() => {
     if (!roomId || roomId === 'undefined') {
       console.error('❌ 유효하지 않은 roomId');
@@ -687,8 +687,7 @@ function VideoMeetingRoom() {
     };
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
-  // 2. 승인 후 초기화 (개선 버전)
-  // ⭐⭐⭐ Effect 2: 초기 연결 (방장 또는 이미 승인된 경우만)
+  // 2. 승인 후 초기화 + 방장 폴링 (변경 없음)
   useEffect(() => {
     if (!room || !user) return;
 
@@ -743,7 +742,7 @@ function VideoMeetingRoom() {
     fetchPendingRequests
   ]);
 
-  // 3. 채팅 초기 로드 (수정)
+  // 3. 채팅 초기 로드 (변경 없음)
   useEffect(() => {
     if (showChatPanel && chatMessages.length === 0 && !chatLoading && wsReady) {
       console.log('📥 채팅 기록 로드...');
@@ -751,6 +750,81 @@ function VideoMeetingRoom() {
       // 필요시 fetchChatMessages() 호출
     }
   }, [showChatPanel, chatMessages.length, chatLoading, wsReady]);
+
+  // ⭐⭐⭐ 4. 새로 추가: 승인 대기 상태 폴링 (WebSocket 실패 대비)
+  useEffect(() => {
+    if (!room || !user) return;
+    
+    // ⭐ pending 상태이고, 방장이 아닐 때만 폴링
+    const isPending = room.participant_status === 'pending';
+    const isNotHost = !room.is_host;
+    
+    if (isPending && isNotHost) {
+      console.log('⏰ 승인 대기 상태 - 폴링 시작 (3초 간격)');
+      
+      let pollCount = 0;
+      const maxPolls = 60; // 최대 3분 (60 * 3초)
+      
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        
+        try {
+          console.log(`🔄 상태 확인 중... (${pollCount}/${maxPolls})`);
+          const updatedRoom = await fetchRoomDetails();
+          
+          // ⭐ 승인되었으면 폴링 중단
+          if (updatedRoom.participant_status === 'approved') {
+            console.log('\n' + '='.repeat(60));
+            console.log('✅ 폴링: 승인 감지!');
+            console.log('='.repeat(60) + '\n');
+            
+            clearInterval(pollInterval);
+            
+            // ⭐ 초기화 시작 (Effect 2번이 자동으로 처리하므로 별도 작업 불필요)
+            // room 상태가 업데이트되면 Effect 2번이 트리거됨
+          }
+          
+          // ⭐ 거부되었으면 폴링 중단
+          if (updatedRoom.participant_status === 'rejected') {
+            console.log('❌ 폴링: 참가 거부됨');
+            clearInterval(pollInterval);
+            alert('참가가 거부되었습니다.');
+            navigate('/video-meetings');
+          }
+          
+          // ⭐ 최대 시간 초과
+          if (pollCount >= maxPolls) {
+            console.log('⏰ 폴링 타임아웃 (3분 경과)');
+            clearInterval(pollInterval);
+            
+            const retry = window.confirm(
+              '승인 대기 시간이 초과되었습니다.\n\n' +
+              '계속 대기하시겠습니까?'
+            );
+            
+            if (!retry) {
+              navigate('/video-meetings');
+            }
+          }
+        } catch (error) {
+          console.error('❌ 폴링 오류:', error);
+        }
+      }, 3000); // 3초마다 확인
+      
+      return () => {
+        console.log('⏰ 폴링 중단');
+        clearInterval(pollInterval);
+      };
+    }
+  }, [
+    room?.participant_status, 
+    room?.is_host, 
+    user, 
+    fetchRoomDetails, 
+    navigate
+  ]);
+
+
 
   // =========================================================================
   // Handlers

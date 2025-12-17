@@ -302,7 +302,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """⭐⭐⭐ 참가 승인 (타이밍 최적화)"""
+        """⭐⭐⭐ 참가 승인 (개선 버전)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -332,7 +332,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # ⭐ 승인 처리
+        # ⭐ 1단계: DB 승인 처리
         participant.status = 'approved'
         participant.joined_at = timezone.now()
         participant.save()
@@ -344,50 +344,53 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         logger.info(f"   Room: {room.title}")
         logger.info(f"{'='*60}\n")
         
-        # ⭐⭐⭐ WebSocket 알림 (순차 전송)
+        # ⭐ 2단계: WebSocket 알림 (여러 번 전송으로 안정성 확보)
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
+        # 알림 데이터 준비
+        notification_data = {
+            'type': 'approval_notification',
+            'participant_user_id': participant.user.id,  # ⭐ 정수형 유지
+            'participant_username': participant.user.username,
+            'message': '참가가 승인되었습니다.',
+            'room_id': str(room.id),
+            'host_username': room.host.username,
+            'should_initialize': True,
+            'timestamp': datetime.now().isoformat()
+        }
+        
         try:
-            # ⭐ 1단계: 참가자 본인에게 승인 알림
-            logger.info(f"📡 1단계: 승인 알림 → {participant.user.username}")
+            # ⭐ 첫 번째 전송
+            logger.info(f"📡 승인 알림 전송 (1차)")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
-                {
-                    'type': 'approval_notification',
-                    'participant_user_id': str(participant.user.id),
-                    'participant_username': participant.user.username,
-                    'message': '참가가 승인되었습니다.',
-                    'room_id': str(room.id),
-                    'host_username': room.host.username,
-                    'should_initialize': True
-                }
+                notification_data
             )
-            logger.info(f"✅ 1단계 완료")
             
-            # ⭐ 2단계: 짧은 대기 (참가자 초기화 시간)
-            time.sleep(1.5)  # ⭐ 1.5초 대기
+            # ⭐ 약간의 지연 후 재전송 (네트워크 지연 대비)
+            time.sleep(0.5)
             
-            # ⭐ 3단계: 방장에게 알림 (선택사항)
-            logger.info(f"📡 2단계: 방장 알림")
+            logger.info(f"📡 승인 알림 전송 (2차 - 안정성)")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
-                {
-                    'type': 'new_participant_approved',
-                    'participant_username': participant.user.username,
-                    'participant_user_id': str(participant.user.id),
-                    'host_username': room.host.username
-                }
+                notification_data
             )
-            logger.info(f"✅ 2단계 완료")
+            
+            logger.info(f"✅ 승인 알림 전송 완료")
             
         except Exception as e:
             logger.error(f"⚠️ WebSocket 알림 실패: {e}")
             import traceback
             traceback.print_exc()
         
+        # ⭐ 3단계: HTTP 응답에도 승인 정보 포함
         serializer = ParticipantSerializer(participant)
-        return Response(serializer.data)
+        response_data = serializer.data
+        response_data['approval_sent'] = True
+        response_data['room_status'] = room.status
+        
+        return Response(response_data)
 
     @action(detail=True, methods=['post'])
     def leave(self, request, pk=None):
