@@ -5,6 +5,7 @@ import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from datetime import datetime
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -221,40 +222,52 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'timestamp': datetime.now().isoformat()
             }
         )
-    
+
     async def handle_raise_hand(self, data):
-        """손들기 처리"""
-        await self.save_raise_hand(True)
-        
-        print(f"✋ {self.username} 손들기")
-        
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'hand_raise',
-                'action': 'raise',
-                'username': self.username,
-                'user_id': self.user_id,
-                'timestamp': datetime.now().isoformat()
-            }
-        )
+        """✋ 손들기 처리"""
+        try:
+            # DB 저장
+            await self.save_raise_hand(True)
+            
+            logger.info(f"✋ {self.username} 손들기 완료")
+            
+            # 모든 참가자에게 알림
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'hand_raise_event',
+                    'action': 'raise',
+                    'username': self.username,
+                    'user_id': self.user_id,
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ 손들기 실패: {e}", exc_info=True)
 
     async def handle_lower_hand(self, data):
-        """손내리기 처리"""
-        await self.save_raise_hand(False)
-        
-        print(f"👋 {self.username} 손내리기")
-        
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'hand_raise',
-                'action': 'lower',
-                'username': self.username,
-                'user_id': self.user_id,
-                'timestamp': datetime.now().isoformat()
-            }
-        )
+        """👋 손내리기 처리"""
+        try:
+            # DB 저장
+            await self.save_raise_hand(False)
+            
+            logger.info(f"👋 {self.username} 손내리기 완료")
+            
+            # 모든 참가자에게 알림
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'hand_raise_event',
+                    'action': 'lower',
+                    'username': self.username,
+                    'user_id': self.user_id,
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ 손내리기 실패: {e}", exc_info=True)
 
     async def handle_ping(self):
         """핑 응답"""
@@ -358,7 +371,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'action': event['action'],
             'username': event['username'],
             'user_id': event['user_id'],
-            'timestamp': event.get('timestamp')
+            'timestamp': event.get('timestamp'),
+            'is_me': event['username'] == self.username  # ⭐ 추가
         }))
         
     # ⭐ 그룹 메시지 핸들러
@@ -540,32 +554,39 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def save_raise_hand(self, is_raised):
-        """손들기 상태 저장"""
+        """
+        손들기 상태 저장
+        ⚠️ raised_at은 항상 유지 (NULL로 변경 금지)
+        """
         from .models import RaisedHand
-        from django.utils import timezone
         
-        if is_raised:
-            # 손들기
-            obj, created = RaisedHand.objects.update_or_create(
-                room_id=self.room_id,
-                user=self.user,
-                defaults={
-                    'is_active': True,
-                    'raised_at': timezone.now(),
-                    'lowered_at': None
-                }
-            )
-            print(f"✅ DB 저장: {self.username} 손들기")
-        else:
-            # 손내리기
-            obj, created = RaisedHand.objects.update_or_create(
-                room_id=self.room_id,
-                user=self.user,
-                defaults={
-                    'is_active': False,
-                    'raised_at': None,  # ⭐ 마이그레이션 후 NULL 허용
-                    'lowered_at': timezone.now()
-                }
-            )
-            print(f"✅ DB 저장: {self.username} 손내리기")
-            
+        try:
+            if is_raised:
+                # ✋ 손들기: raised_at 설정
+                obj, created = RaisedHand.objects.update_or_create(
+                    room_id=self.room_id,
+                    user=self.user,
+                    defaults={
+                        'is_active': True,
+                        'raised_at': timezone.now(),  # ⭐ 항상 값 설정
+                        'lowered_at': None
+                    }
+                )
+                logger.info(f"✅ DB 저장: {self.username} 손들기 (ID: {obj.id})")
+                
+            else:
+                # 👋 손내리기: raised_at은 유지, is_active만 False
+                obj, created = RaisedHand.objects.update_or_create(
+                    room_id=self.room_id,
+                    user=self.user,
+                    defaults={
+                        'is_active': False,
+                        # ⭐⭐⭐ raised_at은 그대로 유지 (NULL 금지)
+                        'lowered_at': timezone.now()
+                    }
+                )
+                logger.info(f"✅ DB 저장: {self.username} 손내리기 (ID: {obj.id})")
+                
+        except Exception as e:
+            logger.error(f"❌ DB 저장 실패: {e}", exc_info=True)
+            raise
