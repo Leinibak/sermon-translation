@@ -48,7 +48,7 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction }) {
 }
 
 /**
- * 반응 버튼 (ControlBar에 추가용)
+ * 반응 버튼 (ControlBar에 추가용) - 모바일 최적화
  */
 export function ReactionsButton({ onSendReaction }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -57,10 +57,10 @@ export function ReactionsButton({ onSendReaction }) {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-3 bg-white text-gray-900 rounded-full hover:bg-gray-200 transition"
+        className="p-2 md:p-3 bg-white text-gray-900 rounded-full hover:bg-gray-200 transition"
         title="반응 보내기"
       >
-        <Smile className="w-6 h-6" />
+        <Smile className="w-5 h-5 md:w-6 md:h-6" />
       </button>
 
       <ReactionsPopover

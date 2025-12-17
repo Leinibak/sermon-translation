@@ -57,7 +57,8 @@ function VideoMeetingRoom() {
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
-  
+  const [unreadChatCount, setUnreadChatCount] = useState(0); // ⭐ 추가
+
   // 채팅
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -152,11 +153,16 @@ function VideoMeetingRoom() {
       }];
     });
     
+    // ⭐ 채팅창이 닫혀있고, 내가 보낸 메시지가 아니면 읽지 않은 카운트 증가
+    if (!showChatPanel && message.sender_username !== user?.username) {
+      setUnreadChatCount(prev => prev + 1);
+    }
+    
     // 스크롤 하단 이동
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
-  }, [user]);
+  }, [user, showChatPanel]);
 
   // =========================================================================
   // ⭐⭐⭐ WebSocket 연결 개선
@@ -824,6 +830,12 @@ function VideoMeetingRoom() {
     navigate
   ]);
 
+  // ⭐ 채팅창이 열리면 읽지 않은 메시지 카운트 초기화
+  useEffect(() => {
+    if (showChatPanel) {
+      setUnreadChatCount(0);
+    }
+  }, [showChatPanel]);
 
 
   // =========================================================================
@@ -1066,8 +1078,8 @@ function VideoMeetingRoom() {
         HandRaisedBadge={HandRaisedBadge}
       />
 
-      {/* 컨트롤 바 */}
-      <div className="bg-gray-800 border-t border-gray-700 px-6 py-3 flex justify-center items-center gap-4">
+      {/* 컨트롤 바 (수정됨) */}
+      <div className="bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3 flex justify-center items-center gap-2 md:gap-4">
         <ControlBar
           isMicOn={isMicOn}
           isVideoOn={isVideoOn}
@@ -1076,10 +1088,12 @@ function VideoMeetingRoom() {
           onLeave={handleLeave}
         />
 
-        <div className="h-8 w-px bg-gray-600 mx-2" />
+        <div className="h-6 md:h-8 w-px bg-gray-600 mx-1 md:mx-2" />
 
+        {/* ⭐ unreadCount 전달 */}
         <ChatToggleButton 
           onClick={() => setShowChatPanel(!showChatPanel)}
+          unreadCount={unreadChatCount}
         />
 
         <ReactionsButton onSendReaction={handleSendReaction} />

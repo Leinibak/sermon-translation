@@ -1,10 +1,22 @@
-// frontend/src/components/VideoMeeting/VideoGrid.jsx (개선 버전)
-import React from 'react';
+// frontend/src/components/VideoMeeting/VideoGrid.jsx (모바일 최적화 버전)
+import React, { useState, useEffect } from 'react';
 import { VideoOff, Mic, MicOff } from 'lucide-react';
 import { VideoElement } from './VideoElement';
 
 export function VideoGrid({ videos, HandRaisedBadge }) {
-  // 그리드 레이아웃 계산
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 그리드 레이아웃 계산 (데스크톱)
   const getGridLayout = (count) => {
     if (count === 1) return { cols: 1, rows: 1 };
     if (count === 2) return { cols: 2, rows: 1 };
@@ -16,6 +28,25 @@ export function VideoGrid({ videos, HandRaisedBadge }) {
 
   const layout = getGridLayout(videos.length);
 
+  // 모바일 레이아웃
+  if (isMobile) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-gray-900 p-2">
+        <div className="space-y-3 max-w-lg mx-auto">
+          {videos.map((video, index) => (
+            <VideoCard 
+              key={video.peerId || index}
+              video={video}
+              HandRaisedBadge={HandRaisedBadge}
+              isMobile={true}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 데스크톱 레이아웃
   return (
     <div className="flex-1 p-4 overflow-y-auto bg-gray-900">
       <div 
@@ -30,6 +61,7 @@ export function VideoGrid({ videos, HandRaisedBadge }) {
             key={video.peerId || index}
             video={video}
             HandRaisedBadge={HandRaisedBadge}
+            isMobile={false}
           />
         ))}
       </div>
@@ -40,11 +72,13 @@ export function VideoGrid({ videos, HandRaisedBadge }) {
 /**
  * 개별 비디오 카드 컴포넌트
  */
-function VideoCard({ video, HandRaisedBadge }) {
+function VideoCard({ video, HandRaisedBadge, isMobile }) {
   return (
     <div 
-      className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video flex items-center justify-center"
-      style={{ minHeight: '200px' }}
+      className={`relative bg-gray-800 rounded-lg overflow-hidden flex items-center justify-center ${
+        isMobile ? 'w-full h-64' : 'aspect-video'
+      }`}
+      style={{ minHeight: isMobile ? '256px' : '200px' }}
     >
       {/* 비디오 엘리먼트 */}
       <VideoElement 
@@ -57,12 +91,16 @@ function VideoCard({ video, HandRaisedBadge }) {
       {/* 비디오 끔 오버레이 */}
       {video.isVideoOff && (
         <div className="absolute inset-0 bg-gray-900 bg-opacity-90 flex flex-col items-center justify-center">
-          <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mb-3">
-            <span className="text-3xl text-white font-bold">
+          <div className={`bg-gray-700 rounded-full flex items-center justify-center mb-3 ${
+            isMobile ? 'w-16 h-16' : 'w-20 h-20'
+          }`}>
+            <span className={`text-white font-bold ${
+              isMobile ? 'text-2xl' : 'text-3xl'
+            }`}>
               {video.username?.charAt(0).toUpperCase()}
             </span>
           </div>
-          <VideoOff className="w-8 h-8 text-gray-500" />
+          <VideoOff className={`text-gray-500 ${isMobile ? 'w-6 h-6' : 'w-8 h-8'}`} />
         </div>
       )}
       
@@ -74,28 +112,30 @@ function VideoCard({ video, HandRaisedBadge }) {
       )}
       
       {/* 하단 정보 바 */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* 마이크 상태 */}
-            <div className={`p-1.5 rounded-full ${
+            <div className={`rounded-full ${
               video.isMuted ? 'bg-red-500' : 'bg-gray-700'
-            }`}>
+            } ${isMobile ? 'p-1' : 'p-1.5'}`}>
               {video.isMuted ? (
-                <MicOff className="w-4 h-4 text-white" />
+                <MicOff className={`text-white ${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
               ) : (
-                <Mic className="w-4 h-4 text-white" />
+                <Mic className={`text-white ${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
               )}
             </div>
             
             {/* 사용자 이름 */}
-            <span className="text-white text-sm font-medium truncate max-w-[150px]">
+            <span className={`text-white font-medium truncate ${
+              isMobile ? 'text-xs max-w-[120px]' : 'text-sm max-w-[150px]'
+            }`}>
               {video.username}
             </span>
           </div>
           
           {/* 연결 품질 표시 (선택사항) */}
-          {video.connectionQuality && (
+          {video.connectionQuality && !isMobile && (
             <ConnectionQualityIndicator quality={video.connectionQuality} />
           )}
         </div>
