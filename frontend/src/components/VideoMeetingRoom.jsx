@@ -444,17 +444,29 @@ function VideoMeetingRoom() {
           // 손들기
           // ============================================================
           if (data.type === 'hand_raise') {
+            console.log(`✋ 손들기 이벤트: ${data.username} - ${data.action}`);
+            
             if (data.action === 'raise') {
               setRaisedHands(prev => {
-                if (prev.some(h => h.username === data.username)) return prev;
+                // 중복 체크
+                if (prev.some(h => h.username === data.username)) {
+                  console.log('⚠️ 이미 손들기 상태');
+                  return prev;
+                }
+                
+                console.log(`✅ 손들기 추가: ${data.username}`);
                 return [...prev, {
                   username: data.username,
                   user_id: data.user_id,
                   raised_at: new Date().toISOString()
                 }];
               });
-            } else {
-              setRaisedHands(prev => prev.filter(h => h.username !== data.username));
+            } else if (data.action === 'lower') {
+              setRaisedHands(prev => {
+                const filtered = prev.filter(h => h.username !== data.username);
+                console.log(`✅ 손내리기 제거: ${data.username} (남은 수: ${filtered.length})`);
+                return filtered;
+              });
             }
             return;
           }
@@ -950,10 +962,14 @@ function VideoMeetingRoom() {
     }
 
     try {
+      console.log('✋ 손들기 요청 전송');
+      
       currentWs.send(JSON.stringify({
         type: 'raise_hand'
       }));
+      
       setIsHandRaised(true);
+      console.log('✅ 손들기 상태 업데이트');
     } catch (error) {
       console.error('❌ 손들기 실패:', error);
     }
@@ -968,15 +984,19 @@ function VideoMeetingRoom() {
     }
 
     try {
+      console.log('👋 손내리기 요청 전송');
+      
       currentWs.send(JSON.stringify({
         type: 'lower_hand'
       }));
+      
       setIsHandRaised(false);
+      console.log('✅ 손내리기 상태 업데이트');
     } catch (error) {
       console.error('❌ 손내리기 실패:', error);
     }
   };
-
+  
   // =========================================================================
   // Render
   // =========================================================================

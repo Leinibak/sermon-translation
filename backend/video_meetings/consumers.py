@@ -207,22 +207,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }
         )
     
-    async def handle_raise_hand(self, data):
-        """손들기 처리"""
-        await self.save_raise_hand(True)
-        
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'hand_raise',
-                'action': 'raise',
-                'username': self.username,
-                'user_id': self.user_id,
-                'timestamp': datetime.now().isoformat()
-            }
-        )
-    
-    async def handle_lower_hand(self, data):
+
         """손내리기 처리"""
         await self.save_raise_hand(False)
         
@@ -237,6 +222,40 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }
         )
     
+    async def handle_raise_hand(self, data):
+        """손들기 처리"""
+        await self.save_raise_hand(True)
+        
+        print(f"✋ {self.username} 손들기")
+        
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'hand_raise',
+                'action': 'raise',
+                'username': self.username,
+                'user_id': self.user_id,
+                'timestamp': datetime.now().isoformat()
+            }
+        )
+
+    async def handle_lower_hand(self, data):
+        """손내리기 처리"""
+        await self.save_raise_hand(False)
+        
+        print(f"👋 {self.username} 손내리기")
+        
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'hand_raise',
+                'action': 'lower',
+                'username': self.username,
+                'user_id': self.user_id,
+                'timestamp': datetime.now().isoformat()
+            }
+        )
+
     async def handle_ping(self):
         """핑 응답"""
         await self.send(text_data=json.dumps({
@@ -333,7 +352,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         }))
     
     async def hand_raise(self, event):
-        """손들기 알림"""
+        """손들기 알림 - 모든 참가자에게 전송"""
         await self.send(text_data=json.dumps({
             'type': 'hand_raise',
             'action': event['action'],
@@ -341,7 +360,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'user_id': event['user_id'],
             'timestamp': event.get('timestamp')
         }))
-
+        
     # ⭐ 그룹 메시지 핸들러
     async def join_ready_notification(self, event):
         """join_ready 알림 - 방장에게만"""
@@ -536,6 +555,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                     'lowered_at': None
                 }
             )
+            print(f"✅ DB 저장: {self.username} 손들기")
         else:
             # 손내리기
             obj, created = RaisedHand.objects.update_or_create(
@@ -543,8 +563,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 user=self.user,
                 defaults={
                     'is_active': False,
-                    'raised_at': None,  # ⭐ 이제 NULL 허용
+                    'raised_at': None,  # ⭐ 마이그레이션 후 NULL 허용
                     'lowered_at': timezone.now()
                 }
             )
-
+            print(f"✅ DB 저장: {self.username} 손내리기")
+            
