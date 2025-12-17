@@ -373,7 +373,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   // =========================================================================
   
   const handleWebSocketSignal = useCallback(async (data) => {
-    const { type, from_user_id: peerId, to_user_id, id: signalId } = data;
+    const { type, from_username: peerId, to_username, id: signalId } = data;
 
     // 자신의 시그널 무시
     if (peerId === currentUser?.username) {
@@ -381,7 +381,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }
 
     // 수신자 확인
-    if (to_user_id && to_user_id !== currentUser?.username) {
+    if (to_username && to_username !== currentUser?.username) {
       return;
     }
 
@@ -405,7 +405,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log(`📨 WebSocket 시그널 수신`);
     console.log(`   Type: ${type}`);
     console.log(`   From: ${peerId}`);
-    console.log(`   To: ${to_user_id || 'broadcast'}`);
+    console.log(`   To: ${to_username || 'broadcast'}`);
     console.log(`${'='.repeat(60)}\n`);
 
     // ⭐ user_joined 처리 (방장만)

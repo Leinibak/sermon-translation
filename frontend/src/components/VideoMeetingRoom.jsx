@@ -87,8 +87,8 @@ function VideoMeetingRoom() {
 
     const message = {
       type,
-      to_user_id: toPeerId,
-      from_user_id: user?.username,
+      to_username: toPeerId,
+      from_username: user?.username,
       ...payload
     };
 
@@ -311,8 +311,8 @@ function VideoMeetingRoom() {
               if (socket.readyState === WebSocket.OPEN) {
                 const readyMessage = {
                   type: 'join_ready',
-                  from_user_id: user.username,
-                  to_user_id: data.host_username
+                  from_username: user.username,
+                  to_username: data.host_username
                 };
                 
                 console.log('📤 전송 메시지:', readyMessage);
@@ -338,12 +338,42 @@ function VideoMeetingRoom() {
         }
 
         // ============================================================
+        // ✅ user_joined 처리 (🔥 최소 수정 핵심)
+        // ============================================================
+        if (data.type === 'user_joined') {
+          console.log('👋 user_joined 수신:', data.username);
+
+          // 방장만 처리
+          if (room?.is_host && data.username !== user.username) {
+            console.log('🚀 방장: user_joined → PeerConnection 시작:', data.username);
+
+            // 로컬 미디어 확인
+            if (!localStreamRef.current) {
+              console.warn('⚠️ 로컬 미디어 없음 - 잠시 후 재시도');
+              setTimeout(() => {
+                if (localStreamRef.current) {
+                  createPeerConnection(data.username, true);
+                }
+              }, 800);
+            } else {
+              // ⭐ 핵심: join_ready 기다리지 말고 바로 시작
+              setTimeout(() => {
+                createPeerConnection(data.username, true);
+              }, 500);
+            }
+          }
+
+          return;
+        }
+
+
+        // ============================================================
         // ⭐⭐⭐ join_ready 처리 (방장만)
         // ============================================================
         if (data.type === 'join_ready') {
           console.log('\n' + '='.repeat(80));
           console.log('📥📥📥 join_ready 수신!');
-          console.log('   From:', data.from_user_id);
+          console.log('   From:', data.from_username);
           console.log('   Is Host:', room?.is_host);
           console.log('   Current User:', user?.username);
           console.log('='.repeat(80) + '\n');
@@ -354,12 +384,12 @@ function VideoMeetingRoom() {
             return;
           }
 
-          const peerId = data.from_user_id;
+          const peerUsername = data.from_username;
 
           // 이미 연결됐는지 확인
-          if (peerConnections.current[peerId]) {
-            const state = peerConnections.current[peerId].connectionState;
-            console.warn(`⚠️ 이미 연결됨: ${peerId} (${state})`);
+          if (peerConnections.current[peerUsername]) {
+            const state = peerConnections.current[peerUsername].connectionState;
+            console.warn(`⚠️ 이미 연결됨: ${peerUsername} (${state})`);
             
             if (state === 'connected' || state === 'connecting') {
               return;
@@ -368,9 +398,9 @@ function VideoMeetingRoom() {
             // Failed 상태면 정리
             console.log('🗑️ 기존 연결 정리');
             try {
-              peerConnections.current[peerId].close();
+              peerConnections.current[peerUsername].close();
             } catch (e) {}
-            delete peerConnections.current[peerId];
+            delete peerConnections.current[peerUsername];
           }
 
           // 미디어 확인
@@ -387,11 +417,11 @@ function VideoMeetingRoom() {
             try {
               console.log(`\n${'='.repeat(80)}`);
               console.log(`🎬🎬🎬 방장: Peer Connection 생성 시작`);
-              console.log(`   Peer: ${peerId}`);
+              console.log(`   Peer: ${peerUsername}`);
               console.log(`   Initiator: true`);
               console.log(`${'='.repeat(80)}\n`);
               
-              const pc = await createPeerConnection(peerId, true);
+              const pc = await createPeerConnection(peerUsername, true);
               
               if (pc) {
                 console.log('✅✅✅ Peer Connection 생성 성공!');
