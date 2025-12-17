@@ -525,12 +525,26 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         from .models import RaisedHand
         from django.utils import timezone
         
-        obj, created = RaisedHand.objects.update_or_create(
-            room_id=self.room_id,
-            user=self.user,
-            defaults={
-                'is_active': is_raised,
-                'raised_at': timezone.now() if is_raised else None,
-                'lowered_at': None if is_raised else timezone.now()
-            }
-        )
+        if is_raised:
+            # 손들기
+            obj, created = RaisedHand.objects.update_or_create(
+                room_id=self.room_id,
+                user=self.user,
+                defaults={
+                    'is_active': True,
+                    'raised_at': timezone.now(),
+                    'lowered_at': None
+                }
+            )
+        else:
+            # 손내리기
+            obj, created = RaisedHand.objects.update_or_create(
+                room_id=self.room_id,
+                user=self.user,
+                defaults={
+                    'is_active': False,
+                    'raised_at': None,  # ⭐ 이제 NULL 허용
+                    'lowered_at': timezone.now()
+                }
+            )
+

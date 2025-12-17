@@ -1,5 +1,5 @@
-// frontend/src/components/VideoMeeting/ReactionsPanel.jsx
-import React, { useState } from 'react';
+// frontend/src/components/VideoMeeting/ReactionsPanel.jsx (수정 버전)
+import React, { useState, useRef, useEffect } from 'react';
 import { Smile } from 'lucide-react';
 
 const REACTION_EMOJIS = [
@@ -12,31 +12,72 @@ const REACTION_EMOJIS = [
 ];
 
 /**
- * 반응 선택 패널 (팝오버)
+ * 반응 선택 패널 (팝오버) - 개선 버전
  */
-export function ReactionsPopover({ isOpen, onClose, onSelectReaction }) {
+export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef }) {
+  const popoverRef = useRef(null);
+
+  // 외부 클릭 감지
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (
+        popoverRef.current && 
+        !popoverRef.current.contains(event.target) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(event.target)
+      ) {
+        onClose();
+      }
+    };
+
+    // 약간의 지연 후 이벤트 리스너 등록 (버튼 클릭과 충돌 방지)
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }, 100);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isOpen, onClose, anchorRef]);
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* 오버레이 */}
+      {/* 모바일용 배경 오버레이 */}
       <div 
-        className="fixed inset-0 z-40"
+        className="fixed inset-0 z-40 md:hidden"
         onClick={onClose}
       />
       
       {/* 팝오버 */}
-      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-xl p-2 z-50 animate-scale-in">
-        <div className="grid grid-cols-3 gap-2">
+      <div 
+        ref={popoverRef}
+        className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-3 z-50 animate-scale-in border-2 border-gray-200"
+        style={{
+          minWidth: '200px'
+        }}
+      >
+        {/* 작은 화살표 (선택사항) */}
+        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-r-2 border-b-2 border-gray-200" />
+        
+        <div className="grid grid-cols-3 gap-2 relative z-10 bg-white rounded-lg">
           {REACTION_EMOJIS.map(({ emoji, label }) => (
             <button
               key={emoji}
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 onSelectReaction(emoji);
                 onClose();
               }}
-              className="w-12 h-12 flex items-center justify-center text-2xl hover:bg-gray-100 rounded-lg transition"
+              className="w-14 h-14 flex items-center justify-center text-3xl hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation"
               title={label}
+              type="button"
             >
               {emoji}
             </button>
@@ -48,17 +89,26 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction }) {
 }
 
 /**
- * 반응 버튼 (ControlBar에 추가용) - 모바일 최적화
+ * 반응 버튼 (ControlBar에 추가용) - 개선 버전
  */
 export function ReactionsButton({ onSendReaction }) {
   const [isOpen, setIsOpen] = useState(false);
+  const buttonRef = useRef(null);
+
+  const handleToggle = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(!isOpen);
+  };
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 md:p-3 bg-white text-gray-900 rounded-full hover:bg-gray-200 transition"
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="p-2 md:p-3 bg-white text-gray-900 rounded-full hover:bg-gray-200 transition touch-manipulation"
         title="반응 보내기"
+        type="button"
       >
         <Smile className="w-5 h-5 md:w-6 md:h-6" />
       </button>
@@ -70,6 +120,7 @@ export function ReactionsButton({ onSendReaction }) {
           onSendReaction(emoji);
           setIsOpen(false);
         }}
+        anchorRef={buttonRef}
       />
     </div>
   );
@@ -103,7 +154,7 @@ function FloatingReaction({ emoji, username }) {
 
   return (
     <div
-      className="absolute animate-float-up"
+      className="absolute animate-float-up pointer-events-none"
       style={{
         left: `${randomX}%`,
         bottom: '20%',
@@ -111,50 +162,11 @@ function FloatingReaction({ emoji, username }) {
       }}
     >
       <div className="flex flex-col items-center">
-        <span className="text-5xl mb-2">{emoji}</span>
-        <span className="text-xs text-white bg-black bg-opacity-50 px-2 py-1 rounded">
+        <span className="text-4xl md:text-5xl mb-2">{emoji}</span>
+        <span className="text-xs text-white bg-black bg-opacity-50 px-2 py-1 rounded whitespace-nowrap">
           {username}
         </span>
       </div>
     </div>
   );
 }
-
-// CSS 애니메이션 추가 (Tailwind config 또는 globals.css에)
-/*
-@keyframes float-up {
-  0% {
-    transform: translateY(0) scale(0.8);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-200px) scale(1.2);
-    opacity: 0;
-  }
-}
-
-@keyframes scale-in {
-  0% {
-    transform: translate(-50%, 10px) scale(0.8);
-    opacity: 0;
-  }
-  100% {
-    transform: translate(-50%, 0) scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-float-up {
-  animation: float-up 3s ease-out forwards;
-}
-
-.animate-scale-in {
-  animation: scale-in 0.2s ease-out;
-}
-*/

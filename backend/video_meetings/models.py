@@ -302,7 +302,8 @@ class RaisedHand(models.Model):
     
     is_active = models.BooleanField(default=True)
     
-    raised_at = models.DateTimeField(auto_now_add=True)
+    # ⭐ null=True, blank=True 추가
+    raised_at = models.DateTimeField(null=True, blank=True)  
     lowered_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
