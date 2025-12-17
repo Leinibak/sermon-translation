@@ -92,6 +92,10 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             if message_type in ['offer', 'answer', 'ice_candidate']:
                 await self.handle_webrtc_signal(data)
             
+            # ⭐⭐⭐ join_ready 처리 (새로 추가!)
+            elif message_type == 'join_ready':
+                await self.handle_join_ready(data)
+            
             # 기존 메시지 타입 처리
             elif message_type == 'join':
                 await self.handle_join(data)
@@ -112,7 +116,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.error(f"❌ JSON 파싱 실패: {e}")
         except Exception as e:
             logger.error(f"❌ 메시지 처리 오류: {e}", exc_info=True)
-    
+        
     # =========================================================================
     # WebRTC 시그널링
     # =========================================================================
@@ -231,7 +235,31 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'type': 'pong',
             'timestamp': datetime.now().isoformat()
         }))
-    
+            
+    # ⭐⭐⭐ 새로운 핸들러 추가
+    async def handle_join_ready(self, data):
+        """
+        참가자가 준비 완료 시그널 전송
+        방장에게만 전달하여 Peer Connection 시작
+        """
+        to_user_id = data.get('to_user_id')  # 방장 username
+        from_user_id = data.get('from_user_id', self.username)
+        
+        logger.info(f"📥 join_ready 수신: {from_user_id} → {to_user_id}")
+        
+        # 방장에게만 전달
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'join_ready_notification',
+                'from_user_id': from_user_id,
+                'to_user_id': to_user_id,
+                'timestamp': datetime.now().isoformat()
+            }
+        )
+        
+        logger.info(f"✅ join_ready 브로드캐스트 완료")
+
     # =========================================================================
     # 그룹 메시지 핸들러
     # =========================================================================
@@ -305,7 +333,25 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'user_id': event['user_id'],
             'timestamp': event.get('timestamp')
         }))
-    
+
+    # ⭐⭐⭐ 그룹 메시지 핸들러 추가
+    async def join_ready_notification(self, event):
+        """join_ready 알림 - 방장에게만 전달"""
+        to_user_id = event.get('to_user_id')
+        
+        # 방장인지 확인
+        if self.username == to_user_id:
+            logger.info(f"👑 방장에게 join_ready 전달: from {event['from_user_id']}")
+            
+            await self.send(text_data=json.dumps({
+                'type': 'join_ready',
+                'from_user_id': event['from_user_id'],
+                'timestamp': event.get('timestamp')
+            }))
+        else:
+            logger.debug(f"⚠️ join_ready 대상 아님: {self.username} vs {to_user_id}")
+        
+
     # ⭐⭐⭐ 승인 알림 (수정)
     async def approval_notification(self, event):
         """⭐⭐⭐ 참가 승인 알림 - 개선 버전"""
@@ -332,38 +378,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             
         else:
             logger.debug(f"⚠️ 승인 알림 대상 아님: {self.username} (user_id: {self.user.id}) vs {participant_user_id}")
-
-
-    # backend/video_meetings/consumers.py (approval_notification만 수정)
-
-    async def approval_notification(self, event):
-        """⭐⭐⭐ 참가 승인 알림 - 개선 버전"""
-        participant_user_id = event.get('participant_user_id')
-        participant_username = event.get('participant_username')
-        
-        # ⭐ 정확한 비교 (문자열 변환)
-        if str(self.user.id) == str(participant_user_id):
-            logger.info(f"🎉 승인 알림 전송: {self.username} (user_id: {self.user.id})")
-            
-            await self.send(text_data=json.dumps({
-                'type': 'approval_notification',
-                'approved': True,
-                'message': event['message'],
-                'room_id': event.get('room_id'),
-                'host_username': event.get('host_username'),
-                'timestamp': datetime.now().isoformat(),
-                # ⭐ 추가: 승인 확인용 데이터
-                'participant_username': participant_username,
-                'participant_user_id': str(participant_user_id),
-                # ⭐⭐⭐ 중요: 즉시 초기화 지시
-                'should_initialize': True
-            }))
-            
-            logger.info(f"✅ 승인 알림 전송 완료")
-            
-        else:
-            logger.debug(f"⚠️ 승인 알림 대상 아님: {self.username} (user_id: {self.user.id}) vs {participant_user_id}")
-
 
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""
