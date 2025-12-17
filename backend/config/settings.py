@@ -352,12 +352,18 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             "hosts": [('redis', 6379)],
-            "capacity": 1500,  # 채널당 최대 메시지 수
-            "expiry": 10,  # 메시지 만료 시간 (초)
+            "capacity": 2000,  # ⭐ 1500 → 2000
+            "expiry": 15,      # ⭐ 10 → 15
+            # ⭐ 추가 설정
+            "group_expiry": 86400,  # 24시간
+            "channel_capacity": {
+                "http.request": 200,
+                "websocket.send*": 2000,
+                "websocket.receive*": 2000,
+            },
         },
     },
 }
-
 # ============================================================================
 # 로깅 설정 (보안 및 모니터링)
 # ============================================================================

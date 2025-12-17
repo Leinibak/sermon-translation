@@ -302,7 +302,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """⭐⭐⭐ 참가 승인 (타이밍 개선)"""
+        """⭐⭐⭐ 참가 승인 (타이밍 최적화)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -337,20 +337,20 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         participant.joined_at = timezone.now()
         participant.save()
         
-        print(f"\n{'='*60}")
-        print(f"✅ 참가 승인 완료")
-        print(f"   User: {participant.user.username}")
-        print(f"   User ID: {participant.user.id}")
-        print(f"   Room: {room.title}")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"✅ 참가 승인 완료")
+        logger.info(f"   User: {participant.user.username}")
+        logger.info(f"   User ID: {participant.user.id}")
+        logger.info(f"   Room: {room.title}")
+        logger.info(f"{'='*60}\n")
         
-        # ⭐⭐⭐ WebSocket 알림 (순차적으로 전송)
+        # ⭐⭐⭐ WebSocket 알림 (순차 전송)
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
         try:
-            # ⭐ 1단계: 참가자 본인에게 승인 알림 (즉시)
-            print(f"📡 1단계: 승인 알림 → {participant.user.username}")
+            # ⭐ 1단계: 참가자 본인에게 승인 알림
+            logger.info(f"📡 1단계: 승인 알림 → {participant.user.username}")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
@@ -363,13 +363,13 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'should_initialize': True
                 }
             )
-            print(f"✅ 1단계 완료")
+            logger.info(f"✅ 1단계 완료")
             
-            # ⭐ 2단계: 짧은 대기 (참가자가 초기화할 시간)
-            time.sleep(2.0)  # ⭐ 2초 대기 (중요!)
+            # ⭐ 2단계: 짧은 대기 (참가자 초기화 시간)
+            time.sleep(1.5)  # ⭐ 1.5초 대기
             
-            # ⭐ 3단계: 방장에게 알림
-            print(f"📡 2단계: 방장 알림")
+            # ⭐ 3단계: 방장에게 알림 (선택사항)
+            logger.info(f"📡 2단계: 방장 알림")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 {
@@ -379,24 +379,10 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                     'host_username': room.host.username
                 }
             )
-            print(f"✅ 2단계 완료")
-            
-            # ⭐ 4단계: 전체 알림 (선택사항)
-            time.sleep(0.5)
-            print(f"📡 3단계: 전체 알림")
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                {
-                    'type': 'user_joined',
-                    'user_id': str(participant.user.id),
-                    'username': participant.user.username,
-                    'timestamp': datetime.now().isoformat()
-                }
-            )
-            print(f"✅ 3단계 완료")
+            logger.info(f"✅ 2단계 완료")
             
         except Exception as e:
-            print(f"⚠️ WebSocket 알림 실패: {e}")
+            logger.error(f"⚠️ WebSocket 알림 실패: {e}")
             import traceback
             traceback.print_exc()
         

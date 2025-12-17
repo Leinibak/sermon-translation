@@ -77,46 +77,54 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.error(f"❌ 연결 종료 오류: {e}", exc_info=True)
     
     async def receive(self, text_data):
-        """메시지 수신 및 처리"""
         try:
             data = json.loads(text_data)
             message_type = data.get('type')
             
             if not message_type:
-                logger.warning(f"⚠️ 메시지 타입 없음: {self.username}")
+                logger.warning(f"⚠️ 메시지 타입 없음")
                 return
             
-            logger.debug(f"📨 메시지 수신: {message_type} from {self.username}")
+            logger.debug(f"📨 수신: {message_type} from {self.username}")
             
-            # WebRTC 시그널링 처리
+            # WebRTC 시그널링
             if message_type in ['offer', 'answer', 'ice_candidate']:
                 await self.handle_webrtc_signal(data)
             
-            # ⭐⭐⭐ join_ready 처리 (새로 추가!)
+            # ⭐ join_ready 처리
             elif message_type == 'join_ready':
                 await self.handle_join_ready(data)
             
-            # 기존 메시지 타입 처리
+            # join
             elif message_type == 'join':
                 await self.handle_join(data)
+            
+            # 채팅
             elif message_type == 'chat':
                 await self.handle_chat_message(data)
+            
+            # 반응
             elif message_type == 'reaction':
                 await self.handle_reaction(data)
+            
+            # 손들기
             elif message_type == 'raise_hand':
                 await self.handle_raise_hand(data)
             elif message_type == 'lower_hand':
                 await self.handle_lower_hand(data)
+            
+            # ping
             elif message_type == 'ping':
                 await self.handle_ping()
+            
             else:
-                logger.warning(f"⚠️ 알 수 없는 메시지 타입: {message_type}")
+                logger.warning(f"⚠️ 알 수 없는 타입: {message_type}")
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON 파싱 실패: {e}")
         except Exception as e:
             logger.error(f"❌ 메시지 처리 오류: {e}", exc_info=True)
-        
+
     # =========================================================================
     # WebRTC 시그널링
     # =========================================================================
@@ -236,18 +244,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'timestamp': datetime.now().isoformat()
         }))
             
-    # ⭐⭐⭐ 새로운 핸들러 추가
+    # ⭐⭐⭐ join_ready 핸들러
     async def handle_join_ready(self, data):
         """
         참가자가 준비 완료 시그널 전송
-        방장에게만 전달하여 Peer Connection 시작
+        방장에게만 전달
         """
-        to_user_id = data.get('to_user_id')  # 방장 username
+        to_user_id = data.get('to_user_id') or data.get('to_username')
         from_user_id = data.get('from_user_id', self.username)
         
-        logger.info(f"📥 join_ready 수신: {from_user_id} → {to_user_id}")
+        logger.info(f"📥 join_ready: {from_user_id} → {to_user_id}")
         
-        # 방장에게만 전달
+        # ⭐ 방장에게만 전달
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -258,8 +266,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }
         )
         
-        logger.info(f"✅ join_ready 브로드캐스트 완료")
-
+        logger.info(f"✅ join_ready 전달 완료")
+    
     # =========================================================================
     # 그룹 메시지 핸들러
     # =========================================================================
@@ -334,45 +342,39 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'timestamp': event.get('timestamp')
         }))
 
-    # ⭐⭐⭐ 그룹 메시지 핸들러 추가
+    # ⭐ 그룹 메시지 핸들러
     async def join_ready_notification(self, event):
-        """join_ready 알림 - 방장에게만 전달"""
+        """join_ready 알림 - 방장에게만"""
         to_user_id = event.get('to_user_id')
         
-        # 방장인지 확인
+        # ⭐ 방장 여부 확인
         if self.username == to_user_id:
             logger.info(f"👑 방장에게 join_ready 전달: from {event['from_user_id']}")
             
             await self.send(text_data=json.dumps({
                 'type': 'join_ready',
-                'from_user_id': event['from_user_id'],
+                'from_username': event['from_user_id'],
                 'timestamp': event.get('timestamp')
             }))
         else:
-            logger.debug(f"⚠️ join_ready 대상 아님: {self.username} vs {to_user_id}")
-        
-    # ⭐⭐⭐ 승인 알림 (수정 버전)
+            logger.debug(f"⚠️ 방장 아님: {self.username} vs {to_user_id}")
+
     async def approval_notification(self, event):
-        """⭐⭐⭐ 참가 승인 알림 - 검증 강화 버전"""
+        """참가 승인 알림"""
         participant_user_id = event.get('participant_user_id')
-        participant_username = event.get('participant_username')
         room_id = event.get('room_id')
         
-        logger.info(f"\n{'='*60}")
-        logger.info(f"📬 approval_notification 수신")
-        logger.info(f"   Room ID: {room_id} (current: {self.room_id})")
-        logger.info(f"   Participant: {participant_username} (ID: {participant_user_id})")
-        logger.info(f"   Current User: {self.username} (ID: {self.user.id})")
-        logger.info(f"{'='*60}\n")
+        logger.info(f"📬 approval_notification")
+        logger.info(f"   Room: {room_id} (current: {self.room_id})")
+        logger.info(f"   Participant: {participant_user_id}")
+        logger.info(f"   Current User: {self.user.id}")
         
         # ⭐ 방 ID 검증
         if str(room_id) != str(self.room_id):
             logger.warning(f"⚠️ 방 ID 불일치 - 알림 무시")
-            logger.warning(f"   Expected: {self.room_id}")
-            logger.warning(f"   Received: {room_id}")
             return
         
-        # ⭐ 정확한 비교 (문자열 변환)
+        # ⭐ 사용자 ID 검증
         if str(self.user.id) == str(participant_user_id):
             logger.info(f"🎉 승인 대상자 - 알림 전송")
             
@@ -383,16 +385,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'room_id': str(room_id),
                 'host_username': event.get('host_username'),
                 'timestamp': datetime.now().isoformat(),
-                'participant_username': participant_username,
+                'participant_username': event.get('participant_username'),
                 'participant_user_id': str(participant_user_id),
                 'should_initialize': True
             }))
             
-            logger.info(f"✅ 승인 알림 전송 완료!")
-            
+            logger.info(f"✅ 승인 알림 전송 완료")
         else:
-            logger.debug(f"⚠️ 승인 대상 아님 ({self.user.id} != {participant_user_id})")
-
+            logger.debug(f"⚠️ 승인 대상 아님")
+            
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""
         # 방장인지 확인
