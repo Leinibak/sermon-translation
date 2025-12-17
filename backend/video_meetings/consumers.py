@@ -358,9 +358,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         participant_user_id = event.get('participant_user_id')
         participant_username = event.get('participant_username')
         
+        logger.info(f"\n{'='*60}")
+        logger.info(f"📬 approval_notification 수신")
+        logger.info(f"   Participant: {participant_username} (ID: {participant_user_id})")
+        logger.info(f"   Current User: {self.username} (ID: {self.user.id})")
+        logger.info(f"{'='*60}\n")
+        
         # ⭐ 정확한 비교 (문자열 변환)
         if str(self.user.id) == str(participant_user_id):
-            logger.info(f"🎉 승인 알림 전송: {self.username} (user_id: {self.user.id})")
+            logger.info(f"🎉 승인 대상자 - 알림 전송")
             
             await self.send(text_data=json.dumps({
                 'type': 'approval_notification',
@@ -369,16 +375,16 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'room_id': event.get('room_id'),
                 'host_username': event.get('host_username'),
                 'timestamp': datetime.now().isoformat(),
-                # ⭐ 추가: 승인 확인용 데이터
                 'participant_username': participant_username,
-                'participant_user_id': str(participant_user_id)
+                'participant_user_id': str(participant_user_id),
+                'should_initialize': True
             }))
             
-            logger.info(f"✅ 승인 알림 전송 완료")
+            logger.info(f"✅ 승인 알림 전송 완료!")
             
         else:
-            logger.debug(f"⚠️ 승인 알림 대상 아님: {self.username} (user_id: {self.user.id}) vs {participant_user_id}")
-
+            logger.debug(f"⚠️ 승인 대상 아님")
+    
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""
         # 방장인지 확인
