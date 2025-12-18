@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingList.jsx (수정 버전)
+// frontend/src/components/VideoMeetingList.jsx (개선 버전 - 자동 새로고침 제거)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -26,6 +26,7 @@ function VideoMeetingList() {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // ⭐ 추가
 
   // 회의실 생성 폼 상태
   const [newRoom, setNewRoom] = useState({
@@ -40,9 +41,15 @@ function VideoMeetingList() {
   // API 함수들
   // =========================================================================
 
-  const fetchRooms = async () => {
+  const fetchRooms = async (isManualRefresh = false) => {
     try {
-      setLoading(true);
+      // ⭐ 수동 새로고침일 때만 refreshing 상태 활성화
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
       setError(null);
       
       const response = await axios.get('/video-meetings/');
@@ -59,12 +66,23 @@ function VideoMeetingList() {
       }
       
       console.log('📋 회의실 목록:', roomsData.length, '개');
-      setRooms(roomsData);
+      
+      // ⭐ 상태가 실제로 변경된 경우에만 업데이트
+      setRooms(prevRooms => {
+        const isDifferent = JSON.stringify(prevRooms) !== JSON.stringify(roomsData);
+        if (isDifferent) {
+          console.log('🔄 회의실 목록 업데이트됨');
+          return roomsData;
+        }
+        console.log('✅ 변경사항 없음 - 업데이트 생략');
+        return prevRooms;
+      });
     } catch (err) {
       console.error('❌ 회의실 목록 로딩 실패:', err);
       setError('회의실 목록을 불러올 수 없습니다.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -100,6 +118,7 @@ function VideoMeetingList() {
 
       console.log('✅ 회의실 생성:', response.data);
       
+      // ⭐ 생성 후 즉시 해당 회의실로 이동
       navigate(`/video-meetings/${response.data.id}`);
     } catch (err) {
       console.error('❌ 회의실 생성 실패:', err);
@@ -157,7 +176,6 @@ function VideoMeetingList() {
     }
   };
 
-  // ⭐ 새로 추가: 회의 종료 함수
   const endMeeting = async (roomId, roomTitle) => {
     const confirmEnd = window.confirm(
       `"${roomTitle}" 회의를 종료하시겠습니까?\n\n모든 참가자가 자동으로 퇴장됩니다.`
@@ -173,8 +191,8 @@ function VideoMeetingList() {
       console.log('✅ 회의 종료 완료');
       alert('회의가 종료되었습니다.');
       
-      // 목록 새로고침
-      await fetchRooms();
+      // ⭐ 목록 새로고침
+      await fetchRooms(true);
     } catch (err) {
       console.error('❌ 회의 종료 실패:', err);
       
@@ -190,17 +208,11 @@ function VideoMeetingList() {
   // Effects
   // =========================================================================
 
+  // ⭐⭐⭐ 초기 로딩만 수행 (자동 새로고침 제거)
   useEffect(() => {
-    fetchRooms();
-
-    const interval = setInterval(() => {
-      if (!showCreateModal) {
-        fetchRooms();
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [showCreateModal]);
+    console.log('🚀 VideoMeetingList 마운트 - 초기 로딩');
+    fetchRooms(false);
+  }, []); // 빈 의존성 배열 - 마운트 시 1회만 실행
 
   // =========================================================================
   // Handlers
@@ -233,8 +245,10 @@ function VideoMeetingList() {
     createRoom();
   };
 
+  // ⭐ 수동 새로고침 핸들러
   const handleRefresh = () => {
-    fetchRooms();
+    console.log('🔄 수동 새로고침 요청');
+    fetchRooms(true);
   };
 
   // =========================================================================
@@ -267,13 +281,15 @@ function VideoMeetingList() {
             </div>
 
             <div className="flex gap-3">
+              {/* ⭐ 새로고침 버튼 개선 */}
               <button
                 onClick={handleRefresh}
-                disabled={loading}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition flex items-center disabled:opacity-50"
+                disabled={refreshing}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                title="회의실 목록 새로고침"
               >
-                <RefreshCw className={`w-5 h-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                새로고침
+                <RefreshCw className={`w-5 h-5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? '새로고침 중...' : '새로고침'}
               </button>
 
               <button
@@ -345,7 +361,7 @@ function VideoMeetingList() {
 }
 
 /**
- * ⭐ 회의실 카드 컴포넌트 (종료 기능 추가)
+ * 회의실 카드 컴포넌트
  */
 function RoomCard({ room, currentUser, onJoin, onEnd }) {
   const [showMenu, setShowMenu] = useState(false);
@@ -411,7 +427,7 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
           <div className="flex items-center gap-2">
             {getStatusBadge()}
             
-            {/* ⭐ 방장 전용: 더보기 메뉴 */}
+            {/* 방장 전용: 더보기 메뉴 */}
             {room.is_host && (
               <div className="relative">
                 <button
@@ -423,13 +439,11 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
 
                 {showMenu && (
                   <>
-                    {/* 오버레이 */}
                     <div 
                       className="fixed inset-0 z-10"
                       onClick={() => setShowMenu(false)}
                     />
                     
-                    {/* 메뉴 */}
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                       <button
                         onClick={() => {
