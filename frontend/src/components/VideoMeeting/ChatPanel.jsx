@@ -1,6 +1,6 @@
-// frontend/src/components/VideoMeeting/ChatPanel.jsx (모바일 최적화 버전)
-import React, { useState, useEffect } from 'react';
-import { X, Send, MessageCircle, Loader } from 'lucide-react';
+// frontend/src/components/VideoMeeting/ChatPanel.jsx (완전 수정 버전)
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Send, MessageCircle, Loader, GripVertical } from 'lucide-react';
 
 export function ChatPanel({ 
   isOpen, 
@@ -14,6 +14,12 @@ export function ChatPanel({
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // ⭐ 데스크톱 드래그 상태
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const panelRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -47,6 +53,49 @@ export function ChatPanel({
       handleSubmit(e);
     }
   };
+
+  // ⭐ 드래그 핸들러 (데스크톱 전용)
+  const handleDragStart = (e) => {
+    if (isMobile) return;
+    
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  const handleDragMove = (e) => {
+    if (!isDragging || isMobile) return;
+    
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    
+    // 화면 밖으로 나가지 않도록 제한
+    const maxX = window.innerWidth - (panelRef.current?.offsetWidth || 320);
+    const maxY = window.innerHeight - (panelRef.current?.offsetHeight || 400);
+    
+    setPosition({
+      x: Math.max(-maxX, Math.min(0, newX)),
+      y: Math.max(0, Math.min(maxY, newY))
+    });
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+      };
+    }
+  }, [isDragging, dragStart]);
 
   if (!isOpen) return null;
 
@@ -137,13 +186,31 @@ export function ChatPanel({
     );
   }
 
-  // 데스크톱: 우측 사이드바
+  // ⭐⭐⭐ 데스크톱: 드래그 가능한 우측 사이드바
   return (
-    <div className="fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 flex flex-col z-40">
+    <div
+      ref={panelRef}
+      className="fixed h-full w-80 bg-gray-800 border-l border-gray-700 flex flex-col z-40 shadow-2xl"
+      style={{
+        right: position.x,
+        top: `${64 + position.y}px`, // ⭐ 네비게이션 바 높이만큼 내림 (64px)
+        height: 'calc(100vh - 64px)', // ⭐ 네비게이션 바 높이 제외
+        cursor: isDragging ? 'grabbing' : 'default'
+      }}
+    >
       
-      {/* 헤더 */}
+      {/* ⭐ 드래그 핸들이 있는 헤더 */}
       <div className="bg-gray-900 p-4 flex justify-between items-center border-b border-gray-700">
-        <div className="flex items-center">
+        <div className="flex items-center flex-1">
+          {/* ⭐ 드래그 핸들 */}
+          <button
+            onMouseDown={handleDragStart}
+            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-300 mr-2"
+            title="드래그하여 이동"
+          >
+            <GripVertical className="w-5 h-5" />
+          </button>
+          
           <MessageCircle className="w-5 h-5 text-blue-400 mr-2" />
           <h3 className="text-white font-semibold">채팅</h3>
         </div>

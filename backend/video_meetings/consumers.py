@@ -231,11 +231,11 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             
             logger.info(f"✋ {self.username} 손들기 완료")
             
-            # 모든 참가자에게 알림
+            # ⭐⭐⭐ 수정: type을 'hand_raise'로 변경 (hand_raise_event → hand_raise)
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'hand_raise_event',
+                    'type': 'hand_raise',  # ⭐ 수정됨
                     'action': 'raise',
                     'username': self.username,
                     'user_id': self.user_id,
@@ -254,11 +254,11 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             
             logger.info(f"👋 {self.username} 손내리기 완료")
             
-            # 모든 참가자에게 알림
+            # ⭐⭐⭐ 수정: type을 'hand_raise'로 변경
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'hand_raise_event',
+                    'type': 'hand_raise',  # ⭐ 수정됨
                     'action': 'lower',
                     'username': self.username,
                     'user_id': self.user_id,
@@ -268,7 +268,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             
         except Exception as e:
             logger.error(f"❌ 손내리기 실패: {e}", exc_info=True)
-
+  
     async def handle_ping(self):
         """핑 응답"""
         await self.send(text_data=json.dumps({
