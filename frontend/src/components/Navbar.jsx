@@ -50,9 +50,12 @@ function Navbar() {
               블로그
             </Link>
 
-            {/* <Link to="/video-meetings" className="hover:text-blue-600 font-medium">
-              화상회의
-            </Link> */}
+            {/* 화상회의 메뉴 - 로그인 시에만 표시 */}
+            {isAuthenticated && (
+              <Link to="/video-meetings" className="hover:text-blue-600 font-medium">
+                화상회의
+              </Link>
+            )}
             
             {/* User Menu */}
             {isAuthenticated ? (
