@@ -15,6 +15,42 @@ import { ChatPanel, ChatToggleButton } from './VideoMeeting/ChatPanel';
 import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel';
 import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 
+
+// ⭐⭐⭐ 유틸리티 함수들 (컴포넌트 외부에 선언)
+const isIOS = () => {
+  if (navigator.userAgentData) {
+    return navigator.userAgentData.platform === 'iOS';
+  }
+  
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  
+  if (/iPad|iPhone|iPod/.test(userAgent)) {
+    return true;
+  }
+  
+  if (
+    userAgent.includes('Mac') && 
+    'ontouchend' in document &&
+    navigator.maxTouchPoints > 0
+  ) {
+    return true;
+  }
+  
+  return false;
+};
+
+const isSafari = () => {
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  
+  return (
+    /Safari/.test(userAgent) &&
+    !/Chrome/.test(userAgent) &&
+    !/CriOS/.test(userAgent) &&
+    !/FxiOS/.test(userAgent) &&
+    !/EdgiOS/.test(userAgent)
+  );
+};
+
 function VideoMeetingRoom() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
@@ -660,22 +696,77 @@ function VideoMeetingRoom() {
 
     try {
       initializationRef.current = true;
+      
+      // ⭐ iOS 사용자 안내
+      if (isIOS()) {
+        console.log('📱 iOS 감지');
+        
+        if (!isSafari()) {
+          const confirmContinue = window.confirm(
+            '⚠️ iOS에서는 Safari 사용을 권장합니다.\n\n' +
+            '현재 브라우저는 WebRTC 지원이 제한적입니다.\n\n' +
+            '계속 진행하시겠습니까?\n' +
+            '(문제 발생 시 Safari로 접속해주세요)'
+          );
+          
+          if (!confirmContinue) {
+            throw new Error('사용자가 취소했습니다');
+          }
+        }
+      }
+      
       console.log('🎥 미디어 초기화 시작');
       
       const stream = await getLocalMedia();
       
       if (localVideoRef.current && stream) {
         localVideoRef.current.srcObject = stream;
+        
+        // ⭐ iOS는 명시적 재생
+        if (isIOS()) {
+          try {
+            await localVideoRef.current.play();
+            console.log('✅ iOS 비디오 재생 시작');
+          } catch (e) {
+            console.warn('⚠️ iOS 자동 재생 실패:', e);
+          }
+        }
+        
         console.log('✅ 로컬 비디오 설정 완료');
       }
     } catch (error) {
       console.error('❌ 미디어 초기화 실패:', error);
-      alert('카메라와 마이크 접근 권한이 필요합니다.');
+      
+      // ⭐ iOS 에러 처리
+      if (isIOS()) {
+        if (error.name === 'NotAllowedError') {
+          alert(
+            '📱 iOS 권한 설정이 필요합니다.\n\n' +
+            '1. 설정 > Safari > 카메라\n' +
+            '2. 설정 > Safari > 마이크\n\n' +
+            '위 권한을 "허용"으로 변경해주세요.'
+          );
+        } else if (error.name === 'NotReadableError') {
+          alert(
+            '📱 카메라/마이크가 사용 중입니다.\n\n' +
+            '1. 다른 앱(FaceTime, Zoom 등) 종료\n' +
+            '2. Safari 탭 모두 닫기\n' +
+            '3. 페이지 새로고침 (F5)'
+          );
+        } else if (error.message !== '사용자가 취소했습니다') {
+          alert('미디어 초기화에 실패했습니다.\n\n페이지를 새로고침해주세요.');
+        }
+      } else {
+        alert('카메라와 마이크 접근 권한이 필요합니다.');
+      }
+      
+      if (error.message !== '사용자가 취소했습니다') {
+        throw error;
+      }
     } finally {
       initializationRef.current = false;
     }
   }, [getLocalMedia]);
-
   // =========================================================================
   // Effects
   // =========================================================================

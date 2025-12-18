@@ -41,7 +41,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         elif self.action == 'create':
             return VideoRoomCreateSerializer
         return VideoRoomDetailSerializer
-       
+    
     def get_queryset(self):
         """활성 회의실만 조회"""
         return VideoRoom.objects.filter(
@@ -302,7 +302,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def approve_participant(self, request, pk=None):
-        """⭐⭐⭐ 참가 승인 (개선 버전)"""
+        """⭐⭐⭐ 참가 승인 (개선 버전 - 에러 처리 강화)"""
         room = self.get_object()
         
         if room.host != request.user:
@@ -318,11 +318,23 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        participant = get_object_or_404(
-            RoomParticipant,
-            id=participant_id,
-            room=room
-        )
+        try:
+            participant = RoomParticipant.objects.get(
+                id=participant_id,
+                room=room
+            )
+        except RoomParticipant.DoesNotExist:
+            logger.error(f"❌ 참가자 없음: {participant_id}")
+            return Response(
+                {'detail': '참가자를 찾을 수 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # ⭐ 이미 승인된 경우 바로 반환
+        if participant.status == 'approved':
+            logger.info(f"✅ 이미 승인됨: {participant.user.username}")
+            serializer = ParticipantSerializer(participant)
+            return Response(serializer.data)
         
         # 최대 참가자 수 확인
         approved_count = room.participants.filter(status='approved').count()
@@ -332,26 +344,34 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # ⭐ 1단계: DB 승인 처리
-        participant.status = 'approved'
-        participant.joined_at = timezone.now()
-        participant.save()
+        try:
+            # ⭐ 1단계: DB 승인 처리
+            participant.status = 'approved'
+            participant.joined_at = timezone.now()
+            participant.save()
+            
+            logger.info(f"\n{'='*60}")
+            logger.info(f"✅ 참가 승인 완료")
+            logger.info(f"   User: {participant.user.username}")
+            logger.info(f"   User ID: {participant.user.id}")
+            logger.info(f"   Room: {room.title}")
+            logger.info(f"{'='*60}\n")
+            
+        except Exception as e:
+            # ⭐ DB 에러 처리
+            logger.error(f"❌ DB 승인 실패: {e}", exc_info=True)
+            return Response(
+                {'detail': f'승인 처리 실패: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         
-        logger.info(f"\n{'='*60}")
-        logger.info(f"✅ 참가 승인 완료")
-        logger.info(f"   User: {participant.user.username}")
-        logger.info(f"   User ID: {participant.user.id}")
-        logger.info(f"   Room: {room.title}")
-        logger.info(f"{'='*60}\n")
-        
-        # ⭐ 2단계: WebSocket 알림 (여러 번 전송으로 안정성 확보)
+        # ⭐ 2단계: WebSocket 알림
         channel_layer = get_channel_layer()
         room_group_name = f'video_room_{room.id}'
         
-        # 알림 데이터 준비
         notification_data = {
             'type': 'approval_notification',
-            'participant_user_id': participant.user.id,  # ⭐ 정수형 유지
+            'participant_user_id': participant.user.id,
             'participant_username': participant.user.username,
             'message': '참가가 승인되었습니다.',
             'room_id': str(room.id),
@@ -368,10 +388,10 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 notification_data
             )
             
-            # ⭐ 약간의 지연 후 재전송 (네트워크 지연 대비)
-            time.sleep(0.5)
+            # ⭐ iOS 대비 재전송 (더 긴 대기)
+            time.sleep(1.0) # ⭐ 1초
             
-            logger.info(f"📡 승인 알림 전송 (2차 - 안정성)")
+            logger.info(f"📡 승인 알림 전송 (2차 - iOS 대비)")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 notification_data
@@ -384,7 +404,7 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
         
-        # ⭐ 3단계: HTTP 응답에도 승인 정보 포함
+        # ⭐ 3단계: HTTP 응답
         serializer = ParticipantSerializer(participant)
         response_data = serializer.data
         response_data['approval_sent'] = True

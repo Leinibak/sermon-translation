@@ -5,8 +5,50 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }, // ⭐ 추가
+    { urls: 'stun:stun3.l.google.com:19302' }, // ⭐ 추가
   ],
-  iceCandidatePoolSize: 10
+  iceCandidatePoolSize: 10,
+    // ⭐ iOS Safari 필수 설정
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require',
+  sdpSemantics: 'unified-plan' // ⭐ iOS는 Unified Plan만 지원
+};
+
+// ⭐⭐⭐ 유틸리티 함수들 (파일 상단에 선언)
+const isIOS = () => {
+  if (navigator.userAgentData) {
+    return navigator.userAgentData.platform === 'iOS';
+  }
+  
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  
+  if (/iPad|iPhone|iPod/.test(userAgent)) {
+    return true;
+  }
+  
+  if (
+    userAgent.includes('Mac') && 
+    'ontouchend' in document &&
+    navigator.maxTouchPoints > 0
+  ) {
+    return true;
+  }
+  
+  return false;
+};
+
+const isMobileDevice = () => {
+  if (navigator.userAgentData && navigator.userAgentData.mobile !== undefined) {
+    return navigator.userAgentData.mobile;
+  }
+  
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) ||
+    ('ontouchstart' in window && navigator.maxTouchPoints > 0)
+  );
 };
 
 export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
@@ -30,65 +72,80 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   // Local Media
   // =========================================================================
   const getLocalMedia = useCallback(async () => {
-    if (localStreamRef.current) {
-      const tracks = localStreamRef.current.getTracks();
-      const isActive = tracks.every(track => track.readyState === 'live');
-      
-      if (isActive) {
-        console.log('✅ 기존 스트림 재사용');
-        return localStreamRef.current;
-      }
-      
-      console.log('⚠️ 기존 스트림 비활성 - 정리');
-      tracks.forEach(track => track.stop());
-      localStreamRef.current = null;
+  if (localStreamRef.current) {
+    const tracks = localStreamRef.current.getTracks();
+    const isActive = tracks.every(track => track.readyState === 'live');
+    
+    if (isActive) {
+      console.log('✅ 기존 스트림 재사용');
+      return localStreamRef.current;
     }
+    
+    console.log('⚠️ 기존 스트림 비활성 - 정리');
+    tracks.forEach(track => track.stop());
+    localStreamRef.current = null;
+  }
 
-    try {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      const constraints = {
-        video: isMobile ? {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user',
-          frameRate: { ideal: 24, max: 30 }
-        } : {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: isMobile ? 16000 : 48000
-        }
-      };
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      localStreamRef.current = stream;
-      
-      console.log('✅ 미디어 준비 완료');
-      return stream;
-    } catch (err) {
-      console.error('❌ 미디어 접근 실패:', err);
-      
-      if (err.name === 'NotAllowedError') {
-        alert('카메라와 마이크 권한을 허용해주세요.');
-      } else if (err.name === 'NotFoundError') {
-        alert('카메라 또는 마이크를 찾을 수 없습니다.');
+  try {
+    const isMobile = isMobileDevice(); // ⭐ 수정됨
+    const isiOS = isIOS(); // ⭐ 수정됨
+    
+    const constraints = {
+      video: isMobile ? {
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        facingMode: 'user',
+        frameRate: { ideal: isiOS ? 15 : 24, max: 30 }
+      } : {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'user'
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: isiOS ? 16000 : (isMobile ? 16000 : 48000)
       }
-      
-      throw err;
+    };
+    
+    console.log('🎥 미디어 제약:', {
+      iOS: isiOS,
+      Mobile: isMobile
+    });
+    
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    localStreamRef.current = stream;
+    
+    console.log('✅ 미디어 준비 완료');
+    return stream;
+  } catch (err) {
+    console.error('❌ 미디어 접근 실패:', err);
+    
+    if (err.name === 'NotAllowedError') {
+      const isiOS = isIOS();
+      alert(
+        isiOS 
+          ? '카메라와 마이크 권한을 허용해주세요.\n\niOS: 설정 > Safari > 카메라/마이크'
+          : '카메라와 마이크 권한을 허용해주세요.'
+      );
+    } else if (err.name === 'NotFoundError') {
+      alert('카메라 또는 마이크를 찾을 수 없습니다.');
+    } else if (err.name === 'NotReadableError') {
+      alert(
+        '카메라/마이크가 다른 앱에서 사용 중일 수 있습니다.\n\n' +
+        '백그라운드 앱을 종료하고 다시 시도해주세요.'
+      );
     }
-  }, []);
+    
+    throw err;
+  }
+}, []);
 
   // =========================================================================
   // Peer Connection 생성
   // =========================================================================
-  const createPeerConnection = useCallback(async (peerId, isInitiator) => {
-    // ⭐ Race condition 방지
+    const createPeerConnection = useCallback(async (peerId, isInitiator) => {
     if (isCreatingConnection.current[peerId]) {
       console.log(`⏳ 연결 생성 대기: ${peerId}`);
       
@@ -105,7 +162,9 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     isCreatingConnection.current[peerId] = true;
     
     try {
-      console.log(`🔧 Peer Connection 생성: ${peerId} (Initiator: ${isInitiator})`);
+      const isiOS = isIOS(); // ⭐ 수정됨
+      
+      console.log(`🔧 Peer Connection 생성: ${peerId} (iOS: ${isiOS}, Initiator: ${isInitiator})`);
       
       // 기존 연결 확인
       const existing = peerConnections.current[peerId];
@@ -130,27 +189,81 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // Local Tracks 추가
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current);
-      });
+      // ⭐⭐⭐ iOS는 track 추가 순서가 중요
+      if (isiOS) {
+        const videoTracks = localStreamRef.current.getVideoTracks();
+        const audioTracks = localStreamRef.current.getAudioTracks();
+        
+        videoTracks.forEach(track => {
+          pc.addTrack(track, localStreamRef.current);
+          console.log('📹 Video track added (iOS)');
+        });
+        
+        audioTracks.forEach(track => {
+          pc.addTrack(track, localStreamRef.current);
+          console.log('🎤 Audio track added (iOS)');
+        });
+      } else {
+        localStreamRef.current.getTracks().forEach(track => {
+          pc.addTrack(track, localStreamRef.current);
+        });
+      }
 
-      // ⭐⭐⭐ ICE Candidate 핸들러
-      pc.onicecandidate = (event) => {
-        if (event.candidate && sendSignalRef.current) {
-          sendSignalRef.current(peerId, 'ice_candidate', {
-            candidate: event.candidate
-          });
+      // ⭐ iOS용 negotiationneeded 이벤트
+      pc.onnegotiationneeded = async () => {
+        if (isInitiator && pc.signalingState === 'stable') {
+          console.log('🔄 Negotiation needed (iOS)');
+          
+          try {
+            const offer = await pc.createOffer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true,
+              iceRestart: false
+            });
+            
+            await pc.setLocalDescription(offer);
+            
+            if (sendSignalRef.current) {
+              sendSignalRef.current(peerId, 'offer', {
+                sdp: pc.localDescription
+              });
+            }
+          } catch (e) {
+            console.error('❌ Re-negotiation 실패:', e);
+          }
         }
       };
 
-      // ⭐⭐⭐ Track 수신 핸들러
+      pc.onicecandidate = (event) => {
+        if (event.candidate && sendSignalRef.current) {
+          if (isiOS) {
+            console.log('🧊 ICE (iOS):', event.candidate.type);
+          }
+          
+          sendSignalRef.current(peerId, 'ice_candidate', {
+            candidate: event.candidate
+          });
+        } else if (!event.candidate && isiOS) {
+          console.log('✅ ICE gathering complete (iOS)');
+        }
+      };
+
       pc.ontrack = (event) => {
-        console.log(`🎥 Remote Track 수신: ${peerId} (${event.track.kind})`);
+        console.log(`🎥 Remote Track: ${peerId} (${event.track.kind}, iOS:${isiOS})`);
         
-        if (event.streams.length === 0) return;
+        if (event.streams.length === 0) {
+          console.warn('⚠️ No streams in track event');
+          return;
+        }
         
         const remoteStream = event.streams[0];
+        
+        if (isiOS) {
+          console.log('📊 Stream tracks (iOS):', {
+            video: remoteStream.getVideoTracks().length,
+            audio: remoteStream.getAudioTracks().length
+          });
+        }
         
         setRemoteStreams(prev => {
           const existingIndex = prev.findIndex(p => p.peerId === peerId);
@@ -173,22 +286,49 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         });
       };
 
-      // 연결 상태 핸들러
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
-        console.log(`🔌 ICE State (${peerId}): ${state}`);
+        console.log(`🔌 ICE State (${peerId}, iOS:${isiOS}): ${state}`);
         
         setConnectionStatus(prev => ({...prev, [peerId]: state}));
         
-        if (state === 'failed' && pc.restartIce) {
+        if (state === 'failed') {
           console.log('🔄 ICE 재시작');
-          pc.restartIce();
+          
+          if (pc.restartIce) {
+            pc.restartIce();
+          } else if (isiOS && isInitiator) {
+            // iOS Safari는 restartIce 미지원
+            setTimeout(async () => {
+              if (pc.signalingState === 'stable') {
+                try {
+                  const offer = await pc.createOffer({ iceRestart: true });
+                  await pc.setLocalDescription(offer);
+                  
+                  if (sendSignalRef.current) {
+                    sendSignalRef.current(peerId, 'offer', { sdp: pc.localDescription });
+                  }
+                } catch (e) {
+                  console.error('❌ ICE restart 실패:', e);
+                }
+              }
+            }, 1000);
+          }
+        }
+        
+        if (state === 'disconnected' && isiOS) {
+          console.warn('⚠️ Disconnected (iOS) - 재연결 시도');
+          setTimeout(() => {
+            if (pc.iceConnectionState === 'disconnected') {
+              pc.restartIce?.();
+            }
+          }, 2000);
         }
       };
 
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
-        console.log(`🔗 Connection State (${peerId}): ${state}`);
+        console.log(`🔗 Connection State (${peerId}, iOS:${isiOS}): ${state}`);
         
         if (state === 'failed' || state === 'closed') {
           setRemoteStreams(prev => prev.filter(s => s.peerId !== peerId));
@@ -198,8 +338,10 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
       peerConnections.current[peerId] = pc;
 
-      // ⭐⭐⭐ Initiator: Offer 생성
+      // ⭐ iOS는 더 긴 대기 시간
       if (isInitiator) {
+        const delay = isiOS ? 2000 : 1000;
+        
         setTimeout(async () => {
           if (pc.signalingState !== 'stable') {
             console.warn(`⚠️ Signaling state: ${pc.signalingState}`);
@@ -214,7 +356,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           try {
             const offer = await pc.createOffer({
               offerToReceiveAudio: true,
-              offerToReceiveVideo: true
+              offerToReceiveVideo: true,
+              voiceActivityDetection: false
             });
             
             await pc.setLocalDescription(offer);
@@ -223,12 +366,12 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
               sendSignalRef.current(peerId, 'offer', {
                 sdp: pc.localDescription
               });
-              console.log(`✅ Offer 전송: ${peerId}`);
+              console.log(`✅ Offer 전송: ${peerId} (iOS:${isiOS})`);
             }
           } catch (e) {
             console.error('❌ Offer 생성 실패:', e);
           }
-        }, 1000); // 1초 대기
+        }, delay);
       }
       
       return pc;
@@ -238,7 +381,9 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     } finally {
       isCreatingConnection.current[peerId] = false;
     }
-  }, []); // ⭐ 의존성 최소화
+  }, []);
+  
+  // ⭐ 의존성 최소화
 
   // =========================================================================
   // WebSocket Signal Handler

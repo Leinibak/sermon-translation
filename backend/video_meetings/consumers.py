@@ -365,16 +365,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         }))
     
     async def hand_raise(self, event):
-        """손들기 알림 - 모든 참가자에게 전송"""
+        """✋ 손들기/내리기 알림 - 모든 참가자에게 전송"""
         await self.send(text_data=json.dumps({
             'type': 'hand_raise',
             'action': event['action'],
             'username': event['username'],
             'user_id': event['user_id'],
             'timestamp': event.get('timestamp'),
-            'is_me': event['username'] == self.username  # ⭐ 추가
+            'is_me': event['username'] == self.username  # ⭐ 본인 여부 확인
         }))
-        
     # ⭐ 그룹 메시지 핸들러
     async def join_ready_notification(self, event):
         """join_ready 알림 - 방장에게만"""
