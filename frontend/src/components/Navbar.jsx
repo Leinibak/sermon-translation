@@ -116,7 +116,12 @@ function Navbar() {
           <Link to="/blog" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
             블로그
           </Link>
-
+          {/* 화상회의 메뉴 - 로그인 시에만 표시 */}
+          {isAuthenticated && (
+            <Link to="/video-meetings" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
+              화상회의
+            </Link>
+          )}
           <div className="mt-4 pt-3 border-t border-gray-200">
             {isAuthenticated ? (
               <div className="flex items-center justify-between">
