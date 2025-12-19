@@ -392,7 +392,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             logger.debug(f"⚠️ 방장 아님: {self.username} vs {to_user_id}")
 
     async def approval_notification(self, event):
-        """⭐⭐⭐ 참가 승인 알림 (개선 버전)"""
+        """⭐⭐⭐ 참가 승인 알림 (강화 버전)"""
         participant_user_id = event.get('participant_user_id')
         room_id = event.get('room_id')
         
@@ -401,6 +401,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         logger.info(f"   Room: {room_id} (current: {self.room_id})")
         logger.info(f"   Participant ID: {participant_user_id} (type: {type(participant_user_id)})")
         logger.info(f"   Current User ID: {self.user.id} (type: {type(self.user.id)})")
+        logger.info(f"   Username: {self.username}")
         logger.info(f"{'='*60}\n")
         
         # ⭐ 방 ID 검증
@@ -416,7 +417,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             if participant_id_int == current_user_id_int:
                 logger.info(f"🎉 승인 대상자 확인 - 알림 전송")
                 
-                # ⭐ 알림 전송 (여러 번 전송으로 안정성 확보)
+                # ⭐ 알림 전송 (3회 전송으로 신뢰성 확보)
                 notification = {
                     'type': 'approval_notification',
                     'approved': True,
@@ -426,25 +427,32 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                     'timestamp': event.get('timestamp') or datetime.now().isoformat(),
                     'participant_username': event.get('participant_username'),
                     'participant_user_id': participant_user_id,
-                    'should_initialize': True
+                    'should_initialize': True,
+                    # ⭐ 추가: 재시도 번호
+                    'retry_count': 0
                 }
                 
-                # 첫 번째 전송
+                # ⭐ 1차 전송
                 await self.send(text_data=json.dumps(notification))
-                logger.info(f"✅ 승인 알림 전송 완료 (1차)")
+                logger.info(f"✅ 승인 알림 전송 (1/3)")
                 
-                # 약간의 지연 후 재전송
-                await asyncio.sleep(0.3)
+                # ⭐ 2차 전송 (0.5초 후)
+                await asyncio.sleep(0.5)
+                notification['retry_count'] = 1
                 await self.send(text_data=json.dumps(notification))
-                logger.info(f"✅ 승인 알림 전송 완료 (2차)")
+                logger.info(f"✅ 승인 알림 전송 (2/3)")
+                
+                # ⭐ 3차 전송 (1초 후)
+                await asyncio.sleep(0.5)
+                notification['retry_count'] = 2
+                await self.send(text_data=json.dumps(notification))
+                logger.info(f"✅ 승인 알림 전송 (3/3)")
                 
             else:
                 logger.debug(f"⚠️ 승인 대상 아님 ({participant_id_int} vs {current_user_id_int})")
                 
         except (ValueError, TypeError) as e:
             logger.error(f"❌ ID 비교 오류: {e}")
-            logger.error(f"   participant_user_id: {participant_user_id} ({type(participant_user_id)})")
-            logger.error(f"   self.user.id: {self.user.id} ({type(self.user.id)})")
             
     async def new_participant_approved(self, event):
         """⭐ 새 참가자 승인 알림 (방장용)"""
