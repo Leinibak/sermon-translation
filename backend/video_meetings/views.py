@@ -28,6 +28,9 @@ from .serializers import (
     RaisedHandSerializer
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class VideoRoomViewSet(viewsets.ModelViewSet):
     """화상회의방 ViewSet"""
