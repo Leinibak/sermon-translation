@@ -355,6 +355,7 @@ function VideoMeetingRoom() {
 
                   console.log('3️⃣ join_ready 전송');
                   if (socket.readyState === WebSocket.OPEN) {
+                    setWsReady(true); // 본인 준비 완료 표시
                     socket.send(JSON.stringify({
                       type: 'join_ready',
                       from_username: user.username,
@@ -404,14 +405,18 @@ function VideoMeetingRoom() {
                 delete peerConnections.current[peerUsername];
               }
 
-              const tryCreatePC = () => {
+              // 연결 시도 함수
+              const startConnection = (attempts = 0) => {
                 if (localStreamRef.current && wsReady) {
-                  createPeerConnection(peerUsername, true);
-                } else {
-                  setTimeout(tryCreatePC, 1000);
+                  console.log(`🚀 ${peerUsername}와 WebRTC 연결 시작...`);
+                  createPeerConnection(peerUsername, true); // true: Offer 생성
+                } else if (attempts < 5) {
+                  console.log(`⏳ 미디어 대기 중... 재시도 (${attempts + 1}/5)`);
+                  setTimeout(() => startConnection(attempts + 1), 1000);
                 }
               };
-              setTimeout(tryCreatePC, 500);
+              
+              startConnection();
               break;
             }
 
