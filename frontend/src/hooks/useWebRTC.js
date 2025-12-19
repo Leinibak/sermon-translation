@@ -1,4 +1,4 @@
-// frontend/src/hooks/useWebRTC.js (전면 수정 - username 기반)
+// frontend/src/hooks/useWebRTC.js (버그 수정 버전)
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 const ICE_SERVERS = {
@@ -14,7 +14,6 @@ const ICE_SERVERS = {
   sdpSemantics: 'unified-plan'
 };
 
-// 유틸리티
 const isIOS = () => {
   if (navigator.userAgentData) {
     return navigator.userAgentData.platform === 'iOS';
@@ -135,10 +134,9 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   }, []);
 
   // =========================================================================
-  // ⭐⭐⭐ Peer Connection 생성 (username 기반)
+  // ⭐⭐⭐ Peer Connection 생성 (isInitiator 매개변수로 받음)
   // =========================================================================
   const createPeerConnection = useCallback(async (peerUsername, isInitiator) => {
-    // ⭐⭐⭐ peerUsername은 항상 username(문자열)이어야 함
     console.log(`\n${'='.repeat(60)}`);
     console.log(`🔧 Peer Connection 생성`);
     console.log(`   Peer Username: ${peerUsername}`);
@@ -166,7 +164,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       
       console.log(`📱 iOS: ${isiOS}`);
       
-      // 기존 연결 확인
       const existing = peerConnections.current[peerUsername];
       if (existing) {
         const state = existing.connectionState;
@@ -189,7 +186,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // ⭐ iOS는 track 추가 순서 중요
       if (isiOS) {
         const videoTracks = localStreamRef.current.getVideoTracks();
         const audioTracks = localStreamRef.current.getAudioTracks();
@@ -209,7 +205,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         });
       }
 
-      // ⭐ Negotiation needed (iOS)
       pc.onnegotiationneeded = async () => {
         if (isInitiator && pc.signalingState === 'stable') {
           console.log('🔄 Negotiation needed (iOS)');
@@ -224,7 +219,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             await pc.setLocalDescription(offer);
             
             if (sendSignalRef.current) {
-              // ⭐⭐⭐ username으로 전송
               sendSignalRef.current(peerUsername, 'offer', {
                 sdp: pc.localDescription
               });
@@ -241,7 +235,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             console.log('🧊 ICE (iOS):', event.candidate.type);
           }
           
-          // ⭐⭐⭐ username으로 전송
           sendSignalRef.current(peerUsername, 'ice_candidate', {
             candidate: event.candidate
           });
@@ -267,13 +260,12 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           });
         }
         
-        // ⭐⭐⭐ peerUsername을 peerId로 사용
         setRemoteStreams(prev => {
           const existingIndex = prev.findIndex(p => p.peerId === peerUsername);
           
           const streamData = { 
-            peerId: peerUsername,       // ⭐ username
-            username: peerUsername,     // ⭐ username
+            peerId: peerUsername,
+            username: peerUsername,
             stream: remoteStream,
             isMuted: !remoteStream.getAudioTracks()[0]?.enabled,
             isVideoOff: !remoteStream.getVideoTracks()[0]?.enabled
@@ -340,7 +332,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
       peerConnections.current[peerUsername] = pc;
 
-      // Offer 생성 (Initiator만)
       if (isInitiator) {
         const delay = isiOS ? 2000 : 1000;
         
@@ -365,7 +356,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             await pc.setLocalDescription(offer);
             
             if (sendSignalRef.current) {
-              // ⭐⭐⭐ username으로 전송
               sendSignalRef.current(peerUsername, 'offer', {
                 sdp: pc.localDescription
               });
@@ -384,10 +374,10 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     } finally {
       isCreatingConnection.current[peerUsername] = false;
     }
-  }, [currentUser, isInitiator]);
+  }, [currentUser]); // ⭐ isInitiator 제거 (매개변수로 받음)
   
   // =========================================================================
-  // ⭐⭐⭐ WebSocket Signal Handler (username 기반)
+  // WebSocket Signal Handler
   // =========================================================================
   const handleWebSocketSignal = useCallback(async (data) => {
     const { type, from_username: peerUsername, to_username } = data;
@@ -400,7 +390,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log(`   Current User: ${currentUser?.username}`);
     console.log(`${'='.repeat(60)}\n`);
 
-    // ⭐⭐⭐ username 비교
     if (peerUsername === currentUser?.username) {
       console.log('⚠️ 자신의 시그널 - 무시');
       return;
@@ -413,7 +402,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
 
     let pc = peerConnections.current[peerUsername];
 
-    // Offer 수신 시 연결 생성
     if (!pc && type === 'offer') {
       console.log('🔧 Offer 수신 - PC 생성');
       pc = await createPeerConnection(peerUsername, false);
@@ -427,7 +415,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     if (!pc) {
       console.warn(`⚠️ PC 없음: ${peerUsername}`);
       
-      // Pending candidates 저장
       if (type === 'ice_candidate' && data.candidate) {
         if (!pendingCandidates.current[peerUsername]) {
           pendingCandidates.current[peerUsername] = [];
@@ -453,14 +440,12 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           await pc.setLocalDescription(answer);
           
           if (sendSignalRef.current) {
-            // ⭐⭐⭐ username으로 전송
             sendSignalRef.current(peerUsername, 'answer', {
               sdp: pc.localDescription
             });
             console.log(`✅ Answer 전송: ${peerUsername}`);
           }
           
-          // Pending candidates 처리
           if (pendingCandidates.current[peerUsername]) {
             console.log(`📤 Pending ICE candidates 처리 (${pendingCandidates.current[peerUsername].length}개)`);
             for (const candidate of pendingCandidates.current[peerUsername]) {
@@ -481,7 +466,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
             console.log(`✅ Answer 적용: ${peerUsername}`);
             
-            // Pending candidates 처리
             if (pendingCandidates.current[peerUsername]) {
               console.log(`📤 Pending ICE candidates 처리 (${pendingCandidates.current[peerUsername].length}개)`);
               for (const candidate of pendingCandidates.current[peerUsername]) {

@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingList.jsx (개선 버전 - 자동 새로고침 제거)
+// frontend/src/components/VideoMeetingList.jsx (네비게이션 버그 수정)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -26,9 +26,8 @@ function VideoMeetingList() {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
-  const [refreshing, setRefreshing] = useState(false); // ⭐ 추가
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 회의실 생성 폼 상태
   const [newRoom, setNewRoom] = useState({
     title: '',
     description: '',
@@ -43,7 +42,6 @@ function VideoMeetingList() {
 
   const fetchRooms = async (isManualRefresh = false) => {
     try {
-      // ⭐ 수동 새로고침일 때만 refreshing 상태 활성화
       if (isManualRefresh) {
         setRefreshing(true);
       } else {
@@ -67,7 +65,6 @@ function VideoMeetingList() {
       
       console.log('📋 회의실 목록:', roomsData.length, '개');
       
-      // ⭐ 상태가 실제로 변경된 경우에만 업데이트
       setRooms(prevRooms => {
         const isDifferent = JSON.stringify(prevRooms) !== JSON.stringify(roomsData);
         if (isDifferent) {
@@ -116,10 +113,28 @@ function VideoMeetingList() {
 
       const response = await axios.post('/video-meetings/', requestData);
 
-      console.log('✅ 회의실 생성:', response.data);
+      console.log('✅ 회의실 생성 응답:', response.data);
       
-      // ⭐ 생성 후 즉시 해당 회의실로 이동
-      navigate(`/video-meetings/${response.data.id}`);
+      // ⭐⭐⭐ 버그 수정: response.data에서 id 추출
+      const roomId = response.data.id;
+      
+      if (!roomId || roomId === 'undefined') {
+        console.error('❌ 유효하지 않은 roomId:', roomId);
+        alert('회의실이 생성되었지만 입장할 수 없습니다. 목록에서 다시 시도해주세요.');
+        setShowCreateModal(false);
+        await fetchRooms(true);
+        return;
+      }
+      
+      console.log(`✅ 회의실 생성 완료: ${roomId}`);
+      console.log(`🚀 이동: /video-meetings/${roomId}`);
+      
+      // 모달 닫기
+      setShowCreateModal(false);
+      
+      // 회의실로 이동
+      navigate(`/video-meetings/${roomId}`);
+      
     } catch (err) {
       console.error('❌ 회의실 생성 실패:', err);
       
@@ -144,6 +159,13 @@ function VideoMeetingList() {
   };
 
   const joinRoom = async (roomId, participantStatus) => {
+    // ⭐⭐⭐ roomId 검증 추가
+    if (!roomId || roomId === 'undefined') {
+      console.error('❌ 유효하지 않은 roomId:', roomId);
+      alert('회의실 정보가 올바르지 않습니다.');
+      return;
+    }
+
     try {
       if (participantStatus === 'approved') {
         console.log('✅ 승인된 상태 - 즉시 입장');
@@ -191,7 +213,6 @@ function VideoMeetingList() {
       console.log('✅ 회의 종료 완료');
       alert('회의가 종료되었습니다.');
       
-      // ⭐ 목록 새로고침
       await fetchRooms(true);
     } catch (err) {
       console.error('❌ 회의 종료 실패:', err);
@@ -208,11 +229,10 @@ function VideoMeetingList() {
   // Effects
   // =========================================================================
 
-  // ⭐⭐⭐ 초기 로딩만 수행 (자동 새로고침 제거)
   useEffect(() => {
     console.log('🚀 VideoMeetingList 마운트 - 초기 로딩');
     fetchRooms(false);
-  }, []); // 빈 의존성 배열 - 마운트 시 1회만 실행
+  }, []);
 
   // =========================================================================
   // Handlers
@@ -245,7 +265,6 @@ function VideoMeetingList() {
     createRoom();
   };
 
-  // ⭐ 수동 새로고침 핸들러
   const handleRefresh = () => {
     console.log('🔄 수동 새로고침 요청');
     fetchRooms(true);
@@ -267,7 +286,6 @@ function VideoMeetingList() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* 헤더 */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <div>
@@ -281,7 +299,6 @@ function VideoMeetingList() {
             </div>
 
             <div className="flex gap-3">
-              {/* ⭐ 새로고침 버튼 개선 */}
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
@@ -313,7 +330,6 @@ function VideoMeetingList() {
           )}
         </div>
 
-        {/* 회의실 목록 */}
         {!Array.isArray(rooms) || rooms.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <Video className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -346,7 +362,6 @@ function VideoMeetingList() {
         )}
       </div>
 
-      {/* 회의실 생성 모달 */}
       {showCreateModal && (
         <CreateRoomModal
           newRoom={newRoom}
@@ -360,9 +375,6 @@ function VideoMeetingList() {
   );
 }
 
-/**
- * 회의실 카드 컴포넌트
- */
 function RoomCard({ room, currentUser, onJoin, onEnd }) {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -413,7 +425,6 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition border border-gray-200 overflow-hidden">
       <div className="p-6">
-        {/* 헤더 */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">
@@ -427,7 +438,6 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
           <div className="flex items-center gap-2">
             {getStatusBadge()}
             
-            {/* 방장 전용: 더보기 메뉴 */}
             {room.is_host && (
               <div className="relative">
                 <button
@@ -463,14 +473,12 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
           </div>
         </div>
 
-        {/* 설명 */}
         {room.description && (
           <p className="text-sm text-gray-600 mb-4 line-clamp-2">
             {room.description}
           </p>
         )}
 
-        {/* 정보 */}
         <div className="space-y-2 mb-4">
           <div className="flex items-center text-sm text-gray-600">
             <Users className="w-4 h-4 mr-2 text-gray-400" />
@@ -498,7 +506,6 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
           )}
         </div>
 
-        {/* 액션 버튼 */}
         <button
           onClick={() => onJoin(room.id, room.participant_status)}
           className={`w-full py-2.5 rounded-lg font-medium transition flex items-center justify-center ${
@@ -514,7 +521,6 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
         </button>
       </div>
 
-      {/* 하단 상태 바 */}
       <div className={`px-6 py-2 text-xs font-medium ${
         room.status === 'active'
           ? 'bg-green-50 text-green-700'
@@ -533,9 +539,6 @@ function RoomCard({ room, currentUser, onJoin, onEnd }) {
   );
 }
 
-/**
- * 회의실 생성 모달
- */
 function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -545,7 +548,6 @@ function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
         </h2>
 
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* 제목 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               회의실 제목 *
@@ -560,7 +562,6 @@ function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
             />
           </div>
 
-          {/* 설명 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               설명 (선택)
@@ -574,7 +575,6 @@ function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
             />
           </div>
 
-          {/* 최대 참가자 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               최대 참가자 수
@@ -589,7 +589,6 @@ function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
             />
           </div>
 
-          {/* 예약 시간 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               예약 시간 (선택)
@@ -602,7 +601,6 @@ function CreateRoomModal({ newRoom, setNewRoom, onSubmit, onClose, creating }) {
             />
           </div>
 
-          {/* 버튼 */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"
