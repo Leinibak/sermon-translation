@@ -366,21 +366,21 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             )
         
         # ⭐ 2단계: WebSocket 알림
-        channel_layer = get_channel_layer()
-        room_group_name = f'video_room_{room.id}'
-        
-        notification_data = {
-            'type': 'approval_notification',
-            'participant_user_id': participant.user.id,
-            'participant_username': participant.user.username,
-            'message': '참가가 승인되었습니다.',
-            'room_id': str(room.id),
-            'host_username': room.host.username,
-            'should_initialize': True,
-            'timestamp': datetime.now().isoformat()
-        }
-        
         try:
+            channel_layer = get_channel_layer()
+            room_group_name = f'video_room_{room.id}'
+            
+            notification_data = {
+                'type': 'approval_notification',
+                'participant_user_id': participant.user.id,
+                'participant_username': participant.user.username,
+                'message': '참가가 승인되었습니다.',
+                'room_id': str(room.id),
+                'host_username': room.host.username,
+                'should_initialize': True,
+                'timestamp': datetime.now().isoformat()
+            }
+            
             # ⭐ 첫 번째 전송
             logger.info(f"📡 승인 알림 전송 (1차)")
             async_to_sync(channel_layer.group_send)(
