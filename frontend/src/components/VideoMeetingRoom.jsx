@@ -274,7 +274,7 @@ function VideoMeetingRoom() {
               console.log("📋 참여자:", data.participants);
               break;
 
-            // ⭐⭐⭐ approval_notification 수정
+            // ⭐⭐⭐ approval_notification 수정 (iOS 자동 초기화)
             case 'approval_notification': {
               const retryCount = data.retry_count || 0;
               console.log(`\n${'='.repeat(60)}`);
@@ -285,61 +285,76 @@ function VideoMeetingRoom() {
               if (String(data.participant_user_id) !== String(user?.id)) return;
               if (retryCount > 0) return;
 
-              // ⭐⭐⭐ iOS가 아닌 경우 즉시 초기화
-              if (!isIOS()) {
-                console.log('💻 데스크톱: 즉시 초기화');
-                
-                // 중복 초기화 방지
-                if (approvalInitializedRef.current) {
-                  console.log('⚠️ 이미 초기화됨 - 생략');
-                  return;
-                }
-                approvalInitializedRef.current = true;
+              // 중복 초기화 방지
+              if (approvalInitializedRef.current) {
+                console.log('⚠️ 이미 초기화됨 - 생략');
+                return;
+              }
+              approvalInitializedRef.current = true;
 
-                setTimeout(async () => {
-                  try {
-                    console.log('1️⃣ 미디어 초기화 (이미 완료)');
-                    
-                    // 미디어가 없으면 초기화
-                    if (!localStreamRef.current) {
-                      await getLocalMedia();
-                      if (localVideoRef.current && localStreamRef.current) {
-                        localVideoRef.current.srcObject = localStreamRef.current;
+              // ⭐⭐⭐ iOS도 자동으로 초기화 (버튼 대기 제거)
+              const isiOS = isIOS();
+              console.log(`${isiOS ? '📱' : '💻'} ${isiOS ? 'iOS' : '데스크톱'}: 자동 초기화`);
+
+              setTimeout(async () => {
+                try {
+                  console.log('1️⃣ 미디어 초기화');
+                  
+                  // 미디어가 없으면 초기화
+                  if (!localStreamRef.current) {
+                    await getLocalMedia();
+                    if (localVideoRef.current && localStreamRef.current) {
+                      localVideoRef.current.srcObject = localStreamRef.current;
+                      
+                      // iOS: 명시적 재생
+                      if (isiOS) {
+                        try {
+                          await localVideoRef.current.play();
+                          console.log('✅ iOS 로컬 비디오 재생');
+                        } catch (e) {
+                          console.warn('⚠️ iOS 자동 재생 실패:', e);
+                        }
                       }
                     }
-                    
-                    await new Promise(r => setTimeout(r, 300)); // 1000ms → 300ms
-
-                    console.log('2️⃣ 방 정보 갱신');
-                    await fetchRoomDetails();
-                    await new Promise(r => setTimeout(r, 300)); // 800ms → 300ms
-
-                    console.log('3️⃣ join_ready 전송');
-                    if (socket.readyState === WebSocket.OPEN) {
-                      // ⭐⭐⭐ wsReady를 강제로 true로 설정
-                      setWsReady(true);
-                      
-                      socket.send(JSON.stringify({
-                        type: 'join_ready',
-                        from_username: user.username,
-                        to_username: data.host_username,
-                        room_id: roomId
-                      }));
-                      
-                      console.log(`✅ join_ready 전송: ${user.username} → ${data.host_username}`);
-                    } else {
-                      console.error('❌ WebSocket 연결 없음 - 재연결');
-                      setTimeout(() => connectWebSocket(), 1000);
-                    }
-                  } catch (error) {
-                    console.error('❌ 초기화 실패:', error);
-                    approvalInitializedRef.current = false;
                   }
-                }, 800); // 1500ms → 800ms
-              } else {
-                // iOS: 사용자 버튼 대기
-                console.log('📱 iOS: 사용자 버튼 대기');
-              }
+                  
+                  // iOS: 더 긴 대기 시간
+                  await new Promise(r => setTimeout(r, isiOS ? 1000 : 300));
+
+                  console.log('2️⃣ 방 정보 갱신');
+                  await fetchRoomDetails();
+                  await new Promise(r => setTimeout(r, isiOS ? 800 : 300));
+
+                  console.log('3️⃣ join_ready 전송');
+                  if (socket.readyState === WebSocket.OPEN) {
+                    setWsReady(true);
+                    
+                    socket.send(JSON.stringify({
+                      type: 'join_ready',
+                      from_username: user.username,
+                      to_username: data.host_username,
+                      room_id: roomId
+                    }));
+                    
+                    console.log(`✅ join_ready 전송: ${user.username} → ${data.host_username}`);
+                  } else {
+                    console.error('❌ WebSocket 연결 없음 - 재연결');
+                    setTimeout(() => connectWebSocket(), 1000);
+                  }
+                } catch (error) {
+                  console.error('❌ 초기화 실패:', error);
+                  approvalInitializedRef.current = false;
+                  
+                  // iOS 에러 처리
+                  if (isiOS) {
+                    if (error.name === 'NotAllowedError') {
+                      alert('📱 카메라/마이크 권한이 필요합니다.\n\n설정 > Safari > 카메라 및 마이크');
+                    } else if (error.name === 'NotReadableError') {
+                      alert('📱 카메라/마이크가 다른 앱에서 사용 중입니다.\n\n백그라운드 앱을 종료하고 다시 시도해주세요.');
+                    }
+                  }
+                }
+              }, isiOS ? 1500 : 800);
               break;
             }
 
@@ -903,63 +918,9 @@ function VideoMeetingRoom() {
     );
   }
 
-  if (
-    !room.is_host &&
-    room.participant_status === 'approved' &&
-    isIOS() &&
-    !wsReady
-  ) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-900 text-white">
-        <h2 className="text-2xl font-bold mb-4">회의 참가 준비 완료</h2>
-        <p className="text-gray-400 mb-6 text-center">
-          iOS에서는 버튼을 눌러야 회의에 참여할 수 있습니다.
-        </p>
-
-        <button
-          onClick={async () => {
-            try {
-              console.log('📱 iOS 참가 버튼 클릭');
-              
-              // 중복 초기화 방지
-              if (approvalInitializedRef.current) {
-                console.log('⚠️ 이미 초기화됨');
-                return;
-              }
-              approvalInitializedRef.current = true;
-
-              await initializeMedia();
-              await new Promise(r => setTimeout(r, 500));
-              
-              connectWebSocket();
-              
-              // join_ready 전송
-              setTimeout(() => {
-                if (wsRef.current?.readyState === WebSocket.OPEN && room.host_username) {
-                  wsRef.current.send(JSON.stringify({
-                    type: 'join_ready',
-                    from_username: user.username,
-                    to_username: room.host_username,
-                    room_id: roomId
-                  }));
-                  console.log('✅ iOS join_ready 전송');
-                }
-              }, 2000);
-              
-            } catch (e) {
-              console.error('❌ iOS 참가 실패:', e);
-              alert('참가 실패. 다시 시도해주세요.');
-              approvalInitializedRef.current = false;
-            }
-          }}
-          className="px-8 py-3 bg-blue-600 rounded-lg text-white text-lg hover:bg-blue-700"
-        >
-          회의 참가하기
-        </button>
-      </div>
-    );
-  }
-
+  // ⭐⭐⭐ iOS 버튼 화면 제거 (자동 초기화로 변경)
+  // iOS도 데스크톱처럼 자동으로 처리하므로 이 화면은 불필요
+  
   const allVideos = [
     {
       peerId: user?.username,
