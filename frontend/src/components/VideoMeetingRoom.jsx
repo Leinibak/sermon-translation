@@ -358,31 +358,47 @@ function VideoMeetingRoom() {
               break;
             }
 
-            // ⭐⭐⭐ user_joined 수정
+            // ⭐⭐⭐ user_joined 수정 (Full Mesh)
             case 'user_joined': {
               const joinedUsername = data.username;
               console.log(`👋 user_joined: ${joinedUsername}`);
               
-              if (room?.is_host && joinedUsername !== user.username) {
-                // ⭐⭐⭐ 즉시 연결 시도 (wsReady 체크 제거)
-                console.log(`🔧 PC 생성 시도: ${joinedUsername} (즉시)`);
-                
-                const tryCreatePC = async () => {
-                  if (localStreamRef.current) {
-                    console.log(`✅ 미디어 준비됨 - PC 생성`);
+              // 자기 자신은 제외
+              if (joinedUsername === user.username) {
+                console.log('⚠️ 본인 입장 - 무시');
+                return;
+              }
+              
+              // ⭐⭐⭐ 모든 참가자가 새 참가자와 연결 시도
+              console.log(`🔧 PC 생성 시도: ${joinedUsername} (Full Mesh)`);
+              
+              const tryCreatePC = async () => {
+                if (localStreamRef.current) {
+                  console.log(`✅ 미디어 준비됨 - PC 생성 (나: ${user.username} → 상대: ${joinedUsername})`);
+                  
+                  // ⭐⭐⭐ username 비교로 Initiator 결정 (알파벳 순서)
+                  const shouldInitiate = user.username < joinedUsername;
+                  
+                  console.log(`   Initiator: ${shouldInitiate ? '내가 먼저' : '상대가 먼저'}`);
+                  
+                  if (shouldInitiate) {
+                    // 내가 먼저 연결 시작
                     await createPeerConnection(joinedUsername, true);
                   } else {
-                    console.log('⏳ 미디어 대기... (1초 후 재시도)');
-                    setTimeout(tryCreatePC, 1000);
+                    // 상대방이 먼저 연결 시작할 때까지 대기 (PC는 미리 생성)
+                    await createPeerConnection(joinedUsername, false);
                   }
-                };
-                
-                setTimeout(tryCreatePC, 500); // 800ms → 500ms
-              }
+                } else {
+                  console.log('⏳ 미디어 대기... (1초 후 재시도)');
+                  setTimeout(tryCreatePC, 1000);
+                }
+              };
+              
+              setTimeout(tryCreatePC, 500);
               break;
             }
 
-            // ⭐⭐⭐ join_ready 수정
+            // ⭐⭐⭐ join_ready 수정 (방장 전용 유지)
             case 'join_ready': {
               const peerUsername = data.from_username;
               console.log(`📥 join_ready from ${peerUsername}`);
@@ -406,11 +422,18 @@ function VideoMeetingRoom() {
               // ⭐⭐⭐ 즉시 연결 시도 (wsReady 체크 제거)
               const startConnection = async (attempts = 0) => {
                 if (localStreamRef.current) {
-                  console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
+                  console.log(`🚀 WebRTC 연결 시작: ${peerUsername} (방장 → 참가자)`);
+                  
+                  // ⭐⭐⭐ 방장이 먼저 연결 시작
                   await createPeerConnection(peerUsername, true);
+                  
+                  // ⭐⭐⭐ 추가: 기존 참가자들에게 새 참가자 알림
+                  // 이렇게 하면 기존 참가자들도 새 참가자와 연결을 맺음
+                  console.log('📢 기존 참가자들에게 새 참가자 알림 (user_joined)');
+                  
                 } else if (attempts < 5) {
                   console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
-                  setTimeout(() => startConnection(attempts + 1), 800); // 1000ms → 800ms
+                  setTimeout(() => startConnection(attempts + 1), 800);
                 } else {
                   console.error('❌ 미디어 준비 타임아웃');
                 }
