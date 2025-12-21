@@ -259,11 +259,13 @@ function VideoMeetingRoom() {
         }, 500); // 1000ms → 500ms
       };
 
+      // socket.onmessage 부분만 완전 교체 (VideoMeetingRoom.jsx 내부)
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           console.log('📨 WebSocket 수신:', data.type);
 
+          // ⭐⭐⭐ WebRTC 시그널링 우선 처리
           if (['offer', 'answer', 'ice_candidate'].includes(data.type)) {
             handleWebSocketSignal(data);
             return;
@@ -274,9 +276,7 @@ function VideoMeetingRoom() {
               console.log("📋 참여자:", data.participants);
               break;
 
-            // ⭐⭐⭐ approval_notification 개선 버전
-            // VideoMeetingRoom.jsx의 WebSocket onmessage 핸들러 중 해당 부분만 교체
-
+            // ⭐⭐⭐ approval_notification (기존 로직 유지)
             case 'approval_notification': {
               const retryCount = data.retry_count || 0;
               console.log(`\n${'='.repeat(60)}`);
@@ -284,28 +284,23 @@ function VideoMeetingRoom() {
               console.log(`   Room ID: ${data.room_id}`);
               console.log(`   Target User ID: ${data.participant_user_id}`);
               console.log(`   Current User ID: ${user?.id}`);
-              console.log(`   Current Username: ${user?.username}`);
               console.log(`${'='.repeat(60)}\n`);
 
-              // ⭐ Room ID 검증
               if (String(data.room_id) !== String(roomId)) {
                 console.log('⚠️ 다른 방의 알림 - 무시');
                 return;
               }
 
-              // ⭐ User ID 검증
               if (String(data.participant_user_id) !== String(user?.id)) {
                 console.log('⚠️ 다른 사용자의 알림 - 무시');
                 return;
               }
 
-              // ⭐ 재전송 무시 (첫 번째만 처리)
               if (retryCount > 0) {
                 console.log('⚠️ 재전송 알림 - 무시');
                 return;
               }
 
-              // ⭐ 중복 초기화 방지
               if (approvalInitializedRef.current) {
                 console.log('⚠️ 이미 초기화 진행 중 - 무시');
                 return;
@@ -313,7 +308,6 @@ function VideoMeetingRoom() {
 
               approvalInitializedRef.current = true;
 
-              // ⭐⭐⭐ 승인 후 초기화 프로세스
               const initializeAfterApproval = async () => {
                 try {
                   const isiOS = isIOS();
@@ -322,11 +316,9 @@ function VideoMeetingRoom() {
                   console.log(`\n${'='.repeat(60)}`);
                   console.log(`🚀 승인 후 초기화 시작`);
                   console.log(`   Platform: ${isiOS ? 'iOS' : isMobile ? 'Mobile' : 'Desktop'}`);
-                  console.log(`   Username: ${user.username}`);
-                  console.log(`   Host: ${data.host_username}`);
                   console.log(`${'='.repeat(60)}\n`);
 
-                  // ⭐ 1단계: 미디어 초기화 (없을 경우에만)
+                  // 1. 미디어 초기화
                   if (!localStreamRef.current) {
                     console.log('1️⃣ 미디어 초기화 시작');
                     
@@ -336,14 +328,12 @@ function VideoMeetingRoom() {
                       if (localVideoRef.current && localStreamRef.current) {
                         localVideoRef.current.srcObject = localStreamRef.current;
                         
-                        // iOS: 명시적 재생
                         if (isiOS) {
                           try {
                             await localVideoRef.current.play();
                             console.log('✅ iOS 로컬 비디오 재생 성공');
                           } catch (playError) {
-                            console.warn('⚠️ iOS 자동 재생 실패 (사용자 제스처 필요):', playError);
-                            // iOS에서 자동 재생 실패는 정상 - 사용자가 터치하면 재생됨
+                            console.warn('⚠️ iOS 자동 재생 실패:', playError);
                           }
                         }
                       }
@@ -351,20 +341,6 @@ function VideoMeetingRoom() {
                       console.log('✅ 미디어 초기화 완료');
                     } catch (mediaError) {
                       console.error('❌ 미디어 초기화 실패:', mediaError);
-                      
-                      // iOS 권한 에러 처리
-                      if (isiOS) {
-                        if (mediaError.name === 'NotAllowedError') {
-                          alert('📱 카메라/마이크 권한이 필요합니다.\n\n설정 > Safari > 카메라 및 마이크에서 권한을 허용해주세요.');
-                        } else if (mediaError.name === 'NotReadableError') {
-                          alert('📱 카메라/마이크가 다른 앱에서 사용 중입니다.\n\n백그라운드 앱을 종료하고 다시 시도해주세요.');
-                        } else if (mediaError.name === 'NotFoundError') {
-                          alert('📱 카메라 또는 마이크를 찾을 수 없습니다.');
-                        } else {
-                          alert('📱 미디어 접근 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
-                        }
-                      }
-                      
                       approvalInitializedRef.current = false;
                       throw mediaError;
                     }
@@ -372,30 +348,24 @@ function VideoMeetingRoom() {
                     console.log('✅ 기존 미디어 스트림 사용');
                   }
 
-                  // ⭐ iOS/모바일: 추가 대기 시간
                   const waitTime = isiOS ? 1500 : (isMobile ? 1000 : 500);
                   console.log(`⏳ ${waitTime}ms 대기 (미디어 안정화)`);
                   await new Promise(r => setTimeout(r, waitTime));
 
-                  // ⭐ 2단계: 방 정보 갱신
+                  // 2. 방 정보 갱신
                   console.log('2️⃣ 방 정보 갱신 시작');
                   await fetchRoomDetails();
                   console.log('✅ 방 정보 갱신 완료');
 
-                  // ⭐ 추가 대기
                   const roomWaitTime = isiOS ? 800 : (isMobile ? 500 : 300);
                   await new Promise(r => setTimeout(r, roomWaitTime));
 
-                  // ⭐ 3단계: WebSocket 연결 확인
+                  // 3. WebSocket 연결 확인
                   const currentWs = wsRef.current;
                   
                   if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
                     console.error('❌ WebSocket 연결 없음 - 재연결 시도');
-                    
-                    // 재연결 시도
                     connectWebSocket();
-                    
-                    // 재연결 대기
                     await new Promise(r => setTimeout(r, 2000));
                     
                     const reconnectedWs = wsRef.current;
@@ -404,11 +374,11 @@ function VideoMeetingRoom() {
                     }
                   }
 
-                  // ⭐ 4단계: WebSocket Ready 설정
+                  // 4. WebSocket Ready
                   console.log('3️⃣ WebSocket 준비 완료');
                   setWsReady(true);
 
-                  // ⭐ 5단계: join_ready 전송
+                  // 5. join_ready 전송
                   console.log(`4️⃣ join_ready 전송 준비`);
                   console.log(`   From: ${user.username} → To: ${data.host_username}`);
                   
@@ -427,7 +397,6 @@ function VideoMeetingRoom() {
                     
                     console.log('✅ join_ready 전송 완료');
                     
-                    // ⭐ iOS: 추가 확인 전송 (1초 후)
                     if (isiOS) {
                       setTimeout(() => {
                         if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -446,25 +415,14 @@ function VideoMeetingRoom() {
 
                 } catch (error) {
                   console.error('❌ 승인 후 초기화 실패:', error);
-                  
-                  // 초기화 실패 시 플래그 초기화
                   approvalInitializedRef.current = false;
                   
-                  // 사용자에게 알림
-                  const isiOS = isIOS();
-                  if (isiOS) {
-                    if (error.name === 'NotAllowedError') {
-                      // 이미 위에서 알림 표시됨
-                    } else if (error.message !== 'WebSocket 연결 상태 불안정') {
-                      alert('회의 참가 준비 중 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
-                    }
-                  } else {
-                    alert('회의 참가 준비 중 오류가 발생했습니다.\n\n다시 시도해주세요.');
+                  if (error.message !== 'WebSocket 연결 상태 불안정') {
+                    alert('회의 참가 준비 중 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
                   }
                 }
               };
 
-              // ⭐ 초기화 시작 (약간의 지연 후)
               const startDelay = isIOS() ? 800 : 500;
               console.log(`⏳ ${startDelay}ms 후 초기화 시작`);
               
@@ -473,10 +431,14 @@ function VideoMeetingRoom() {
               break;
             }
 
-            // ⭐⭐⭐ user_joined 수정 (Full Mesh)
+            // ⭐⭐⭐ user_joined (수정 버전)
             case 'user_joined': {
               const joinedUsername = data.username;
-              console.log(`👋 user_joined: ${joinedUsername}`);
+              console.log(`\n${'='.repeat(60)}`);
+              console.log(`👋 user_joined 수신`);
+              console.log(`   입장자: ${joinedUsername}`);
+              console.log(`   현재 사용자: ${user.username}`);
+              console.log(`${'='.repeat(60)}\n`);
               
               // 자기 자신은 제외
               if (joinedUsername === user.username) {
@@ -484,39 +446,52 @@ function VideoMeetingRoom() {
                 return;
               }
               
-              // ⭐⭐⭐ 모든 참가자가 새 참가자와 연결 시도
-              console.log(`🔧 PC 생성 시도: ${joinedUsername} (Full Mesh)`);
-              
-              const tryCreatePC = async () => {
-                if (localStreamRef.current) {
-                  console.log(`✅ 미디어 준비됨 - PC 생성 (나: ${user.username} → 상대: ${joinedUsername})`);
-                  
-                  // ⭐⭐⭐ username 비교로 Initiator 결정 (알파벳 순서)
-                  const shouldInitiate = user.username < joinedUsername;
-                  
-                  console.log(`   Initiator: ${shouldInitiate ? '내가 먼저' : '상대가 먼저'}`);
-                  
-                  if (shouldInitiate) {
-                    // 내가 먼저 연결 시작
-                    await createPeerConnection(joinedUsername, true);
+              // ⭐⭐⭐ 미디어 준비 확인 후 연결
+              const tryConnect = async (attempt = 0) => {
+                if (!localStreamRef.current) {
+                  if (attempt < 10) {
+                    console.log(`⏳ 미디어 대기 중... (${attempt + 1}/10)`);
+                    setTimeout(() => tryConnect(attempt + 1), 1000);
                   } else {
-                    // 상대방이 먼저 연결 시작할 때까지 대기 (PC는 미리 생성)
-                    await createPeerConnection(joinedUsername, false);
+                    console.error('❌ 미디어 준비 타임아웃');
                   }
-                } else {
-                  console.log('⏳ 미디어 대기... (1초 후 재시도)');
-                  setTimeout(tryCreatePC, 1000);
+                  return;
+                }
+
+                console.log(`✅ 미디어 준비됨 - 연결 시작`);
+                console.log(`   나: ${user.username}`);
+                console.log(`   상대: ${joinedUsername}`);
+                
+                // ⭐⭐⭐ username 알파벳 순서로 Initiator 결정
+                const myUsername = user.username.toLowerCase();
+                const peerUsername = joinedUsername.toLowerCase();
+                const shouldInitiate = myUsername < peerUsername;
+                
+                console.log(`   Initiator 결정: ${shouldInitiate ? '내가 먼저 (Offer 전송)' : '상대가 먼저 (Answer 대기)'}`);
+                console.log(`   비교: "${myUsername}" < "${peerUsername}" = ${shouldInitiate}`);
+                
+                try {
+                  // PC 생성
+                  await createPeerConnection(joinedUsername, shouldInitiate);
+                  console.log(`✅ PC 생성 완료: ${joinedUsername}`);
+                } catch (error) {
+                  console.error('❌ 연결 시작 실패:', error);
                 }
               };
               
-              setTimeout(tryCreatePC, 500);
+              // 약간의 지연 후 연결 시도
+              setTimeout(() => tryConnect(0), 500);
               break;
             }
 
-            // ⭐⭐⭐ join_ready 수정 (방장 전용 유지)
+            // ⭐⭐⭐ join_ready (방장 전용)
             case 'join_ready': {
               const peerUsername = data.from_username;
-              console.log(`📥 join_ready from ${peerUsername}`);
+              console.log(`\n${'='.repeat(60)}`);
+              console.log(`📥 join_ready 수신`);
+              console.log(`   From: ${peerUsername}`);
+              console.log(`   방장 여부: ${room?.is_host}`);
+              console.log(`${'='.repeat(60)}\n`);
               
               if (!room?.is_host) {
                 console.log('⚠️ 방장 아님 - 무시');
@@ -531,20 +506,25 @@ function VideoMeetingRoom() {
                   return;
                 }
                 console.log('🗑️ 기존 연결 제거 후 재생성');
+                try {
+                  peerConnections.current[peerUsername].close();
+                } catch (e) {}
                 delete peerConnections.current[peerUsername];
               }
 
-              // ⭐⭐⭐ 즉시 연결 시도 (wsReady 체크 제거)
+              // 연결 시작
               const startConnection = async (attempts = 0) => {
                 if (localStreamRef.current) {
                   console.log(`🚀 WebRTC 연결 시작: ${peerUsername} (방장 → 참가자)`);
+                  console.log(`   방장이 Initiator로 Offer 전송`);
                   
-                  // ⭐⭐⭐ 방장이 먼저 연결 시작
-                  await createPeerConnection(peerUsername, true);
-                  
-                  // ⭐⭐⭐ 추가: 기존 참가자들에게 새 참가자 알림
-                  // 이렇게 하면 기존 참가자들도 새 참가자와 연결을 맺음
-                  console.log('📢 기존 참가자들에게 새 참가자 알림 (user_joined)');
+                  try {
+                    // ⭐⭐⭐ 방장이 항상 Initiator
+                    await createPeerConnection(peerUsername, true);
+                    console.log(`✅ PC 생성 완료 (Initiator: true)`);
+                  } catch (error) {
+                    console.error('❌ PC 생성 실패:', error);
+                  }
                   
                 } else if (attempts < 5) {
                   console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
@@ -559,6 +539,7 @@ function VideoMeetingRoom() {
             }
 
             case 'user_left':
+              console.log(`👋 user_left: ${data.username}`);
               removeRemoteStream(data.username);
               break;
 
