@@ -275,7 +275,7 @@ function VideoMeetingRoom() {
               console.log("📋 참여자:", data.participants);
               break;
 
-            // ⭐⭐⭐ approval_notification
+            // ⭐⭐⭐ approval_notification 핸들러 (수정)
             case 'approval_notification': {
               const retryCount = data.retry_count || 0;
               console.log(`\n${'='.repeat(60)}`);
@@ -283,6 +283,7 @@ function VideoMeetingRoom() {
               console.log(`   Room ID: ${data.room_id}`);
               console.log(`   Target User ID: ${data.participant_user_id}`);
               console.log(`   Current User ID: ${user?.id}`);
+              console.log(`   Host Username: ${data.host_username}`);  // ⭐ 추가
               console.log(`${'='.repeat(60)}\n`);
 
               if (String(data.room_id) !== String(roomId)) {
@@ -377,8 +378,15 @@ function VideoMeetingRoom() {
                   console.log('3️⃣ WebSocket 준비 완료');
                   setWsReady(true);
 
-                  // 5. join_ready 전송
+                  // ⭐⭐⭐ 5. join_ready 전송 (방장 정보 사용)
                   console.log(`4️⃣ join_ready 전송 준비`);
+                  
+                  // ⭐ host_username 검증
+                  if (!data.host_username) {
+                    console.error('❌ host_username 없음:', data);
+                    throw new Error('host_username이 없습니다');
+                  }
+                  
                   console.log(`   From: ${user.username} → To: ${data.host_username}`);
                   
                   const finalWs = wsRef.current;
@@ -387,7 +395,7 @@ function VideoMeetingRoom() {
                     const joinReadyMessage = {
                       type: 'join_ready',
                       from_username: user.username,
-                      to_username: data.host_username,
+                      to_username: data.host_username,  // ⭐ Backend에서 받은 host_username 사용
                       room_id: String(roomId)
                     };
                     
@@ -396,7 +404,7 @@ function VideoMeetingRoom() {
                     
                     console.log('✅ join_ready 전송 완료');
                     
-                    // ⭐⭐⭐ 추가: 1초 후 재전송 (안정성 향상)
+                    // 재전송
                     setTimeout(() => {
                       if (wsRef.current?.readyState === WebSocket.OPEN) {
                         console.log('📤 join_ready 재전송 (확인용)');
