@@ -161,42 +161,76 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     # =========================================================================
     # 메시지 핸들러
     # =========================================================================
-    
-    async def handle_join(self, data):
-        """참가 알림 처리"""
-        logger.info(f"👋 사용자 입장: {self.username} (ID: {self.user_id})")
-        
-        # ⭐ username과 user_id 모두 전송
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'user_joined',
-                'username': self.username,     # ⭐ WebRTC peerId로 사용
-                'user_id': self.user_id,       # ⭐ DB 조회용
-                'timestamp': datetime.now().isoformat()
-            }
-        )
-    
+       
     async def handle_join_ready(self, data):
         """
         참가자가 준비 완료 시그널 전송
-        ⭐ username 기반으로 통신
+        ⭐ 방장에게만 전달
         """
-        to_username = data.get('to_username')  # ⭐ 방장 username
+        to_username = data.get('to_username')  # 방장 username
         
-        logger.info(f"📥 join_ready from {self.username} to {to_username}")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"📥 join_ready 수신")
+        logger.info(f"   From: {self.username} (참가자)")
+        logger.info(f"   To: {to_username} (방장)")
+        logger.info(f"{'='*60}\n")
         
+        # ⭐⭐⭐ 방장 확인
+        is_host = await self.check_is_host_by_username(to_username)
+        
+        if not is_host:
+            logger.warning(f"⚠️ {to_username}은 방장이 아님")
+            return
+        
+        # ⭐⭐⭐ 그룹 전송 (방장만 수신하도록 필터링)
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'join_ready_notification',
-                'from_username': self.username,    # ⭐ 참가자 username
-                'from_user_id': self.user_id,      # ⭐ 참가자 DB ID
-                'to_username': to_username,        # ⭐ 방장 username
+                'from_username': self.username,
+                'from_user_id': self.user_id,
+                'to_username': to_username,
                 'timestamp': datetime.now().isoformat()
             }
         )
+        
+        logger.info(f"✅ join_ready 전송 완료: {self.username} → {to_username}")
+
+    async def handle_join(self, data):
+            """참가 알림 처리"""
+            logger.info(f"👋 사용자 입장: {self.username} (ID: {self.user_id})")
+            
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_joined',
+                    'username': self.username,
+                    'user_id': self.user_id,
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
     
+    async def handle_chat_message(self, data):
+        """채팅 메시지 처리"""
+        content = data.get('content', '').strip()
+        
+        if not content or len(content) > 1000:
+            return
+        
+        message_id = await self.save_chat_message(content)
+        
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message_id': message_id,
+                'sender_username': self.username,
+                'sender_user_id': self.user_id,
+                'content': content,
+                'created_at': datetime.now().isoformat()
+            }
+        )
+
     async def handle_chat_message(self, data):
         """채팅 메시지 처리"""
         content = data.get('content', '').strip()
@@ -374,24 +408,36 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'timestamp': event.get('timestamp'),
             'is_me': event['username'] == self.username
         }))
-    
+
     async def join_ready_notification(self, event):
         """
         join_ready 알림 - 방장에게만
-        ⭐ username 비교
+        ⭐ username 비교로 필터링
         """
         to_username = event.get('to_username')
+        from_username = event.get('from_username')
         
-        # 방장인지 확인
+        logger.info(f"\n{'='*60}")
+        logger.info(f"📬 join_ready_notification 처리")
+        logger.info(f"   Current User: {self.username}")
+        logger.info(f"   Target (방장): {to_username}")
+        logger.info(f"   From (참가자): {from_username}")
+        logger.info(f"{'='*60}\n")
+        
+        # ⭐⭐⭐ 방장인지 확인 (username 비교)
         if self.username == to_username:
-            logger.info(f"👑 방장에게 join_ready 전달: from {event['from_username']}")
+            logger.info(f"👑 방장 확인 - join_ready 전달")
             
             await self.send(text_data=json.dumps({
                 'type': 'join_ready',
-                'from_username': event['from_username'],  # ⭐ 참가자 username
-                'from_user_id': event['from_user_id'],    # ⭐ 참가자 DB ID
+                'from_username': from_username,
+                'from_user_id': event.get('from_user_id'),
                 'timestamp': event.get('timestamp')
             }))
+            
+            logger.info(f"✅ join_ready 전송 완료: {from_username} → {self.username}")
+        else:
+            logger.debug(f"⚠️ 방장 아님 - 무시")
 
     async def approval_notification(self, event):
         """

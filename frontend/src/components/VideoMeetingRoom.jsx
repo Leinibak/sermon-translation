@@ -259,7 +259,6 @@ function VideoMeetingRoom() {
         }, 500); // 1000ms → 500ms
       };
 
-      // socket.onmessage 부분만 완전 교체 (VideoMeetingRoom.jsx 내부)
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -276,7 +275,7 @@ function VideoMeetingRoom() {
               console.log("📋 참여자:", data.participants);
               break;
 
-            // ⭐⭐⭐ approval_notification (기존 로직 유지)
+            // ⭐⭐⭐ approval_notification
             case 'approval_notification': {
               const retryCount = data.retry_count || 0;
               console.log(`\n${'='.repeat(60)}`);
@@ -397,14 +396,13 @@ function VideoMeetingRoom() {
                     
                     console.log('✅ join_ready 전송 완료');
                     
-                    if (isiOS) {
-                      setTimeout(() => {
-                        if (wsRef.current?.readyState === WebSocket.OPEN) {
-                          console.log('📤 join_ready 재전송 (iOS 확인)');
-                          wsRef.current.send(JSON.stringify(joinReadyMessage));
-                        }
-                      }, 1000);
-                    }
+                    // ⭐⭐⭐ 추가: 1초 후 재전송 (안정성 향상)
+                    setTimeout(() => {
+                      if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        console.log('📤 join_ready 재전송 (확인용)');
+                        wsRef.current.send(JSON.stringify(joinReadyMessage));
+                      }
+                    }, 1000);
                   } else {
                     throw new Error('WebSocket 연결 상태 불안정');
                   }
@@ -431,7 +429,7 @@ function VideoMeetingRoom() {
               break;
             }
 
-            // ⭐⭐⭐ user_joined (수정 버전)
+            // ⭐⭐⭐ user_joined
             case 'user_joined': {
               const joinedUsername = data.username;
               console.log(`\n${'='.repeat(60)}`);
@@ -440,13 +438,11 @@ function VideoMeetingRoom() {
               console.log(`   현재 사용자: ${user.username}`);
               console.log(`${'='.repeat(60)}\n`);
               
-              // 자기 자신은 제외
               if (joinedUsername === user.username) {
                 console.log('⚠️ 본인 입장 - 무시');
                 return;
               }
               
-              // ⭐⭐⭐ 미디어 준비 확인 후 연결
               const tryConnect = async (attempt = 0) => {
                 if (!localStreamRef.current) {
                   if (attempt < 10) {
@@ -462,7 +458,6 @@ function VideoMeetingRoom() {
                 console.log(`   나: ${user.username}`);
                 console.log(`   상대: ${joinedUsername}`);
                 
-                // ⭐⭐⭐ username 알파벳 순서로 Initiator 결정
                 const myUsername = user.username.toLowerCase();
                 const peerUsername = joinedUsername.toLowerCase();
                 const shouldInitiate = myUsername < peerUsername;
@@ -471,7 +466,6 @@ function VideoMeetingRoom() {
                 console.log(`   비교: "${myUsername}" < "${peerUsername}" = ${shouldInitiate}`);
                 
                 try {
-                  // PC 생성
                   await createPeerConnection(joinedUsername, shouldInitiate);
                   console.log(`✅ PC 생성 완료: ${joinedUsername}`);
                 } catch (error) {
@@ -479,17 +473,16 @@ function VideoMeetingRoom() {
                 }
               };
               
-              // 약간의 지연 후 연결 시도
               setTimeout(() => tryConnect(0), 500);
               break;
             }
 
-            // ⭐⭐⭐ join_ready (방장 전용)
+            // ⭐⭐⭐ join_ready (방장 전용) - 핵심 수정!
             case 'join_ready': {
               const peerUsername = data.from_username;
               console.log(`\n${'='.repeat(60)}`);
               console.log(`📥 join_ready 수신`);
-              console.log(`   From: ${peerUsername}`);
+              console.log(`   From: ${peerUsername} (참가자)`);
               console.log(`   방장 여부: ${room?.is_host}`);
               console.log(`${'='.repeat(60)}\n`);
               
