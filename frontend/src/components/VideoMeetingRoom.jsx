@@ -468,10 +468,22 @@ function VideoMeetingRoom() {
                 
                 const myUsername = user.username.toLowerCase();
                 const peerUsername = joinedUsername.toLowerCase();
-                const shouldInitiate = myUsername < peerUsername;
+
+                // 2. ⭐⭐⭐ Initiator 결정 로직 수정
+                // 기본적으로 이름순으로 하되, 이름이 같을 경우(대소문자 차이) 방장이 우선권을 가짐
+                let shouldInitiate = false;
                 
-                console.log(`   Initiator 결정: ${shouldInitiate ? '내가 먼저 (Offer 전송)' : '상대가 먼저 (Answer 대기)'}`);
-                console.log(`   비교: "${myUsername}" < "${peerUsername}" = ${shouldInitiate}`);
+                if (myUsername < peerUsername) {
+                  shouldInitiate = true;
+                } else if (myUsername === peerUsername) {
+                  // 이름이 같다면(예: david vs David), 방장이 Initiator가 됨
+                  shouldInitiate = isHost; 
+                }
+                
+                console.log(`   나: ${user.username} (${isHost ? '방장' : '참가자'})`);
+                console.log(`   상대: ${joinedUsername}`);
+                console.log(`   Initiator 결정: ${shouldInitiate ? '내가 먼저 (Offer 전송)' : '상대가 먼저 (Answer 대기)'}`);
+                console.log(`   비교: "${myUsername}" < "${peerUsername}" = ${myUsername < peerUsername}`);
                 
                 try {
                   await createPeerConnection(joinedUsername, shouldInitiate);
