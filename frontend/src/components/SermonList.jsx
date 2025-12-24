@@ -1,4 +1,4 @@
-// frontend/src/components/SermonList.jsx
+// frontend/src/components/SermonList.jsx (수정 버전)
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
@@ -14,14 +14,12 @@ function SermonCarousel({ sermons, title, navigate }) {
   const checkScroll = () => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setCanScrollLeft(scrollLeft > 5); // 약간의 여유값
+      setCanScrollLeft(scrollLeft > 5);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
     }
   };
 
-  // ✅ 초기 렌더링 후와 sermons 변경 시 체크
   useEffect(() => {
-    // DOM이 완전히 렌더링된 후 체크
     const timer = setTimeout(() => {
       checkScroll();
     }, 100);
@@ -29,7 +27,6 @@ function SermonCarousel({ sermons, title, navigate }) {
     return () => clearTimeout(timer);
   }, [sermons]);
 
-  // ✅ 윈도우 리사이즈 시에도 체크
   useEffect(() => {
     const handleResize = () => checkScroll();
     window.addEventListener('resize', handleResize);
@@ -43,11 +40,11 @@ function SermonCarousel({ sermons, title, navigate }) {
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
       });
-      // 스크롤 애니메이션 후 상태 업데이트
       setTimeout(checkScroll, 350);
     }
   };
 
+  // ✅ 설교가 없으면 렌더링 안 함
   if (!sermons || sermons.length === 0) return null;
 
   return (
@@ -97,7 +94,7 @@ function SermonCarousel({ sermons, title, navigate }) {
             className="flex-shrink-0 w-72 bg-white rounded-lg shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden border border-gray-200"
             style={{ scrollSnapAlign: 'start' }}
           >
-            {/* 카드 헤더 - 매우 연한 파스텔 톤 */}
+            {/* 카드 헤더 */}
             <div className="bg-gradient-to-r from-blue-100/30 to-gray-50 p-3 h-24 flex flex-col justify-between border-b border-gray-100">
               <div className="flex items-center justify-between text-xs">
                 <span className="bg-white border border-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs font-medium shadow-sm">
@@ -166,11 +163,6 @@ function SermonList() {
       const response = await axios.get('/sermons/');
       const sermons = response.data.results || response.data;
       
-      console.log('전체 설교:', sermons);
-      console.log('주일예배:', sermons.filter(s => s.category === 'sunday'));
-      console.log('컨퍼런스:', sermons.filter(s => s.category === 'conference'));
-      console.log('세미나:', sermons.filter(s => s.category === 'seminar'));
-      
       setAllSermons(sermons);
       
       // 가장 최근 주일예배 설교 찾기
@@ -201,7 +193,7 @@ function SermonList() {
         params: { search: searchTerm }
       });
       setAllSermons(response.data.results || response.data);
-      setLatestSundaySermon(null); // 검색 시에는 최신 설교 숨김
+      setLatestSundaySermon(null);
     } catch (err) {
       console.error(err);
       setError('검색에 실패했습니다.');
@@ -210,10 +202,13 @@ function SermonList() {
     }
   };
 
-  // 카테고리별로 설교 그룹화
+  // ✅ 카테고리별로 설교 그룹화
   const sundaySermons = allSermons.filter(s => s.category === 'sunday');
+  const youthSermons = allSermons.filter(s => s.category === 'youth');
+  const specialSermons = allSermons.filter(s => s.category === 'special');
   const conferenceSermons = allSermons.filter(s => s.category === 'conference');
   const seminarSermons = allSermons.filter(s => s.category === 'seminar');
+  const otherSermons = allSermons.filter(s => s.category === 'other');
 
   if (loading) {
     return (
@@ -225,12 +220,12 @@ function SermonList() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 섹션 - 간소화 */}
+      {/* 헤더 섹션 */}
       <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl  text-gray-200 font-bold mb-1">설교 통역/번역</h1>
+              <h1 className="text-2xl text-gray-200 font-bold mb-1">설교 통역/번역</h1>
               <p className="text-slate-300 text-sm">
                 독일 함부르크 Arche 교회의 설교를 한국어로 통역·번역하여 제공합니다
               </p>
@@ -250,7 +245,7 @@ function SermonList() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* 최신 주일예배 설교 (Featured) - 크기 축소 */}
+        {/* 최신 주일예배 설교 (Featured) */}
         {latestSundaySermon && !searchTerm && (
           <div className="mb-8">
             <h2 className="text-lg font-bold text-gray-900 mb-4">최신 주일예배 설교</h2>
@@ -322,7 +317,7 @@ function SermonList() {
           </div>
         )}
 
-        {/* 검색바 - 크기 축소 */}
+        {/* 검색바 */}
         <div className="mb-8">
           <form onSubmit={handleSearch} className="max-w-xl mx-auto">
             <div className="relative">
@@ -350,24 +345,40 @@ function SermonList() {
           </div>
         ) : (
           <>
-            {/* 주일예배 설교 캐러셀 */}
+            {/* ✅ 비어있지 않은 카테고리만 표시 */}
             <SermonCarousel 
               sermons={sundaySermons}
               title="주일예배"
               navigate={navigate}
             />
 
-            {/* 컨퍼런스 설교 캐러셀 */}
+            <SermonCarousel 
+              sermons={youthSermons}
+              title="청소년예배"
+              navigate={navigate}
+            />
+
+            <SermonCarousel 
+              sermons={specialSermons}
+              title="특별예배"
+              navigate={navigate}
+            />
+
             <SermonCarousel 
               sermons={conferenceSermons}
               title="컨퍼런스"
               navigate={navigate}
             />
 
-            {/* 세미나 설교 캐러셀 */}
             <SermonCarousel 
               sermons={seminarSermons}
               title="세미나"
+              navigate={navigate}
+            />
+
+            <SermonCarousel 
+              sermons={otherSermons}
+              title="기타"
               navigate={navigate}
             />
 
