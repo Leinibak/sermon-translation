@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Document, Page } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
 import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -13,8 +11,7 @@ import {
   Maximize2, Minimize2, AlertCircle
 } from 'lucide-react';
 
-// ⭐⭐⭐ PDF 설정 임포트
-import '../utils/pdfConfig';
+// ⭐ PDF 설정은 main.jsx에서 전역 적용됨
 
 function PastoralLetterDetail() {
   const { id } = useParams();
