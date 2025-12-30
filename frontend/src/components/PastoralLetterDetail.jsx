@@ -1,18 +1,20 @@
-// frontend/src/components/PastoralLetterDetail.jsx
+// frontend/src/components/PastoralLetterDetail.jsx (수정 버전)
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, Page } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, Calendar, User, Eye, 
   ExternalLink, Edit, Trash2, FileText,
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  Maximize2, Minimize2
+  Maximize2, Minimize2, AlertCircle
 } from 'lucide-react';
 
-// ✅ pdfConfig.js의 설정 사용 (이미 전역 설정되어 있음)
-// pdfjs.GlobalWorkerOptions.workerSrc는 이미 pdfConfig.js에서 설정됨
+// ⭐⭐⭐ PDF 설정 임포트
+import '../utils/pdfConfig';
 
 function PastoralLetterDetail() {
   const { id } = useParams();
@@ -28,7 +30,8 @@ function PastoralLetterDetail() {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ function PastoralLetterDetail() {
       setLetter(response.data);
       setError(null);
     } catch (err) {
-      console.error(err);
+      console.error('❌ 서신 로딩 실패:', err);
       if (err.response?.status === 403) {
         setError(err.response?.data?.detail || '접근 권한이 없습니다.');
       } else {
@@ -54,13 +57,16 @@ function PastoralLetterDetail() {
   };
 
   const onDocumentLoadSuccess = ({ numPages }) => {
+    console.log('✅ PDF 로딩 성공:', numPages, '페이지');
     setNumPages(numPages);
     setPdfLoading(false);
+    setPdfError(null);
   };
 
   const onDocumentLoadError = (error) => {
-    console.error('PDF 로딩 에러:', error);
+    console.error('❌ PDF 로딩 에러:', error);
     setPdfLoading(false);
+    setPdfError('PDF를 불러올 수 없습니다. 새 창에서 열기를 시도해주세요.');
   };
 
   const goToPrevPage = () => {
@@ -99,7 +105,7 @@ function PastoralLetterDetail() {
       alert('목회서신이 삭제되었습니다.');
       navigate('/pastoral-letters');
     } catch (err) {
-      console.error(err);
+      console.error('❌ 삭제 실패:', err);
       alert('삭제에 실패했습니다.');
     }
   };
@@ -164,7 +170,6 @@ function PastoralLetterDetail() {
             {letter.title}
           </h1>
 
-
           <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-lg">
               <Calendar className="w-4 h-4 mr-1.5" />
@@ -201,13 +206,8 @@ function PastoralLetterDetail() {
             </div>
           )}
 
-          {/* PDF 보기 */}
-          <div className="border-t pt-6 pb-16">
-            {/* <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-              <span className="w-1 h-5 bg-slate-600 rounded-full mr-2"></span>
-              목회서신 마라보기
-            </h3> */}
-            {/* PDF 미리보기 */}
+          {/* PDF 뷰어 */}
+          <div className="border-t pt-6">
             {letter.pdf_url && (
               <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
                 {/* 컨트롤 바 */}
@@ -264,7 +264,7 @@ function PastoralLetterDetail() {
                   </div>
                 </div>
 
-                {/* PDF 뷰어 */}
+                {/* PDF 뷰어 컨테이너 */}
                 <div 
                   className={`bg-gray-100 ${
                     isFullscreen 
@@ -272,52 +272,62 @@ function PastoralLetterDetail() {
                       : 'h-[600px] overflow-auto'
                   } flex items-start justify-center p-4`}
                 >
-                  {pdfLoading && (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
+                  {pdfError ? (
+                    <div className="text-center p-8 bg-red-50 rounded-lg border border-red-200 max-w-md">
+                      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                      <p className="text-red-700 mb-4">{pdfError}</p>
+                      <button
+                        onClick={() => handlePdfView(letter.pdf_url)}
+                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm"
+                      >
+                        새 창에서 열기
+                      </button>
                     </div>
+                  ) : (
+                    <Document
+                      file={letter.pdf_url}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={onDocumentLoadError}
+                      loading={
+                        <div className="flex flex-col items-center justify-center p-8">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600 mb-4"></div>
+                          <p className="text-gray-600 text-sm">PDF 로딩 중...</p>
+                        </div>
+                      }
+                      error={
+                        <div className="text-center p-8 bg-red-50 rounded-lg border border-red-200">
+                          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                          <p className="text-red-700 mb-4">PDF를 불러올 수 없습니다.</p>
+                          <button
+                            onClick={() => handlePdfView(letter.pdf_url)}
+                            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm"
+                          >
+                            새 창에서 열기
+                          </button>
+                        </div>
+                      }
+                      options={{
+                        cMapUrl: 'https://unpkg.com/pdfjs-dist@4.0.379/cmaps/',
+                        cMapPacked: true,
+                      }}
+                    >
+                      <Page
+                        pageNumber={pageNumber}
+                        scale={scale}
+                        renderTextLayer={false}
+                        renderAnnotationLayer={false}
+                        className="shadow-lg"
+                      />
+                    </Document>
                   )}
-                  
-                  <Document
-                    file={letter.pdf_url}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
-                      </div>
-                    }
-                    error={
-                      <div className="text-red-600 text-center p-8">
-                        <p className="mb-2">PDF를 불러올 수 없습니다.</p>
-                        <button
-                          onClick={() => handlePdfView(letter.pdf_url)}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          새 창에서 열기
-                        </button>
-                      </div>
-                    }
-                  >
-                    <Page
-                      pageNumber={pageNumber}
-                      scale={scale}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                      className="-m-12 shadow-lg"
-
-                    />
-                  </Document>
                 </div>
               </div>
             )}
-          </div>
 
-          <div>
             {/* 새 창에서 열기 버튼 */}
             <button
               onClick={() => handlePdfView(letter.pdf_url)}
-              className="group w-full flex items-center justify-center px-6 py-4 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 rounded-lg hover:from-slate-100 hover:to-slate-200 transition-all shadow-sm hover:shadow-md border border-slate-200 mb-6"
+              className="group w-full flex items-center justify-center px-6 py-4 bg-gradient-to-br from-slate-50 to-slate-100 text-slate-700 rounded-lg hover:from-slate-100 hover:to-slate-200 transition-all shadow-sm hover:shadow-md border border-slate-200 mt-4"
             >
               <ExternalLink className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
               <div className="text-left">

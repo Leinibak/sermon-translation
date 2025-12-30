@@ -59,10 +59,12 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   const isCreatingConnection = useRef({});
   
   const sendSignalRef = useRef(sendWebRTCSignal);
+  const isHostRef = useRef(isHost); // ⭐⭐⭐ 추가
   
   useEffect(() => {
     sendSignalRef.current = sendWebRTCSignal;
-  }, [sendWebRTCSignal]);
+    isHostRef.current = isHost; // ⭐⭐⭐ 추가
+  }, [sendWebRTCSignal, isHost]); // ⭐⭐⭐ isHost 의존성 추가
 
   // =========================================================================
   // Local Media
