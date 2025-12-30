@@ -18,7 +18,7 @@ import SermonDetail from './components/SermonDetail';
 import SermonUpload from './components/SermonUpload';
 import PastoralLetterList from './components/PastoralLetterList';
 import PastoralLetterDetail from './components/PastoralLetterDetail';
-import "./pdfConfig";
+// import "./pdfConfig";
 import VideoMeetingList from './components/VideoMeetingList'; 
 import VideoMeetingRoom from './components/VideoMeetingRoom';
 
