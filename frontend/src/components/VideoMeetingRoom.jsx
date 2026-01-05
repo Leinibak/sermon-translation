@@ -264,7 +264,7 @@ function VideoMeetingRoom() {
           }
         }, 500); // 1000ms → 500ms
       };
-
+  
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -281,7 +281,7 @@ function VideoMeetingRoom() {
               console.log("📋 참여자:", data.participants);
               break;
 
-            // ⭐⭐⭐ approval_notification 핸들러 (수정)
+            // ⭐⭐⭐ approval_notification 핸들러
             case 'approval_notification': {
               const retryCount = data.retry_count || 0;
               console.log(`\n${'='.repeat(60)}`);
@@ -289,7 +289,7 @@ function VideoMeetingRoom() {
               console.log(`   Room ID: ${data.room_id}`);
               console.log(`   Target User ID: ${data.participant_user_id}`);
               console.log(`   Current User ID: ${user?.id}`);
-              console.log(`   Host Username: ${data.host_username}`);  // ⭐ 추가
+              console.log(`   Host Username: ${data.host_username}`);
               console.log(`${'='.repeat(60)}\n`);
 
               if (String(data.room_id) !== String(roomId)) {
@@ -387,7 +387,6 @@ function VideoMeetingRoom() {
                   // ⭐⭐⭐ 5. join_ready 전송 (방장 정보 사용)
                   console.log(`4️⃣ join_ready 전송 준비`);
                   
-                  // ⭐ host_username 검증
                   if (!data.host_username) {
                     console.error('❌ host_username 없음:', data);
                     throw new Error('host_username이 없습니다');
@@ -401,7 +400,7 @@ function VideoMeetingRoom() {
                     const joinReadyMessage = {
                       type: 'join_ready',
                       from_username: user.username,
-                      to_username: data.host_username,  // ⭐ Backend에서 받은 host_username 사용
+                      to_username: data.host_username,
                       room_id: String(roomId)
                     };
                     
@@ -443,53 +442,43 @@ function VideoMeetingRoom() {
               break;
             }
 
-            // ⭐⭐⭐ user_joined
+            // ⭐⭐⭐ user_joined 핸들러 (수정!)
             case 'user_joined': {
               const joinedUsername = data.username;
               console.log(`\n${'='.repeat(60)}`);
               console.log(`👋 user_joined 수신`);
               console.log(`   입장자: ${joinedUsername}`);
               console.log(`   현재 사용자: ${user.username}`);
+              console.log(`   방장 여부: ${room?.is_host}`);
               console.log(`${'='.repeat(60)}\n`);
               
+              // 자신의 입장은 무시
               if (joinedUsername === user.username) {
                 console.log('⚠️ 본인 입장 - 무시');
                 return;
               }
               
+              // ⭐⭐⭐ 미디어 준비 대기 후 연결
               const tryConnect = async (attempt = 0) => {
                 if (!localStreamRef.current) {
                   if (attempt < 10) {
-                    console.log(`⏳ 미디어 대기 중... (${attempt + 1}/10)`);
+                    console.log(`⏳ 미디어 대기... (${attempt + 1}/10)`);
                     setTimeout(() => tryConnect(attempt + 1), 1000);
                   } else {
                     console.error('❌ 미디어 준비 타임아웃');
                   }
                   return;
                 }
-
+                
                 console.log(`✅ 미디어 준비됨 - 연결 시작`);
-                console.log(`   나: ${user.username}`);
+                console.log(`   나: ${user.username} (${room?.is_host ? '방장' : '참가자'})`);
                 console.log(`   상대: ${joinedUsername}`);
                 
-                const myUsername = user.username.toLowerCase();
-                const peerUsername = joinedUsername.toLowerCase();
-
-                // 2. ⭐⭐⭐ Initiator 결정 로직 수정
-                // 기본적으로 이름순으로 하되, 이름이 같을 경우(대소문자 차이) 방장이 우선권을 가짐
-                let shouldInitiate = false;
+                // ⭐⭐⭐ Initiator 결정
+                // 규칙: 방장이 항상 Initiator (Offer 전송)
+                const shouldInitiate = room?.is_host === true;  // ⭐ 수정!
                 
-                if (myUsername < peerUsername) {
-                  shouldInitiate = true;
-                } else if (myUsername === peerUsername) {
-                  // 이름이 같다면(예: david vs David), 방장이 Initiator가 됨
-                  shouldInitiate = isHost; 
-                }
-                
-                console.log(`   나: ${user.username} (${isHost ? '방장' : '참가자'})`);
-                console.log(`   상대: ${joinedUsername}`);
-                console.log(`   Initiator 결정: ${shouldInitiate ? '내가 먼저 (Offer 전송)' : '상대가 먼저 (Answer 대기)'}`);
-                console.log(`   비교: "${myUsername}" < "${peerUsername}" = ${myUsername < peerUsername}`);
+                console.log(`   Initiator: ${shouldInitiate ? '내가 먼저 (Offer)' : '상대가 먼저 (Answer 대기)'}`);
                 
                 try {
                   await createPeerConnection(joinedUsername, shouldInitiate);
@@ -503,20 +492,21 @@ function VideoMeetingRoom() {
               break;
             }
 
-            // ⭐⭐⭐ join_ready (방장 전용) - 핵심 수정!
+            // ⭐⭐⭐ join_ready 핸들러 (방장 전용!)
             case 'join_ready': {
               const peerUsername = data.from_username;
               console.log(`\n${'='.repeat(60)}`);
-              console.log(`📥 join_ready 수신`);
+              console.log(`🔥 join_ready 수신`);
               console.log(`   From: ${peerUsername} (참가자)`);
               console.log(`   방장 여부: ${room?.is_host}`);
               console.log(`${'='.repeat(60)}\n`);
               
+              // 방장이 아니면 무시
               if (!room?.is_host) {
                 console.log('⚠️ 방장 아님 - 무시');
                 return;
               }
-
+              
               // 기존 연결 체크
               if (peerConnections.current[peerUsername]) {
                 const state = peerConnections.current[peerUsername].connectionState;
@@ -530,21 +520,20 @@ function VideoMeetingRoom() {
                 } catch (e) {}
                 delete peerConnections.current[peerUsername];
               }
-
-              // 연결 시작
+              
+              // ⭐⭐⭐ 연결 시작 (방장이 항상 Initiator!)
               const startConnection = async (attempts = 0) => {
                 if (localStreamRef.current) {
-                  console.log(`🚀 WebRTC 연결 시작: ${peerUsername} (방장 → 참가자)`);
+                  console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
                   console.log(`   방장이 Initiator로 Offer 전송`);
                   
                   try {
-                    // ⭐⭐⭐ 방장이 항상 Initiator
+                    // ⭐ 방장은 항상 Initiator (true)
                     await createPeerConnection(peerUsername, true);
-                    console.log(`✅ PC 생성 완료 (Initiator: true)`);
+                    console.log(`✅ PC 생성 완료`);
                   } catch (error) {
                     console.error('❌ PC 생성 실패:', error);
                   }
-                  
                 } else if (attempts < 5) {
                   console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
                   setTimeout(() => startConnection(attempts + 1), 800);

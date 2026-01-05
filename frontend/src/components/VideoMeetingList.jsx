@@ -1,5 +1,5 @@
 // frontend/src/components/VideoMeetingList.jsx (네비게이션 버그 수정)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import { 
   Video, 
