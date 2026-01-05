@@ -1,4 +1,4 @@
-# backend/video_meetings/consumers.py (전면 수정)
+# backend/video_meetings/consumers.py (WebRTC 연결 수정 버전)
 import asyncio
 import json
 import logging
@@ -10,7 +10,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 class VideoMeetingConsumer(AsyncWebsocketConsumer):
-    """WebSocket Consumer - ID/Username 명확히 구분"""
+    """WebSocket Consumer - WebRTC 연결 개선"""
     
     async def connect(self):
         """WebSocket 연결 수립"""
@@ -19,17 +19,16 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             self.room_group_name = f'video_room_{self.room_id}'
             self.user = self.scope.get('user')
             
-            # ⭐⭐⭐ 명확한 변수명 사용
-            self.user_id = None          # DB ID (숫자)
-            self.username = None         # Username (문자열)
+            self.user_id = None
+            self.username = None
             
             if not self.user or not self.user.is_authenticated:
                 logger.warning(f"❌ 비인증 사용자 연결 시도: Room {self.room_id}")
                 await self.close(code=4001)
                 return
             
-            self.user_id = self.user.id              # DB ID
-            self.username = self.user.username       # Username
+            self.user_id = self.user.id
+            self.username = self.user.username
             
             logger.info(f"🔗 WebSocket 연결: {self.username} (ID: {self.user_id}) → Room {self.room_id}")
             
@@ -64,8 +63,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                     room_group_name,
                     {
                         'type': 'user_left',
-                        'username': username,      # ⭐ username
-                        'user_id': user_id,        # ⭐ DB ID
+                        'username': username,
+                        'user_id': user_id,
                     }
                 )
             
@@ -133,12 +132,10 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     async def handle_webrtc_signal(self, data):
         """
-        WebRTC 시그널 처리 (Offer, Answer, ICE)
-        
-        ⭐ 중요: to_username은 항상 username(문자열)이어야 함
+        WebRTC 신호 처리 (Offer, Answer, ICE)
         """
         signal_type = data.get('type')
-        to_username = data.get('to_username')  # ⭐ username
+        to_username = data.get('to_username')
         
         logger.info(f"📡 WebRTC 시그널: {signal_type}")
         logger.info(f"   From: {self.username} (ID: {self.user_id})")
@@ -150,27 +147,27 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             {
                 'type': 'webrtc_signal',
                 'signal_type': signal_type,
-                'from_username': self.username,    # ⭐ 발신자 username
-                'from_user_id': self.user_id,      # ⭐ 발신자 DB ID
-                'to_username': to_username,        # ⭐ 수신자 username
+                'from_username': self.username,
+                'from_user_id': self.user_id,
+                'to_username': to_username,
                 'data': data,
                 'timestamp': datetime.now().isoformat()
             }
         )
     
     # =========================================================================
-    # 메시지 핸들러
+    # ⭐⭐⭐ join_ready 처리 (핵심 수정)
     # =========================================================================
        
     async def handle_join_ready(self, data):
         """
         참가자가 준비 완료 시그널 전송
-        ⭐ 방장에게만 전달
+        ⭐ 모든 참가자에게 브로드캐스트 (방장 포함)
         """
         to_username = data.get('to_username')  # 방장 username
         
         logger.info(f"\n{'='*60}")
-        logger.info(f"📥 join_ready 수신")
+        logger.info(f"🔥 join_ready 수신")
         logger.info(f"   From: {self.username} (참가자)")
         logger.info(f"   To: {to_username} (방장)")
         logger.info(f"{'='*60}\n")
@@ -197,18 +194,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         logger.info(f"✅ join_ready 전송 완료: {self.username} → {to_username}")
 
     async def handle_join(self, data):
-            """참가 알림 처리"""
-            logger.info(f"👋 사용자 입장: {self.username} (ID: {self.user_id})")
-            
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'user_joined',
-                    'username': self.username,
-                    'user_id': self.user_id,
-                    'timestamp': datetime.now().isoformat()
-                }
-            )
+        """참가 알림 처리"""
+        logger.info(f"👋 사용자 입장: {self.username} (ID: {self.user_id})")
+        
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'user_joined',
+                'username': self.username,
+                'user_id': self.user_id,
+                'timestamp': datetime.now().isoformat()
+            }
+        )
     
     async def handle_chat_message(self, data):
         """채팅 메시지 처리"""
@@ -226,27 +223,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'message_id': message_id,
                 'sender_username': self.username,
                 'sender_user_id': self.user_id,
-                'content': content,
-                'created_at': datetime.now().isoformat()
-            }
-        )
-
-    async def handle_chat_message(self, data):
-        """채팅 메시지 처리"""
-        content = data.get('content', '').strip()
-        
-        if not content or len(content) > 1000:
-            return
-        
-        message_id = await self.save_chat_message(content)
-        
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message_id': message_id,
-                'sender_username': self.username,   # ⭐ username
-                'sender_user_id': self.user_id,     # ⭐ DB ID
                 'content': content,
                 'created_at': datetime.now().isoformat()
             }
@@ -332,8 +308,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         if event['username'] != self.username:
             await self.send(text_data=json.dumps({
                 'type': 'user_joined',
-                'username': event['username'],      # ⭐ WebRTC peerId
-                'user_id': event['user_id'],        # ⭐ DB ID
+                'username': event['username'],
+                'user_id': event['user_id'],
                 'timestamp': event.get('timestamp')
             }))
     
@@ -371,9 +347,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         # ⭐⭐⭐ 클라이언트에 전달
         await self.send(text_data=json.dumps({
             'type': event['signal_type'],
-            'from_username': from_username,      # ⭐ 발신자 username
-            'from_user_id': event.get('from_user_id'),  # ⭐ 발신자 DB ID
-            'to_username': to_username,          # ⭐ 수신자 username
+            'from_username': from_username,
+            'from_user_id': event.get('from_user_id'),
+            'to_username': to_username,
             **event['data']  # SDP, candidate 등
         }))
     
@@ -555,6 +531,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         try:
             room = VideoRoom.objects.get(id=self.room_id)
             return room.host == self.user
+        except:
+            return False
+    
+    @database_sync_to_async
+    def check_is_host_by_username(self, username):
+        """특정 사용자가 방장인지 확인"""
+        from .models import VideoRoom
+        from django.contrib.auth.models import User
+        try:
+            room = VideoRoom.objects.get(id=self.room_id)
+            user = User.objects.get(username=username)
+            return room.host == user
         except:
             return False
     

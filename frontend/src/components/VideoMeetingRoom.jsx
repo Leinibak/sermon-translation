@@ -729,6 +729,313 @@ function VideoMeetingRoom() {
     }
   }, [getLocalMedia]);
 
+   
+  // ⭐⭐⭐ 핵심: WebSocket 메시지 핸들러
+  const handleWebSocketMessage = useCallback((data) => {
+    const type = data.type;
+    
+    console.log('📨 WebSocket 수신:', type);
+    
+    // ⭐⭐⭐ WebRTC 시그널링 우선 처리
+    if (['offer', 'answer', 'ice_candidate'].includes(type)) {
+      handleWebSocketSignal(data);
+      return;
+    }
+    
+    switch (type) {
+      case 'participants_list':
+        console.log("📋 참여자:", data.participants);
+        break;
+      
+      // ⭐⭐⭐ approval_notification 핸들러 (핵심 수정!)
+      case 'approval_notification': {
+        const retryCount = data.retry_count || 0;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🎉 승인 알림 수신 (재시도: ${retryCount}/2)`);
+        console.log(`   Room ID: ${data.room_id}`);
+        console.log(`   Target User ID: ${data.participant_user_id}`);
+        console.log(`   Current User ID: ${user?.id}`);
+        console.log(`   Host Username: ${data.host_username}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        // 중복 처리 방지
+        if (String(data.room_id) !== String(roomId)) {
+          console.log('⚠️ 다른 방의 알림 - 무시');
+          return;
+        }
+        
+        if (String(data.participant_user_id) !== String(user?.id)) {
+          console.log('⚠️ 다른 사용자의 알림 - 무시');
+          return;
+        }
+        
+        if (retryCount > 0) {
+          console.log('⚠️ 재전송 알림 - 무시');
+          return;
+        }
+        
+        if (approvalInitializedRef.current) {
+          console.log('⚠️ 이미 초기화 진행 중 - 무시');
+          return;
+        }
+        
+        approvalInitializedRef.current = true;
+        
+        // ⭐⭐⭐ 승인 후 초기화 (핵심!)
+        const initializeAfterApproval = async () => {
+          try {
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`🚀 승인 후 초기화 시작`);
+            console.log(`${'='.repeat(60)}\n`);
+            
+            // 1. 미디어 초기화
+            if (!localStreamRef.current) {
+              console.log('1️⃣ 미디어 초기화');
+              await getLocalMedia();
+              
+              if (localVideoRef.current && localStreamRef.current) {
+                localVideoRef.current.srcObject = localStreamRef.current;
+              }
+              console.log('✅ 미디어 준비 완료');
+            }
+            
+            await new Promise(r => setTimeout(r, 800));
+            
+            // 2. 방 정보 갱신
+            console.log('2️⃣ 방 정보 갱신');
+            await fetchRoomDetails();
+            console.log('✅ 방 정보 갱신 완료');
+            
+            await new Promise(r => setTimeout(r, 500));
+            
+            // 3. WebSocket 연결 확인
+            const currentWs = wsRef.current;
+            if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+              console.error('❌ WebSocket 연결 없음');
+              throw new Error('WebSocket 연결 없음');
+            }
+            
+            // 4. WebSocket Ready
+            console.log('3️⃣ WebSocket 준비 완료');
+            setWsReady(true);
+            
+            // ⭐⭐⭐ 5. join_ready 전송 (방장에게)
+            console.log(`4️⃣ join_ready 전송 준비`);
+            
+            if (!data.host_username) {
+              console.error('❌ host_username 없음:', data);
+              throw new Error('host_username이 없습니다');
+            }
+            
+            console.log(`   From: ${user.username} → To: ${data.host_username}`);
+            
+            const joinReadyMessage = {
+              type: 'join_ready',
+              from_username: user.username,
+              to_username: data.host_username,  // ⭐ 방장 username
+              room_id: String(roomId)
+            };
+            
+            console.log('📤 join_ready 전송:', joinReadyMessage);
+            currentWs.send(JSON.stringify(joinReadyMessage));
+            console.log('✅ join_ready 전송 완료');
+            
+            // 재전송 (확인용)
+            setTimeout(() => {
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
+                console.log('📤 join_ready 재전송');
+                wsRef.current.send(JSON.stringify(joinReadyMessage));
+              }
+            }, 1000);
+            
+            console.log(`\n${'='.repeat(60)}`);
+            console.log('✅ 승인 후 초기화 완료');
+            console.log(`${'='.repeat(60)}\n`);
+            
+          } catch (error) {
+            console.error('❌ 승인 후 초기화 실패:', error);
+            approvalInitializedRef.current = false;
+            alert('회의 참가 준비 중 오류가 발생했습니다.');
+          }
+        };
+        
+        // 약간의 지연 후 초기화
+        setTimeout(initializeAfterApproval, 500);
+        break;
+      }
+      
+      // ⭐⭐⭐ user_joined 핸들러 (핵심 수정!)
+      case 'user_joined': {
+        const joinedUsername = data.username;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`👋 user_joined 수신`);
+        console.log(`   입장자: ${joinedUsername}`);
+        console.log(`   현재 사용자: ${user.username}`);
+        console.log(`   방장 여부: ${room?.is_host}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        // 자신의 입장은 무시
+        if (joinedUsername === user.username) {
+          console.log('⚠️ 본인 입장 - 무시');
+          return;
+        }
+        
+        // ⭐⭐⭐ 미디어 준비 대기 후 연결
+        const tryConnect = async (attempt = 0) => {
+          if (!localStreamRef.current) {
+            if (attempt < 10) {
+              console.log(`⏳ 미디어 대기... (${attempt + 1}/10)`);
+              setTimeout(() => tryConnect(attempt + 1), 1000);
+            } else {
+              console.error('❌ 미디어 준비 타임아웃');
+            }
+            return;
+          }
+          
+          console.log(`✅ 미디어 준비됨 - 연결 시작`);
+          console.log(`   나: ${user.username} (${room?.is_host ? '방장' : '참가자'})`);
+          console.log(`   상대: ${joinedUsername}`);
+          
+          // ⭐⭐⭐ Initiator 결정 (간단한 규칙!)
+          // 규칙: 방장이 항상 Initiator (Offer 전송)
+          const shouldInitiate = room?.is_host === true;
+          
+          console.log(`   Initiator: ${shouldInitiate ? '내가 먼저 (Offer)' : '상대가 먼저 (Answer 대기)'}`);
+          
+          try {
+            await createPeerConnection(joinedUsername, shouldInitiate);
+            console.log(`✅ PC 생성 완료: ${joinedUsername}`);
+          } catch (error) {
+            console.error('❌ 연결 시작 실패:', error);
+          }
+        };
+        
+        setTimeout(() => tryConnect(0), 500);
+        break;
+      }
+      
+      // ⭐⭐⭐ join_ready 핸들러 (방장 전용!)
+      case 'join_ready': {
+        const peerUsername = data.from_username;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🔥 join_ready 수신`);
+        console.log(`   From: ${peerUsername} (참가자)`);
+        console.log(`   방장 여부: ${room?.is_host}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        // 방장이 아니면 무시
+        if (!room?.is_host) {
+          console.log('⚠️ 방장 아님 - 무시');
+          return;
+        }
+        
+        // 기존 연결 체크
+        if (peerConnections.current[peerUsername]) {
+          const state = peerConnections.current[peerUsername].connectionState;
+          if (state === 'connected' || state === 'connecting') {
+            console.log('✅ 이미 연결 중');
+            return;
+          }
+          console.log('🗑️ 기존 연결 제거 후 재생성');
+          try {
+            peerConnections.current[peerUsername].close();
+          } catch (e) {}
+          delete peerConnections.current[peerUsername];
+        }
+        
+        // ⭐⭐⭐ 연결 시작 (방장이 항상 Initiator!)
+        const startConnection = async (attempts = 0) => {
+          if (localStreamRef.current) {
+            console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
+            console.log(`   방장이 Initiator로 Offer 전송`);
+            
+            try {
+              // ⭐ 방장은 항상 Initiator (true)
+              await createPeerConnection(peerUsername, true);
+              console.log(`✅ PC 생성 완료`);
+            } catch (error) {
+              console.error('❌ PC 생성 실패:', error);
+            }
+          } else if (attempts < 5) {
+            console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
+            setTimeout(() => startConnection(attempts + 1), 800);
+          } else {
+            console.error('❌ 미디어 준비 타임아웃');
+          }
+        };
+        
+        startConnection();
+        break;
+      }
+      
+      case 'user_left':
+        console.log(`👋 user_left: ${data.username}`);
+        removeRemoteStream(data.username);
+        break;
+      
+      case 'chat_message':
+        addChatMessage(data);
+        break;
+      
+      case 'reaction': {
+        const id = Date.now() + Math.random();
+        setReactions(prev => [...prev, { 
+          id, 
+          emoji: data.reaction, 
+          username: data.username 
+        }]);
+        setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
+        break;
+      }
+      
+      case 'hand_raise':
+        if (data.action === 'raise') {
+          setRaisedHands(prev => 
+            prev.some(h => h.username === data.username) 
+              ? prev 
+              : [...prev, { 
+                  username: data.username, 
+                  user_id: data.user_id, 
+                  raised_at: new Date().toISOString() 
+                }]
+          );
+        } else {
+          setRaisedHands(prev => prev.filter(h => h.username !== data.username));
+        }
+        break;
+      
+      case 'rejection_notification':
+        alert('참가가 거부되었습니다.');
+        navigate('/video-meetings');
+        break;
+      
+      case 'join_request_notification':
+        fetchPendingRequests();
+        break;
+      
+      case 'meeting_ended':
+        alert(data.message);
+        navigate('/video-meetings');
+        break;
+      
+      default:
+        console.log('⚠️ Unknown type:', type);
+        break;
+    }
+  }, [
+    user, 
+    roomId, 
+    room?.is_host, 
+    localStreamRef, 
+    createPeerConnection, 
+    handleWebSocketSignal, 
+    removeRemoteStream, 
+    addChatMessage, 
+    fetchRoomDetails, 
+    fetchPendingRequests, 
+    navigate
+  ]);
+
   useEffect(() => {
     if (!roomId || roomId === 'undefined') {
       console.error('❌ 유효하지 않은 roomId');

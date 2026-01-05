@@ -1,52 +1,12 @@
-// frontend/src/hooks/useWebRTC.js (영상 전송 수정 버전)
-import { useState, useRef, useCallback, useEffect } from 'react';
+// frontend/src/hooks/useWebRTC.js (트랙 추가 개선 버전)
+import { useState, useRef, useCallback } from 'react';
 
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
   ],
   iceCandidatePoolSize: 10,
-  bundlePolicy: 'max-bundle',
-  rtcpMuxPolicy: 'require',
-  sdpSemantics: 'unified-plan'
-};
-
-const isIOS = () => {
-  if (navigator.userAgentData) {
-    return navigator.userAgentData.platform === 'iOS';
-  }
-  
-  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-  
-  if (/iPad|iPhone|iPod/.test(userAgent)) {
-    return true;
-  }
-  
-  if (
-    userAgent.includes('Mac') && 
-    'ontouchend' in document &&
-    navigator.maxTouchPoints > 0
-  ) {
-    return true;
-  }
-  
-  return false;
-};
-
-const isMobileDevice = () => {
-  if (navigator.userAgentData && navigator.userAgentData.mobile !== undefined) {
-    return navigator.userAgentData.mobile;
-  }
-  
-  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-  
-  return (
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) ||
-    ('ontouchstart' in window && navigator.maxTouchPoints > 0)
-  );
 };
 
 export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
@@ -59,12 +19,13 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   const isCreatingConnection = useRef({});
   
   const sendSignalRef = useRef(sendWebRTCSignal);
-  const isHostRef = useRef(isHost); // ⭐⭐⭐ 추가
+  const isHostRef = useRef(isHost);
   
+  // ⭐ sendWebRTCSignal과 isHost를 항상 최신으로 유지
   useEffect(() => {
     sendSignalRef.current = sendWebRTCSignal;
-    isHostRef.current = isHost; // ⭐⭐⭐ 추가
-  }, [sendWebRTCSignal, isHost]); // ⭐⭐⭐ isHost 의존성 추가
+    isHostRef.current = isHost;
+  }, [sendWebRTCSignal, isHost]);
 
   // =========================================================================
   // Local Media
@@ -85,16 +46,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }
 
     try {
-      const isMobile = isMobileDevice();
-      const isiOS = isIOS();
-      
       const constraints = {
-        video: isMobile ? {
-          width: { ideal: 640, max: 1280 },
-          height: { ideal: 480, max: 720 },
-          facingMode: 'user',
-          frameRate: { ideal: isiOS ? 15 : 24, max: 30 }
-        } : {
+        video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'user'
@@ -103,11 +56,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: isiOS ? 16000 : (isMobile ? 16000 : 48000)
         }
       };
-      
-      console.log('🎥 미디어 제약:', { iOS: isiOS, Mobile: isMobile });
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       localStreamRef.current = stream;
@@ -118,32 +68,17 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           id: t.id,
           enabled: t.enabled,
           readyState: t.readyState,
-          muted: t.muted
         })),
         audio: stream.getAudioTracks().map(t => ({
           id: t.id,
           enabled: t.enabled,
           readyState: t.readyState,
-          muted: t.muted
         }))
       });
       
       return stream;
     } catch (err) {
       console.error('❌ 미디어 접근 실패:', err);
-      
-      if (err.name === 'NotAllowedError') {
-        alert(
-          isIOS() 
-            ? '📱 카메라/마이크 권한 허용\n\n설정 > Safari > 카메라/마이크'
-            : '카메라와 마이크 권한을 허용해주세요.'
-        );
-      } else if (err.name === 'NotFoundError') {
-        alert('카메라 또는 마이크를 찾을 수 없습니다.');
-      } else if (err.name === 'NotReadableError') {
-        alert('카메라/마이크가 다른 앱에서 사용 중일 수 있습니다.\n\n백그라운드 앱을 종료하고 다시 시도해주세요.');
-      }
-      
       throw err;
     }
   }, []);
@@ -156,9 +91,10 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log(`🔧 Peer Connection 생성`);
     console.log(`   Peer: ${peerUsername}`);
     console.log(`   Initiator: ${isInitiator}`);
+    console.log(`   나: ${currentUser?.username}`);
     console.log(`${'='.repeat(60)}\n`);
     
-    // ⭐⭐⭐ 중복 생성 방지
+    // 중복 생성 방지
     if (isCreatingConnection.current[peerUsername]) {
       console.log(`⏳ 연결 생성 대기: ${peerUsername}`);
       
@@ -216,10 +152,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
       // ⭐⭐⭐ 트랙 추가 (반드시 연결 전에)
+      console.log('📤 로컬 트랙 추가 중...');
       localStream.getTracks().forEach(track => {
         try {
           pc.addTrack(track, localStream);
-          console.log(`✅ Track 추가: ${track.kind}`);
+          console.log(`✅ Track 추가: ${track.kind} (${track.id.substring(0, 8)}...)`);
         } catch (e) {
           console.error(`❌ Track 추가 실패: ${track.kind}`, e);
         }
@@ -231,6 +168,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         console.log(`🎥 Remote Track 수신`);
         console.log(`   Peer: ${peerUsername}`);
         console.log(`   Kind: ${event.track.kind}`);
+        console.log(`   Track ID: ${event.track.id.substring(0, 8)}...`);
         console.log(`   Streams: ${event.streams.length}`);
         console.log(`${'='.repeat(60)}\n`);
         
@@ -248,6 +186,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           audio: remoteStream.getAudioTracks().length
         });
         
+        // ⭐ 상태 업데이트
         setRemoteStreams(prev => {
           const existingIndex = prev.findIndex(p => p.peerId === peerUsername);
           
@@ -262,9 +201,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           if (existingIndex >= 0) {
             const updated = [...prev];
             updated[existingIndex] = streamData;
+            console.log('🔄 기존 스트림 업데이트');
             return updated;
           }
           
+          console.log('➕ 새 스트림 추가');
           return [...prev, streamData];
         });
       };
@@ -292,13 +233,14 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             sendSignalRef.current(peerUsername, 'offer', {
               sdp: pc.localDescription
             });
-            console.log(`✅ Offer 전송`);
+            console.log(`✅ Offer 전송 완료`);
           }
         } catch (e) {
           console.error('❌ Offer 생성 실패:', e);
         }
       };
 
+      // ⭐ ICE Candidate 핸들러
       pc.onicecandidate = (event) => {
         if (event.candidate && sendSignalRef.current) {
           sendSignalRef.current(peerUsername, 'ice_candidate', {
@@ -307,6 +249,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         }
       };
 
+      // ⭐ 연결 상태 핸들러
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
         console.log(`🔌 ICE (${peerUsername}): ${state}`);
@@ -324,6 +267,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       };
 
       peerConnections.current[peerUsername] = pc;
+      console.log('✅ PeerConnection 저장 완료');
+      
       return pc;
       
     } catch (e) {
@@ -368,7 +313,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         return;
       }
       
-      // PC 생성 후 약간 대기
       await new Promise(resolve => setTimeout(resolve, 300));
     }
 
@@ -388,7 +332,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     try {
       switch (type) {
         case 'offer':
-          console.log('📥 Offer 처리');
+          console.log('🔥 Offer 처리');
           
           // ⭐⭐⭐ Rollback 처리
           if (pc.signalingState === 'have-local-offer') {
@@ -405,7 +349,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             sendSignalRef.current(peerUsername, 'answer', {
               sdp: pc.localDescription
             });
-            console.log(`✅ Answer 전송`);
+            console.log(`✅ Answer 전송 완료`);
           }
           
           // ⭐⭐⭐ Pending ICE 처리
@@ -423,11 +367,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           break;
 
         case 'answer':
-          console.log('📥 Answer 처리');
+          console.log('🔥 Answer 처리');
           
           if (pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-            console.log(`✅ Answer 적용`);
+            console.log(`✅ Answer 적용 완료`);
             
             // ⭐⭐⭐ Pending ICE 처리
             if (pendingCandidates.current[peerUsername]) {
@@ -466,6 +410,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       console.error(`❌ Signal 처리 실패 (${type}):`, e);
     }
   }, [currentUser, createPeerConnection]);
+
   // =========================================================================
   // Cleanup
   // =========================================================================
