@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingRoom.jsx (버그 수정 버전)
+// frontend/src/components/VideoMeetingRoom.jsx (상단 import 수정)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
@@ -46,6 +46,12 @@ const isSafari = () => {
     !/CriOS/.test(userAgent) &&
     !/FxiOS/.test(userAgent) &&
     !/EdgiOS/.test(userAgent)
+  );
+};
+
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
   );
 };
 

@@ -50,29 +50,25 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         return VideoRoom.objects.filter(
             status__in=['waiting', 'active']
         ).order_by('-created_at')
-    
+       
     def perform_create(self, serializer):
         """
         회의실 생성 시 방장 자동 설정
-        ⭐ 빈 문자열 처리 개선
+        ⭐ 생성 후 DetailSerializer로 응답하여 id 포함
         """
         try:
-            # ⭐ 빈 문자열을 None으로 변환
             validated_data = serializer.validated_data.copy()
             
-            # description이 빈 문자열이면 제거
+            # 빈 문자열 처리
             if 'description' in validated_data and not validated_data['description']:
                 validated_data['description'] = ''
             
-            # password가 빈 문자열이면 제거
             if 'password' in validated_data and not validated_data['password']:
                 validated_data.pop('password', None)
             
-            # scheduled_time이 빈 문자열이면 제거
             if 'scheduled_time' in validated_data and not validated_data['scheduled_time']:
                 validated_data.pop('scheduled_time', None)
             
-            # max_participants 기본값 설정
             if 'max_participants' not in validated_data or validated_data['max_participants'] is None:
                 validated_data['max_participants'] = 10
             
@@ -86,6 +82,27 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"❌ 회의실 생성 실패: {str(e)}")
             raise
+
+    # ⭐⭐⭐ create 메서드 오버라이드하여 DetailSerializer로 응답
+    def create(self, request, *args, **kwargs):
+        """회의실 생성 - id 포함된 응답 반환"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # ⭐ 생성된 인스턴스를 DetailSerializer로 직렬화
+        instance = serializer.instance
+        detail_serializer = VideoRoomDetailSerializer(
+            instance, 
+            context={'request': request}
+        )
+        
+        headers = self.get_success_headers(detail_serializer.data)
+        return Response(
+            detail_serializer.data, 
+            status=status.HTTP_201_CREATED, 
+            headers=headers
+        )
     
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):

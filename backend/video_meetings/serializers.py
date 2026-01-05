@@ -107,18 +107,21 @@ class VideoRoomDetailSerializer(serializers.ModelSerializer):
 
 
 class VideoRoomCreateSerializer(serializers.ModelSerializer):
-    """회의실 생성용 Serializer"""
+    """회의실 생성용 Serializer - ⭐ 응답에 id 포함"""
     
     class Meta:
         model = VideoRoom
         fields = [
+            'id',  # ⭐⭐⭐ 추가!
             'title', 
             'description', 
             'max_participants',
             'password', 
             'scheduled_time'
         ]
-        # ⭐ 모든 필드를 선택적으로 설정
+        # ⭐ id는 read_only
+        read_only_fields = ['id']
+        
         extra_kwargs = {
             'description': {'required': False, 'allow_blank': True},
             'password': {'required': False, 'allow_blank': True, 'allow_null': True},
@@ -129,7 +132,7 @@ class VideoRoomCreateSerializer(serializers.ModelSerializer):
     def validate_max_participants(self, value):
         """최대 참가자 수 유효성 검사"""
         if value is None:
-            return 10  # 기본값
+            return 10
         
         if value < 2:
             raise serializers.ValidationError('최소 2명 이상이어야 합니다.')
@@ -158,7 +161,12 @@ class VideoRoomCreateSerializer(serializers.ModelSerializer):
         if value and len(value) > 50:
             raise serializers.ValidationError('비밀번호는 50자를 초과할 수 없습니다.')
         return value.strip() if value else ''
-
+    
+    # ⭐⭐⭐ 생성 후 전체 정보 반환
+    def create(self, validated_data):
+        """회의실 생성 - id 포함하여 반환"""
+        instance = super().create(validated_data)
+        return instance
 
 class SignalMessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
