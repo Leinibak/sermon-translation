@@ -1,5 +1,7 @@
-// frontend/src/hooks/useWebRTC.js (트랙 추가 개선 버전)
-import { useState, useRef, useCallback } from 'react';
+// frontend/src/hooks/useWebRTC.js (완전 수정 버전)
+
+// ⭐⭐⭐ useEffect 추가!
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 const ICE_SERVERS = {
   iceServers: [
