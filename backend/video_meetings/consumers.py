@@ -1,4 +1,4 @@
-# backend/video_meetings/consumers.py (WebRTC 연결 수정 버전)
+# backend/video_meetings/consumers.py (핵심 수정)
 import asyncio
 import json
 import logging
@@ -10,7 +10,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 class VideoMeetingConsumer(AsyncWebsocketConsumer):
-    """WebSocket Consumer - WebRTC 연결 개선"""
+    """WebSocket Consumer - 참가자 간 연결 수정"""
     
     async def connect(self):
         """WebSocket 연결 수립"""
@@ -96,7 +96,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             elif message_type == 'join_ready':
                 await self.handle_join_ready(data)
             
-            # join
+            # ⭐⭐⭐ join 처리 (수정!)
             elif message_type == 'join':
                 await self.handle_join(data)
             
@@ -193,10 +193,24 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         
         logger.info(f"✅ join_ready 전송 완료: {self.username} → {to_username}")
 
+    # ⭐⭐⭐ 핵심 수정: join 핸들러
     async def handle_join(self, data):
-        """참가 알림 처리"""
+        """
+        참가 알림 처리
+        ⭐⭐⭐ 모든 승인된 참가자에게 브로드캐스트
+        """
+        logger.info(f"\n{'='*60}")
         logger.info(f"👋 사용자 입장: {self.username} (ID: {self.user_id})")
+        logger.info(f"{'='*60}\n")
         
+        # ⭐⭐⭐ 승인된 참가자인지 확인
+        is_approved = await self.check_is_approved()
+        
+        if not is_approved:
+            logger.warning(f"⚠️ {self.username}은 아직 승인되지 않음")
+            return
+        
+        # ⭐⭐⭐ 모든 참가자에게 입장 알림 브로드캐스트
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -206,6 +220,23 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'timestamp': datetime.now().isoformat()
             }
         )
+        
+        logger.info(f"✅ 입장 알림 브로드캐스트 완료: {self.username}")
+        
+        # ⭐⭐⭐ 기존 참가자 목록 전송 (자신 제외)
+        current_participants = await self.get_approved_participants()
+        
+        other_participants = [
+            p for p in current_participants 
+            if p['user__username'] != self.username
+        ]
+        
+        if other_participants:
+            logger.info(f"📋 기존 참가자 {len(other_participants)}명에게 알림")
+            
+            for participant in other_participants:
+                peer_username = participant['user__username']
+                logger.info(f"   → {peer_username}")
     
     async def handle_chat_message(self, data):
         """채팅 메시지 처리"""
@@ -306,6 +337,8 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         ⭐ username 비교
         """
         if event['username'] != self.username:
+            logger.info(f"📢 {event['username']} 입장 알림 수신")
+            
             await self.send(text_data=json.dumps({
                 'type': 'user_joined',
                 'username': event['username'],
@@ -517,7 +550,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     
     async def send_current_participants(self):
         """현재 참가자 목록 전송"""
-        participants = await self.get_participants()
+        participants = await self.get_approved_participants()
         
         await self.send(text_data=json.dumps({
             'type': 'participants_list',
@@ -545,10 +578,31 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             return room.host == user
         except:
             return False
+        
+    @database_sync_to_async
+    def check_is_approved(self):
+        """⭐⭐⭐ 승인된 참가자인지 확인"""
+        from .models import RoomParticipant, VideoRoom
+        try:
+            # 방장은 자동 승인
+            room = VideoRoom.objects.get(id=self.room_id)
+            if room.host == self.user:
+                return True
+            
+            # 참가자는 승인 상태 확인
+            participant = RoomParticipant.objects.filter(
+                room_id=self.room_id,
+                user=self.user,
+                status='approved'
+            ).exists()
+            
+            return participant
+        except:
+            return False
     
     @database_sync_to_async
-    def get_participants(self):
-        """참가자 목록 조회"""
+    def get_approved_participants(self):
+        """⭐⭐⭐ 승인된 참가자 목록 조회"""
         from .models import RoomParticipant
         
         return list(
