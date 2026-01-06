@@ -1,4 +1,4 @@
-// frontend/src/components/VideoMeetingRoom.jsx (상단 import 수정)
+// frontend/src/components/VideoMeetingRoom.jsx (수정본)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
@@ -15,6 +15,7 @@ import { ChatPanel, ChatToggleButton } from './VideoMeeting/ChatPanel';
 import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel';
 import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 
+// 유틸리티 함수들
 const isIOS = () => {
   if (navigator.userAgentData) {
     return navigator.userAgentData.platform === 'iOS';
@@ -68,44 +69,45 @@ function VideoMeetingRoom() {
     error: roomError,
     fetchRoomDetails,
     fetchPendingRequests,
-    removeRemoteStream,  
     approveParticipant,
     rejectParticipant,
     leaveRoom,
     endMeeting,
   } = useVideoMeetingAPI(roomId);
 
-  const [ws, setWs] = useState(null);
+  // WebSocket 상태
   const [wsConnected, setWsConnected] = useState(false);
   const [wsReady, setWsReady] = useState(false);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const wsRef = useRef(null);
 
-  const peerConnections = useRef({});
-  
+  // UI 상태
   const [isMicOn, setIsMicOn] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
+  // 채팅 상태
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const messageIdsRef = useRef(new Set());
 
+  // 반응 및 손들기 상태
   const [reactions, setReactions] = useState([]);
-  
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState([]);
 
+  // 미디어 참조
   const localVideoRef = useRef(null);
   const initializationRef = useRef(false);
-
-  // ⭐⭐⭐ 추가: 승인 후 초기화 완료 플래그
   const approvalInitializedRef = useRef(false);
 
+  // =========================================================================
+  // WebRTC 훅
+  // =========================================================================
   const sendWebRTCSignal = useCallback((toUsername, type, payload = {}) => {
     const currentWs = wsRef.current;
     
@@ -135,14 +137,20 @@ function VideoMeetingRoom() {
 
   const {
     localStreamRef,
+    peerConnections,
     remoteStreams,
     connectionStatus,
-    createPeerConnection,
     getLocalMedia,
+    createPeerConnection,
     handleWebSocketSignal,
+    handleTrackStateChange,
+    removeRemoteStream,
     cleanup: cleanupWebRTC,
   } = useWebRTC(roomId, user, room?.is_host, sendWebRTCSignal);
 
+  // =========================================================================
+  // 채팅 메시지 추가
+  // =========================================================================
   const addChatMessage = useCallback((message) => {
     const messageId = message.message_id || message.id;
     
@@ -182,6 +190,393 @@ function VideoMeetingRoom() {
     }, 100);
   }, [user, showChatPanel]);
 
+  // =========================================================================
+  // Track 상태 브로드캐스트
+  // =========================================================================
+  const broadcastTrackState = useCallback((kind, enabled) => {
+    const currentWs = wsRef.current;
+    
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      console.warn('⚠️ WebSocket 연결 없음 - track 상태 전송 불가');
+      return;
+    }
+
+    try {
+      const message = {
+        type: 'track_state',
+        kind,
+        enabled
+      };
+      
+      console.log('📤 Track 상태 브로드캐스트:', message);
+      currentWs.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('❌ Track 상태 전송 실패:', error);
+    }
+  }, []);
+
+  // =========================================================================
+  // ⭐⭐⭐ WebSocket 메시지 핸들러 (핵심 통합)
+  // =========================================================================
+  const handleWebSocketMessage = useCallback((data) => {
+    const type = data.type;
+    
+    console.log('📨 WebSocket 수신:', type);
+    
+    // WebRTC 시그널링 우선 처리
+    if (['offer', 'answer', 'ice_candidate'].includes(type)) {
+      handleWebSocketSignal(data);
+      return;
+    }
+
+    // Track 상태 변경
+    if (type === 'track_state') {
+      handleTrackStateChange(data);
+      return;
+    }
+    
+    switch (type) {
+      case 'participants_list':
+        console.log("📋 참여자:", data.participants);
+        break;
+      
+      // ⭐⭐⭐ 승인 알림 핸들러
+      case 'approval_notification': {
+        const retryCount = data.retry_count || 0;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🎉 승인 알림 수신 (재시도: ${retryCount}/2)`);
+        console.log(`   Room ID: ${data.room_id}`);
+        console.log(`   Target User ID: ${data.participant_user_id}`);
+        console.log(`   Current User ID: ${user?.id}`);
+        console.log(`   Host Username: ${data.host_username}`);
+        console.log(`${'='.repeat(60)}\n`);
+
+        // 중복 처리 방지
+        if (String(data.room_id) !== String(roomId)) {
+          console.log('⚠️ 다른 방의 알림 - 무시');
+          return;
+        }
+
+        if (String(data.participant_user_id) !== String(user?.id)) {
+          console.log('⚠️ 다른 사용자의 알림 - 무시');
+          return;
+        }
+
+        if (retryCount > 0) {
+          console.log('⚠️ 재전송 알림 - 무시');
+          return;
+        }
+
+        if (approvalInitializedRef.current) {
+          console.log('⚠️ 이미 초기화 진행 중 - 무시');
+          return;
+        }
+
+        approvalInitializedRef.current = true;
+
+        const initializeAfterApproval = async () => {
+          try {
+            const isiOS = isIOS();
+            const isMobile = isMobileDevice();
+            
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`🚀 승인 후 초기화 시작`);
+            console.log(`   Platform: ${isiOS ? 'iOS' : isMobile ? 'Mobile' : 'Desktop'}`);
+            console.log(`${'='.repeat(60)}\n`);
+
+            // 1. 미디어 초기화
+            if (!localStreamRef.current) {
+              console.log('1️⃣ 미디어 초기화 시작');
+              
+              try {
+                await getLocalMedia();
+                
+                if (localVideoRef.current && localStreamRef.current) {
+                  localVideoRef.current.srcObject = localStreamRef.current;
+                  
+                  if (isiOS) {
+                    try {
+                      await localVideoRef.current.play();
+                      console.log('✅ iOS 로컬 비디오 재생 성공');
+                    } catch (playError) {
+                      console.warn('⚠️ iOS 자동 재생 실패:', playError);
+                    }
+                  }
+                }
+                
+                console.log('✅ 미디어 초기화 완료');
+              } catch (mediaError) {
+                console.error('❌ 미디어 초기화 실패:', mediaError);
+                approvalInitializedRef.current = false;
+                throw mediaError;
+              }
+            } else {
+              console.log('✅ 기존 미디어 스트림 사용');
+            }
+
+            const waitTime = isiOS ? 1500 : (isMobile ? 1000 : 500);
+            console.log(`⏳ ${waitTime}ms 대기 (미디어 안정화)`);
+            await new Promise(r => setTimeout(r, waitTime));
+
+            // 2. 방 정보 갱신
+            console.log('2️⃣ 방 정보 갱신 시작');
+            await fetchRoomDetails();
+            console.log('✅ 방 정보 갱신 완료');
+
+            const roomWaitTime = isiOS ? 800 : (isMobile ? 500 : 300);
+            await new Promise(r => setTimeout(r, roomWaitTime));
+
+            // 3. WebSocket 연결 확인
+            const currentWs = wsRef.current;
+            
+            if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+              console.error('❌ WebSocket 연결 없음 - 재연결 시도');
+              connectWebSocket();
+              await new Promise(r => setTimeout(r, 2000));
+              
+              const reconnectedWs = wsRef.current;
+              if (!reconnectedWs || reconnectedWs.readyState !== WebSocket.OPEN) {
+                throw new Error('WebSocket 재연결 실패');
+              }
+            }
+
+            // 4. WebSocket Ready
+            console.log('3️⃣ WebSocket 준비 완료');
+            setWsReady(true);
+
+            // 5. join_ready 전송
+            console.log(`4️⃣ join_ready 전송 준비`);
+            
+            if (!data.host_username) {
+              console.error('❌ host_username 없음:', data);
+              throw new Error('host_username이 없습니다');
+            }
+            
+            console.log(`   From: ${user.username} → To: ${data.host_username}`);
+            
+            const finalWs = wsRef.current;
+            
+            if (finalWs && finalWs.readyState === WebSocket.OPEN) {
+              const joinReadyMessage = {
+                type: 'join_ready',
+                from_username: user.username,
+                to_username: data.host_username,
+                room_id: String(roomId)
+              };
+              
+              console.log('📤 join_ready 전송:', joinReadyMessage);
+              finalWs.send(JSON.stringify(joinReadyMessage));
+              
+              console.log('✅ join_ready 전송 완료');
+              
+              // 재전송
+              setTimeout(() => {
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                  console.log('📤 join_ready 재전송 (확인용)');
+                  wsRef.current.send(JSON.stringify(joinReadyMessage));
+                }
+              }, 1000);
+            } else {
+              throw new Error('WebSocket 연결 상태 불안정');
+            }
+
+            console.log(`\n${'='.repeat(60)}`);
+            console.log('✅ 승인 후 초기화 완료');
+            console.log(`${'='.repeat(60)}\n`);
+
+          } catch (error) {
+            console.error('❌ 승인 후 초기화 실패:', error);
+            approvalInitializedRef.current = false;
+            
+            if (error.message !== 'WebSocket 연결 상태 불안정') {
+              alert('회의 참가 준비 중 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
+            }
+          }
+        };
+
+        const startDelay = isIOS() ? 800 : 500;
+        console.log(`⏳ ${startDelay}ms 후 초기화 시작`);
+        
+        setTimeout(initializeAfterApproval, startDelay);
+        break;
+      }
+
+      // ⭐⭐⭐ user_joined 핸들러
+      case 'user_joined': {
+        const joinedUsername = data.username;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`👋 user_joined 수신`);
+        console.log(`   입장자: ${joinedUsername}`);
+        console.log(`   현재 사용자: ${user.username}`);
+        console.log(`   방장 여부: ${room?.is_host}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        // 자신의 입장은 무시
+        if (joinedUsername === user.username) {
+          console.log('⚠️ 본인 입장 - 무시');
+          return;
+        }
+        
+        // 미디어 준비 대기 후 연결
+        const tryConnect = async (attempt = 0) => {
+          if (!localStreamRef.current) {
+            if (attempt < 10) {
+              console.log(`⏳ 미디어 대기... (${attempt + 1}/10)`);
+              setTimeout(() => tryConnect(attempt + 1), 1000);
+            } else {
+              console.error('❌ 미디어 준비 타임아웃');
+            }
+            return;
+          }
+          
+          console.log(`✅ 미디어 준비됨 - 연결 시작`);
+          console.log(`   나: ${user.username} (${room?.is_host ? '방장' : '참가자'})`);
+          console.log(`   상대: ${joinedUsername}`);
+          
+          // Initiator 결정: 방장이 항상 Initiator
+          const shouldInitiate = room?.is_host === true;
+          
+          console.log(`   Initiator: ${shouldInitiate ? '내가 먼저 (Offer)' : '상대가 먼저 (Answer 대기)'}`);
+          
+          try {
+            await createPeerConnection(joinedUsername, shouldInitiate);
+            console.log(`✅ PC 생성 완료: ${joinedUsername}`);
+          } catch (error) {
+            console.error('❌ 연결 시작 실패:', error);
+          }
+        };
+        
+        setTimeout(() => tryConnect(0), 500);
+        break;
+      }
+
+      // ⭐⭐⭐ join_ready 핸들러 (방장 전용)
+      case 'join_ready': {
+        const peerUsername = data.from_username;
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🔥 join_ready 수신`);
+        console.log(`   From: ${peerUsername} (참가자)`);
+        console.log(`   방장 여부: ${room?.is_host}`);
+        console.log(`${'='.repeat(60)}\n`);
+        
+        // 방장이 아니면 무시
+        if (!room?.is_host) {
+          console.log('⚠️ 방장 아님 - 무시');
+          return;
+        }
+        
+        // 기존 연결 체크
+        if (peerConnections.current[peerUsername]) {
+          const state = peerConnections.current[peerUsername].connectionState;
+          if (state === 'connected' || state === 'connecting') {
+            console.log('✅ 이미 연결 중');
+            return;
+          }
+          console.log('🗑️ 기존 연결 제거 후 재생성');
+          try {
+            peerConnections.current[peerUsername].close();
+          } catch (e) {}
+          delete peerConnections.current[peerUsername];
+        }
+        
+        // 연결 시작 (방장이 항상 Initiator)
+        const startConnection = async (attempts = 0) => {
+          if (localStreamRef.current) {
+            console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
+            console.log(`   방장이 Initiator로 Offer 전송`);
+            
+            try {
+              await createPeerConnection(peerUsername, true);
+              console.log(`✅ PC 생성 완료`);
+            } catch (error) {
+              console.error('❌ PC 생성 실패:', error);
+            }
+          } else if (attempts < 5) {
+            console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
+            setTimeout(() => startConnection(attempts + 1), 800);
+          } else {
+            console.error('❌ 미디어 준비 타임아웃');
+          }
+        };
+        
+        startConnection();
+        break;
+      }
+
+      case 'user_left':
+        console.log(`👋 user_left: ${data.username}`);
+        removeRemoteStream(data.username);
+        break;
+
+      case 'chat_message':
+        addChatMessage(data);
+        break;
+
+      case 'reaction': {
+        const id = Date.now() + Math.random();
+        setReactions(prev => [...prev, { 
+          id, 
+          emoji: data.reaction, 
+          username: data.username 
+        }]);
+        setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
+        break;
+      }
+
+      case 'hand_raise':
+        if (data.action === 'raise') {
+          setRaisedHands(prev => 
+            prev.some(h => h.username === data.username) 
+              ? prev 
+              : [...prev, { 
+                  username: data.username, 
+                  user_id: data.user_id, 
+                  raised_at: new Date().toISOString() 
+                }]
+          );
+        } else {
+          setRaisedHands(prev => prev.filter(h => h.username !== data.username));
+        }
+        break;
+
+      case 'rejection_notification':
+        alert('참가가 거부되었습니다.');
+        navigate('/video-meetings');
+        break;
+
+      case 'join_request_notification':
+        fetchPendingRequests();
+        break;
+
+      case 'meeting_ended':
+        alert(data.message);
+        navigate('/video-meetings');
+        break;
+
+      default:
+        console.log('⚠️ Unknown type:', type);
+        break;
+    }
+  }, [
+    user, 
+    roomId, 
+    room?.is_host, 
+    localStreamRef, 
+    peerConnections,
+    createPeerConnection, 
+    handleWebSocketSignal, 
+    handleTrackStateChange,
+    removeRemoteStream, 
+    addChatMessage, 
+    fetchRoomDetails, 
+    fetchPendingRequests, 
+    navigate,
+    getLocalMedia
+  ]);
+
+  // =========================================================================
+  // WebSocket 연결
+  // =========================================================================
   const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') {
       console.error('❌ roomId 또는 user 없음');
@@ -253,353 +648,22 @@ function VideoMeetingRoom() {
               }));
               console.log('📤 Join 메시지 전송');
               
-              // ⭐⭐⭐ wsReady를 더 빨리 설정
               setTimeout(() => {
                 setWsReady(true);
                 console.log('✅ WebSocket 완전 준비');
-              }, 500); // 1500ms → 500ms
+              }, 500);
             } catch (e) {
               console.error('❌ Join 실패:', e);
             }
           }
-        }, 500); // 1000ms → 500ms
+        }, 500);
       };
   
+      // ⭐⭐⭐ 핵심: handleWebSocketMessage 사용
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 WebSocket 수신:', data.type);
-
-          // ⭐⭐⭐ WebRTC 시그널링 우선 처리
-          if (['offer', 'answer', 'ice_candidate'].includes(data.type)) {
-            handleWebSocketSignal(data);
-            return;
-          }
-
-          switch (data.type) {
-            case 'participants_list':
-              console.log("📋 참여자:", data.participants);
-              break;
-
-            // ⭐⭐⭐ approval_notification 핸들러
-            case 'approval_notification': {
-              const retryCount = data.retry_count || 0;
-              console.log(`\n${'='.repeat(60)}`);
-              console.log(`🎉 승인 알림 수신 (재시도: ${retryCount}/2)`);
-              console.log(`   Room ID: ${data.room_id}`);
-              console.log(`   Target User ID: ${data.participant_user_id}`);
-              console.log(`   Current User ID: ${user?.id}`);
-              console.log(`   Host Username: ${data.host_username}`);
-              console.log(`${'='.repeat(60)}\n`);
-
-              if (String(data.room_id) !== String(roomId)) {
-                console.log('⚠️ 다른 방의 알림 - 무시');
-                return;
-              }
-
-              if (String(data.participant_user_id) !== String(user?.id)) {
-                console.log('⚠️ 다른 사용자의 알림 - 무시');
-                return;
-              }
-
-              if (retryCount > 0) {
-                console.log('⚠️ 재전송 알림 - 무시');
-                return;
-              }
-
-              if (approvalInitializedRef.current) {
-                console.log('⚠️ 이미 초기화 진행 중 - 무시');
-                return;
-              }
-
-              approvalInitializedRef.current = true;
-
-              const initializeAfterApproval = async () => {
-                try {
-                  const isiOS = isIOS();
-                  const isMobile = isMobileDevice();
-                  
-                  console.log(`\n${'='.repeat(60)}`);
-                  console.log(`🚀 승인 후 초기화 시작`);
-                  console.log(`   Platform: ${isiOS ? 'iOS' : isMobile ? 'Mobile' : 'Desktop'}`);
-                  console.log(`${'='.repeat(60)}\n`);
-
-                  // 1. 미디어 초기화
-                  if (!localStreamRef.current) {
-                    console.log('1️⃣ 미디어 초기화 시작');
-                    
-                    try {
-                      await getLocalMedia();
-                      
-                      if (localVideoRef.current && localStreamRef.current) {
-                        localVideoRef.current.srcObject = localStreamRef.current;
-                        
-                        if (isiOS) {
-                          try {
-                            await localVideoRef.current.play();
-                            console.log('✅ iOS 로컬 비디오 재생 성공');
-                          } catch (playError) {
-                            console.warn('⚠️ iOS 자동 재생 실패:', playError);
-                          }
-                        }
-                      }
-                      
-                      console.log('✅ 미디어 초기화 완료');
-                    } catch (mediaError) {
-                      console.error('❌ 미디어 초기화 실패:', mediaError);
-                      approvalInitializedRef.current = false;
-                      throw mediaError;
-                    }
-                  } else {
-                    console.log('✅ 기존 미디어 스트림 사용');
-                  }
-
-                  const waitTime = isiOS ? 1500 : (isMobile ? 1000 : 500);
-                  console.log(`⏳ ${waitTime}ms 대기 (미디어 안정화)`);
-                  await new Promise(r => setTimeout(r, waitTime));
-
-                  // 2. 방 정보 갱신
-                  console.log('2️⃣ 방 정보 갱신 시작');
-                  await fetchRoomDetails();
-                  console.log('✅ 방 정보 갱신 완료');
-
-                  const roomWaitTime = isiOS ? 800 : (isMobile ? 500 : 300);
-                  await new Promise(r => setTimeout(r, roomWaitTime));
-
-                  // 3. WebSocket 연결 확인
-                  const currentWs = wsRef.current;
-                  
-                  if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-                    console.error('❌ WebSocket 연결 없음 - 재연결 시도');
-                    connectWebSocket();
-                    await new Promise(r => setTimeout(r, 2000));
-                    
-                    const reconnectedWs = wsRef.current;
-                    if (!reconnectedWs || reconnectedWs.readyState !== WebSocket.OPEN) {
-                      throw new Error('WebSocket 재연결 실패');
-                    }
-                  }
-
-                  // 4. WebSocket Ready
-                  console.log('3️⃣ WebSocket 준비 완료');
-                  setWsReady(true);
-
-                  // ⭐⭐⭐ 5. join_ready 전송 (방장 정보 사용)
-                  console.log(`4️⃣ join_ready 전송 준비`);
-                  
-                  if (!data.host_username) {
-                    console.error('❌ host_username 없음:', data);
-                    throw new Error('host_username이 없습니다');
-                  }
-                  
-                  console.log(`   From: ${user.username} → To: ${data.host_username}`);
-                  
-                  const finalWs = wsRef.current;
-                  
-                  if (finalWs && finalWs.readyState === WebSocket.OPEN) {
-                    const joinReadyMessage = {
-                      type: 'join_ready',
-                      from_username: user.username,
-                      to_username: data.host_username,
-                      room_id: String(roomId)
-                    };
-                    
-                    console.log('📤 join_ready 전송:', joinReadyMessage);
-                    finalWs.send(JSON.stringify(joinReadyMessage));
-                    
-                    console.log('✅ join_ready 전송 완료');
-                    
-                    // 재전송
-                    setTimeout(() => {
-                      if (wsRef.current?.readyState === WebSocket.OPEN) {
-                        console.log('📤 join_ready 재전송 (확인용)');
-                        wsRef.current.send(JSON.stringify(joinReadyMessage));
-                      }
-                    }, 1000);
-                  } else {
-                    throw new Error('WebSocket 연결 상태 불안정');
-                  }
-
-                  console.log(`\n${'='.repeat(60)}`);
-                  console.log('✅ 승인 후 초기화 완료');
-                  console.log(`${'='.repeat(60)}\n`);
-
-                } catch (error) {
-                  console.error('❌ 승인 후 초기화 실패:', error);
-                  approvalInitializedRef.current = false;
-                  
-                  if (error.message !== 'WebSocket 연결 상태 불안정') {
-                    alert('회의 참가 준비 중 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
-                  }
-                }
-              };
-
-              const startDelay = isIOS() ? 800 : 500;
-              console.log(`⏳ ${startDelay}ms 후 초기화 시작`);
-              
-              setTimeout(initializeAfterApproval, startDelay);
-              
-              break;
-            }
-
-            // ⭐⭐⭐ user_joined 핸들러 (수정!)
-            case 'user_joined': {
-              const joinedUsername = data.username;
-              console.log(`\n${'='.repeat(60)}`);
-              console.log(`👋 user_joined 수신`);
-              console.log(`   입장자: ${joinedUsername}`);
-              console.log(`   현재 사용자: ${user.username}`);
-              console.log(`   방장 여부: ${room?.is_host}`);
-              console.log(`${'='.repeat(60)}\n`);
-              
-              // 자신의 입장은 무시
-              if (joinedUsername === user.username) {
-                console.log('⚠️ 본인 입장 - 무시');
-                return;
-              }
-              
-              // ⭐⭐⭐ 미디어 준비 대기 후 연결
-              const tryConnect = async (attempt = 0) => {
-                if (!localStreamRef.current) {
-                  if (attempt < 10) {
-                    console.log(`⏳ 미디어 대기... (${attempt + 1}/10)`);
-                    setTimeout(() => tryConnect(attempt + 1), 1000);
-                  } else {
-                    console.error('❌ 미디어 준비 타임아웃');
-                  }
-                  return;
-                }
-                
-                console.log(`✅ 미디어 준비됨 - 연결 시작`);
-                console.log(`   나: ${user.username} (${room?.is_host ? '방장' : '참가자'})`);
-                console.log(`   상대: ${joinedUsername}`);
-                
-                // ⭐⭐⭐ Initiator 결정
-                // 규칙: 방장이 항상 Initiator (Offer 전송)
-                const shouldInitiate = room?.is_host === true;  // ⭐ 수정!
-                
-                console.log(`   Initiator: ${shouldInitiate ? '내가 먼저 (Offer)' : '상대가 먼저 (Answer 대기)'}`);
-                
-                try {
-                  await createPeerConnection(joinedUsername, shouldInitiate);
-                  console.log(`✅ PC 생성 완료: ${joinedUsername}`);
-                } catch (error) {
-                  console.error('❌ 연결 시작 실패:', error);
-                }
-              };
-              
-              setTimeout(() => tryConnect(0), 500);
-              break;
-            }
-
-            // ⭐⭐⭐ join_ready 핸들러 (방장 전용!)
-            case 'join_ready': {
-              const peerUsername = data.from_username;
-              console.log(`\n${'='.repeat(60)}`);
-              console.log(`🔥 join_ready 수신`);
-              console.log(`   From: ${peerUsername} (참가자)`);
-              console.log(`   방장 여부: ${room?.is_host}`);
-              console.log(`${'='.repeat(60)}\n`);
-              
-              // 방장이 아니면 무시
-              if (!room?.is_host) {
-                console.log('⚠️ 방장 아님 - 무시');
-                return;
-              }
-              
-              // 기존 연결 체크
-              if (peerConnections.current[peerUsername]) {
-                const state = peerConnections.current[peerUsername].connectionState;
-                if (state === 'connected' || state === 'connecting') {
-                  console.log('✅ 이미 연결 중');
-                  return;
-                }
-                console.log('🗑️ 기존 연결 제거 후 재생성');
-                try {
-                  peerConnections.current[peerUsername].close();
-                } catch (e) {}
-                delete peerConnections.current[peerUsername];
-              }
-              
-              // ⭐⭐⭐ 연결 시작 (방장이 항상 Initiator!)
-              const startConnection = async (attempts = 0) => {
-                if (localStreamRef.current) {
-                  console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
-                  console.log(`   방장이 Initiator로 Offer 전송`);
-                  
-                  try {
-                    // ⭐ 방장은 항상 Initiator (true)
-                    await createPeerConnection(peerUsername, true);
-                    console.log(`✅ PC 생성 완료`);
-                  } catch (error) {
-                    console.error('❌ PC 생성 실패:', error);
-                  }
-                } else if (attempts < 5) {
-                  console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
-                  setTimeout(() => startConnection(attempts + 1), 800);
-                } else {
-                  console.error('❌ 미디어 준비 타임아웃');
-                }
-              };
-              
-              startConnection();
-              break;
-            }
-
-            case 'user_left':
-              console.log(`👋 user_left: ${data.username}`);
-              removeRemoteStream(data.username);
-              break;
-
-            case 'chat_message':
-              addChatMessage(data);
-              break;
-
-            case 'reaction': {
-              const id = Date.now() + Math.random();
-              setReactions(prev => [...prev, { 
-                id, 
-                emoji: data.reaction, 
-                username: data.username 
-              }]);
-              setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
-              break;
-            }
-
-            case 'hand_raise':
-              if (data.action === 'raise') {
-                setRaisedHands(prev => 
-                  prev.some(h => h.username === data.username) 
-                    ? prev 
-                    : [...prev, { 
-                        username: data.username, 
-                        user_id: data.user_id, 
-                        raised_at: new Date().toISOString() 
-                      }]
-                );
-              } else {
-                setRaisedHands(prev => prev.filter(h => h.username !== data.username));
-              }
-              break;
-
-            case 'rejection_notification':
-              alert('참가가 거부되었습니다.');
-              navigate('/video-meetings');
-              break;
-
-            case 'join_request_notification':
-              fetchPendingRequests();
-              break;
-
-            case 'meeting_ended':
-              alert(data.message);
-              navigate('/video-meetings');
-              break;
-
-            default:
-              console.log('⚠️ Unknown type:', data.type);
-              break;
-          }
+          handleWebSocketMessage(data);
         } catch (e) {
           console.error('❌ 메시지 처리 오류:', e);
         }
@@ -639,27 +703,14 @@ function VideoMeetingRoom() {
           }
         }
       };
-
-      setWs(socket);
     } catch (error) {
       console.error('❌ WebSocket 생성 실패:', error);
-      clearTimeout(connectionTimeout);
     }
-  }, [
-    roomId, 
-    user, 
-    navigate, 
-    fetchRoomDetails, 
-    fetchPendingRequests, 
-    addChatMessage, 
-    room?.is_host, 
-    localStreamRef, 
-    createPeerConnection, 
-    getLocalMedia, 
-    handleWebSocketSignal, 
-    removeRemoteStream
-  ]);
+  }, [roomId, user, navigate, handleWebSocketMessage]);
 
+  // =========================================================================
+  // 미디어 초기화
+  // =========================================================================
   const initializeMedia = useCallback(async () => {
     if (initializationRef.current) {
       console.log('⚠️ 이미 초기화 중');
@@ -724,313 +775,163 @@ function VideoMeetingRoom() {
     }
   }, [getLocalMedia]);
 
-   
-  // ⭐⭐⭐ 핵심: WebSocket 메시지 핸들러
-  const handleWebSocketMessage = useCallback((data) => {
-    const type = data.type;
+  // =========================================================================
+  // 마이크/비디오 토글
+  // =========================================================================
+  const handleToggleMic = useCallback(() => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        const newState = !isMicOn;
+        audioTrack.enabled = newState;
+        setIsMicOn(newState);
+        broadcastTrackState('audio', newState);
+        console.log('🎤 마이크:', newState ? 'ON' : 'OFF');
+      }
+    }
+  }, [isMicOn, localStreamRef, broadcastTrackState]);
+
+  const handleToggleVideo = useCallback(() => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        const newState = !isVideoOn;
+        videoTrack.enabled = newState;
+        setIsVideoOn(newState);
+        broadcastTrackState('video', newState);
+        console.log('📹 비디오:', newState ? 'ON' : 'OFF');
+      }
+    }
+  }, [isVideoOn, localStreamRef, broadcastTrackState]);
+
+  // =========================================================================
+  // 회의 나가기
+  // =========================================================================
+  const handleLeave = async () => {
+    if (room.is_host) {
+      const confirmEnd = window.confirm(
+        '회의를 종료하시겠습니까?\n\n"확인": 모든 참가자 퇴장\n"취소": 나만 나가기'
+      );
+
+      try {
+        if (confirmEnd) {
+          console.log('🛑 회의 종료');
+          await endMeeting();
+        } else {
+          console.log('👋 방장 나가기');
+          await leaveRoom();
+        }
+        
+        cleanupWebRTC();
+        if (wsRef.current) {
+          wsRef.current.close(1000, 'User leaving');
+        }
+        navigate('/video-meetings');
+      } catch (error) {
+        console.error('❌ 나가기 실패:', error);
+        navigate('/video-meetings');
+      }
+    } else {
+      try {
+        await leaveRoom();
+        cleanupWebRTC();
+        if (wsRef.current) {
+          wsRef.current.close(1000, 'User leaving');
+        }
+        navigate('/video-meetings');
+      } catch (error) {
+        console.error('❌ 나가기 실패:', error);
+        navigate('/video-meetings');
+      }
+    }
+  };
+
+  // =========================================================================
+  // 채팅 전송
+  // =========================================================================
+  const handleSendChatMessage = async (content) => {
+    const currentWs = wsRef.current;
     
-    console.log('📨 WebSocket 수신:', type);
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket 연결 없음');
+    }
+
+    try {
+      currentWs.send(JSON.stringify({
+        type: 'chat',
+        content: content
+      }));
+      
+      console.log('💬 채팅 전송:', content.substring(0, 30));
+    } catch (error) {
+      console.error('❌ 채팅 실패:', error);
+      throw error;
+    }
+  };
+
+  // =========================================================================
+  // 반응 전송
+  // =========================================================================
+  const handleSendReaction = async (emoji) => {
+    const currentWs = wsRef.current;
     
-    // ⭐⭐⭐ WebRTC 시그널링 우선 처리
-    if (['offer', 'answer', 'ice_candidate'].includes(type)) {
-      handleWebSocketSignal(data);
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      console.error('❌ WebSocket 연결 없음');
       return;
     }
-    
-    switch (type) {
-      case 'participants_list':
-        console.log("📋 참여자:", data.participants);
-        break;
-      
-      // ⭐⭐⭐ approval_notification 핸들러 (핵심 수정!)
-      case 'approval_notification': {
-        const retryCount = data.retry_count || 0;
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`🎉 승인 알림 수신 (재시도: ${retryCount}/2)`);
-        console.log(`   Room ID: ${data.room_id}`);
-        console.log(`   Target User ID: ${data.participant_user_id}`);
-        console.log(`   Current User ID: ${user?.id}`);
-        console.log(`   Host Username: ${data.host_username}`);
-        console.log(`${'='.repeat(60)}\n`);
-        
-        // 중복 처리 방지
-        if (String(data.room_id) !== String(roomId)) {
-          console.log('⚠️ 다른 방의 알림 - 무시');
-          return;
-        }
-        
-        if (String(data.participant_user_id) !== String(user?.id)) {
-          console.log('⚠️ 다른 사용자의 알림 - 무시');
-          return;
-        }
-        
-        if (retryCount > 0) {
-          console.log('⚠️ 재전송 알림 - 무시');
-          return;
-        }
-        
-        if (approvalInitializedRef.current) {
-          console.log('⚠️ 이미 초기화 진행 중 - 무시');
-          return;
-        }
-        
-        approvalInitializedRef.current = true;
-        
-        // ⭐⭐⭐ 승인 후 초기화 (핵심!)
-        const initializeAfterApproval = async () => {
-          try {
-            console.log(`\n${'='.repeat(60)}`);
-            console.log(`🚀 승인 후 초기화 시작`);
-            console.log(`${'='.repeat(60)}\n`);
-            
-            // 1. 미디어 초기화
-            if (!localStreamRef.current) {
-              console.log('1️⃣ 미디어 초기화');
-              await getLocalMedia();
-              
-              if (localVideoRef.current && localStreamRef.current) {
-                localVideoRef.current.srcObject = localStreamRef.current;
-              }
-              console.log('✅ 미디어 준비 완료');
-            }
-            
-            await new Promise(r => setTimeout(r, 800));
-            
-            // 2. 방 정보 갱신
-            console.log('2️⃣ 방 정보 갱신');
-            await fetchRoomDetails();
-            console.log('✅ 방 정보 갱신 완료');
-            
-            await new Promise(r => setTimeout(r, 500));
-            
-            // 3. WebSocket 연결 확인
-            const currentWs = wsRef.current;
-            if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-              console.error('❌ WebSocket 연결 없음');
-              throw new Error('WebSocket 연결 없음');
-            }
-            
-            // 4. WebSocket Ready
-            console.log('3️⃣ WebSocket 준비 완료');
-            setWsReady(true);
-            
-            // ⭐⭐⭐ 5. join_ready 전송 (방장에게)
-            console.log(`4️⃣ join_ready 전송 준비`);
-            
-            if (!data.host_username) {
-              console.error('❌ host_username 없음:', data);
-              throw new Error('host_username이 없습니다');
-            }
-            
-            console.log(`   From: ${user.username} → To: ${data.host_username}`);
-            
-            const joinReadyMessage = {
-              type: 'join_ready',
-              from_username: user.username,
-              to_username: data.host_username,  // ⭐ 방장 username
-              room_id: String(roomId)
-            };
-            
-            console.log('📤 join_ready 전송:', joinReadyMessage);
-            currentWs.send(JSON.stringify(joinReadyMessage));
-            console.log('✅ join_ready 전송 완료');
-            
-            // 재전송 (확인용)
-            setTimeout(() => {
-              if (wsRef.current?.readyState === WebSocket.OPEN) {
-                console.log('📤 join_ready 재전송');
-                wsRef.current.send(JSON.stringify(joinReadyMessage));
-              }
-            }, 1000);
-            
-            console.log(`\n${'='.repeat(60)}`);
-            console.log('✅ 승인 후 초기화 완료');
-            console.log(`${'='.repeat(60)}\n`);
-            
-          } catch (error) {
-            console.error('❌ 승인 후 초기화 실패:', error);
-            approvalInitializedRef.current = false;
-            alert('회의 참가 준비 중 오류가 발생했습니다.');
-          }
-        };
-        
-        // 약간의 지연 후 초기화
-        setTimeout(initializeAfterApproval, 500);
-        break;
-      }
-      
-      // ⭐⭐⭐ user_joined 핸들러 (핵심 수정!)
-      case 'user_joined': {
-        const joinedUsername = data.username;
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`👋 user_joined 수신`);
-        console.log(`   입장자: ${joinedUsername}`);
-        console.log(`   현재 사용자: ${user.username}`);
-        console.log(`   방장 여부: ${room?.is_host}`);
-        console.log(`${'='.repeat(60)}\n`);
-        
-        // 자신의 입장은 무시
-        if (joinedUsername === user.username) {
-          console.log('⚠️ 본인 입장 - 무시');
-          return;
-        }
-        
-        // ⭐⭐⭐ 미디어 준비 대기 후 연결
-        const tryConnect = async (attempt = 0) => {
-          if (!localStreamRef.current) {
-            if (attempt < 10) {
-              console.log(`⏳ 미디어 대기... (${attempt + 1}/10)`);
-              setTimeout(() => tryConnect(attempt + 1), 1000);
-            } else {
-              console.error('❌ 미디어 준비 타임아웃');
-            }
-            return;
-          }
-          
-          console.log(`✅ 미디어 준비됨 - 연결 시작`);
-          console.log(`   나: ${user.username} (${room?.is_host ? '방장' : '참가자'})`);
-          console.log(`   상대: ${joinedUsername}`);
-          
-          // ⭐⭐⭐ Initiator 결정 (간단한 규칙!)
-          // 규칙: 방장이 항상 Initiator (Offer 전송)
-          const shouldInitiate = room?.is_host === true;
-          
-          console.log(`   Initiator: ${shouldInitiate ? '내가 먼저 (Offer)' : '상대가 먼저 (Answer 대기)'}`);
-          
-          try {
-            await createPeerConnection(joinedUsername, shouldInitiate);
-            console.log(`✅ PC 생성 완료: ${joinedUsername}`);
-          } catch (error) {
-            console.error('❌ 연결 시작 실패:', error);
-          }
-        };
-        
-        setTimeout(() => tryConnect(0), 500);
-        break;
-      }
-      
-      // ⭐⭐⭐ join_ready 핸들러 (방장 전용!)
-      case 'join_ready': {
-        const peerUsername = data.from_username;
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`🔥 join_ready 수신`);
-        console.log(`   From: ${peerUsername} (참가자)`);
-        console.log(`   방장 여부: ${room?.is_host}`);
-        console.log(`${'='.repeat(60)}\n`);
-        
-        // 방장이 아니면 무시
-        if (!room?.is_host) {
-          console.log('⚠️ 방장 아님 - 무시');
-          return;
-        }
-        
-        // 기존 연결 체크
-        if (peerConnections.current[peerUsername]) {
-          const state = peerConnections.current[peerUsername].connectionState;
-          if (state === 'connected' || state === 'connecting') {
-            console.log('✅ 이미 연결 중');
-            return;
-          }
-          console.log('🗑️ 기존 연결 제거 후 재생성');
-          try {
-            peerConnections.current[peerUsername].close();
-          } catch (e) {}
-          delete peerConnections.current[peerUsername];
-        }
-        
-        // ⭐⭐⭐ 연결 시작 (방장이 항상 Initiator!)
-        const startConnection = async (attempts = 0) => {
-          if (localStreamRef.current) {
-            console.log(`🚀 WebRTC 연결 시작: ${peerUsername}`);
-            console.log(`   방장이 Initiator로 Offer 전송`);
-            
-            try {
-              // ⭐ 방장은 항상 Initiator (true)
-              await createPeerConnection(peerUsername, true);
-              console.log(`✅ PC 생성 완료`);
-            } catch (error) {
-              console.error('❌ PC 생성 실패:', error);
-            }
-          } else if (attempts < 5) {
-            console.log(`⏳ 미디어 대기... (${attempts + 1}/5)`);
-            setTimeout(() => startConnection(attempts + 1), 800);
-          } else {
-            console.error('❌ 미디어 준비 타임아웃');
-          }
-        };
-        
-        startConnection();
-        break;
-      }
-      
-      case 'user_left':
-        console.log(`👋 user_left: ${data.username}`);
-        removeRemoteStream(data.username);
-        break;
-      
-      case 'chat_message':
-        addChatMessage(data);
-        break;
-      
-      case 'reaction': {
-        const id = Date.now() + Math.random();
-        setReactions(prev => [...prev, { 
-          id, 
-          emoji: data.reaction, 
-          username: data.username 
-        }]);
-        setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
-        break;
-      }
-      
-      case 'hand_raise':
-        if (data.action === 'raise') {
-          setRaisedHands(prev => 
-            prev.some(h => h.username === data.username) 
-              ? prev 
-              : [...prev, { 
-                  username: data.username, 
-                  user_id: data.user_id, 
-                  raised_at: new Date().toISOString() 
-                }]
-          );
-        } else {
-          setRaisedHands(prev => prev.filter(h => h.username !== data.username));
-        }
-        break;
-      
-      case 'rejection_notification':
-        alert('참가가 거부되었습니다.');
-        navigate('/video-meetings');
-        break;
-      
-      case 'join_request_notification':
-        fetchPendingRequests();
-        break;
-      
-      case 'meeting_ended':
-        alert(data.message);
-        navigate('/video-meetings');
-        break;
-      
-      default:
-        console.log('⚠️ Unknown type:', type);
-        break;
-    }
-  }, [
-    user, 
-    roomId, 
-    room?.is_host, 
-    localStreamRef, 
-    createPeerConnection, 
-    handleWebSocketSignal, 
-    removeRemoteStream, 
-    addChatMessage, 
-    fetchRoomDetails, 
-    fetchPendingRequests, 
-    navigate
-  ]);
 
+    try {
+      currentWs.send(JSON.stringify({
+        type: 'reaction',
+        reaction_type: emoji
+      }));
+    } catch (error) {
+      console.error('❌ 반응 실패:', error);
+    }
+  };
+
+  // =========================================================================
+  // 손들기/내리기
+  // =========================================================================
+  const handleRaiseHand = async () => {
+    const currentWs = wsRef.current;
+    
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      console.error('❌ WebSocket 연결 없음');
+      return;
+    }
+
+    try {
+      console.log('✋ 손들기 요청');
+      currentWs.send(JSON.stringify({ type: 'raise_hand' }));
+      setIsHandRaised(true);
+      console.log('✅ 손들기 완료');
+    } catch (error) {
+      console.error('❌ 손들기 실패:', error);
+    }
+  };
+
+  const handleLowerHand = async () => {
+    const currentWs = wsRef.current;
+    
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+      console.error('❌ WebSocket 연결 없음');
+      return;
+    }
+
+    try {
+      console.log('👋 손내리기 요청');
+      currentWs.send(JSON.stringify({ type: 'lower_hand' }));
+      setIsHandRaised(false);
+      console.log('✅ 손내리기 완료');
+    } catch (error) {
+      console.error('❌ 손내리기 실패:', error);
+    }
+  };
+
+  // =========================================================================
+  // 마운트/언마운트 처리
+  // =========================================================================
   useEffect(() => {
     if (!roomId || roomId === 'undefined') {
       console.error('❌ 유효하지 않은 roomId');
@@ -1056,6 +957,9 @@ function VideoMeetingRoom() {
     };
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
+  // =========================================================================
+  // 초기 연결 및 방장 폴링
+  // =========================================================================
   useEffect(() => {
     if (!room || !user) return;
 
@@ -1073,7 +977,7 @@ function VideoMeetingRoom() {
           console.log('🎥 미디어 초기화');
           await initializeMedia();
           
-          await new Promise(resolve => setTimeout(resolve, 300)); // 500ms → 300ms
+          await new Promise(resolve => setTimeout(resolve, 300));
           
           console.log('🔌 WebSocket 연결');
           connectWebSocket();
@@ -1087,7 +991,7 @@ function VideoMeetingRoom() {
       initialize();
     }
 
-    // ⭐⭐⭐ 방장: 대기 요청 폴링 (wsReady 체크 제거)
+    // 방장: 대기 요청 폴링
     if (room.is_host && isApproved && wsConnected) {
       console.log('👑 방장: 대기 요청 폴링');
       fetchPendingRequests();
@@ -1099,11 +1003,15 @@ function VideoMeetingRoom() {
     room?.is_host, 
     user, 
     wsConnected, 
+    localStreamRef,
     initializeMedia, 
     connectWebSocket, 
     fetchPendingRequests
   ]);
 
+  // =========================================================================
+  // 승인 대기 폴링 (참가자용)
+  // =========================================================================
   useEffect(() => {
     if (!room || !user) return;
     
@@ -1163,155 +1071,18 @@ function VideoMeetingRoom() {
     navigate
   ]);
 
+  // =========================================================================
+  // 채팅 패널 열릴 때 읽지 않은 메시지 초기화
+  // =========================================================================
   useEffect(() => {
     if (showChatPanel) {
       setUnreadChatCount(0);
     }
   }, [showChatPanel]);
 
-  const handleToggleMic = () => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !isMicOn;
-        setIsMicOn(!isMicOn);
-        console.log('🎤 마이크:', !isMicOn ? 'ON' : 'OFF');
-      }
-    }
-  };
-
-  const handleToggleVideo = () => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !isVideoOn;
-        setIsVideoOn(!isVideoOn);
-        console.log('📹 비디오:', !isVideoOn ? 'ON' : 'OFF');
-      }
-    }
-  };
-
-  const handleLeave = async () => {
-    if (room.is_host) {
-      const confirmEnd = window.confirm(
-        '회의를 종료하시겠습니까?\n\n"확인": 모든 참가자 퇴장\n"취소": 나만 나가기'
-      );
-
-      try {
-        if (confirmEnd) {
-          console.log('🛑 회의 종료');
-          await endMeeting();
-        } else {
-          console.log('👋 방장 나가기');
-          await leaveRoom();
-        }
-        
-        cleanupWebRTC();
-        if (wsRef.current) {
-          wsRef.current.close(1000, 'User leaving');
-        }
-        navigate('/video-meetings');
-      } catch (error) {
-        console.error('❌ 나가기 실패:', error);
-        navigate('/video-meetings');
-      }
-    } else {
-      try {
-        await leaveRoom();
-        cleanupWebRTC();
-        if (wsRef.current) {
-          wsRef.current.close(1000, 'User leaving');
-        }
-        navigate('/video-meetings');
-      } catch (error) {
-        console.error('❌ 나가기 실패:', error);
-        navigate('/video-meetings');
-      }
-    }
-  };
-
-  const handleSendChatMessage = async (content) => {
-    const currentWs = wsRef.current;
-    
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket 연결 없음');
-    }
-
-    try {
-      currentWs.send(JSON.stringify({
-        type: 'chat',
-        content: content
-      }));
-      
-      console.log('💬 채팅 전송:', content.substring(0, 30));
-    } catch (error) {
-      console.error('❌ 채팅 실패:', error);
-      throw error;
-    }
-  };
-
-  const handleSendReaction = async (emoji) => {
-    const currentWs = wsRef.current;
-    
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      console.error('❌ WebSocket 연결 없음');
-      return;
-    }
-
-    try {
-      currentWs.send(JSON.stringify({
-        type: 'reaction',
-        reaction_type: emoji
-      }));
-    } catch (error) {
-      console.error('❌ 반응 실패:', error);
-    }
-  };
-
-  const handleRaiseHand = async () => {
-    const currentWs = wsRef.current;
-    
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      console.error('❌ WebSocket 연결 없음');
-      return;
-    }
-
-    try {
-      console.log('✋ 손들기 요청');
-      
-      currentWs.send(JSON.stringify({
-        type: 'raise_hand'
-      }));
-      
-      setIsHandRaised(true);
-      console.log('✅ 손들기 완료');
-    } catch (error) {
-      console.error('❌ 손들기 실패:', error);
-    }
-  };
-
-  const handleLowerHand = async () => {
-    const currentWs = wsRef.current;
-    
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-      console.error('❌ WebSocket 연결 없음');
-      return;
-    }
-
-    try {
-      console.log('👋 손내리기 요청');
-      
-      currentWs.send(JSON.stringify({
-        type: 'lower_hand'
-      }));
-      
-      setIsHandRaised(false);
-      console.log('✅ 손내리기 완료');
-    } catch (error) {
-      console.error('❌ 손내리기 실패:', error);
-    }
-  };
-  
+  // =========================================================================
+  // 렌더링
+  // =========================================================================
   if (roomLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-900">
@@ -1352,9 +1123,6 @@ function VideoMeetingRoom() {
     );
   }
 
-  // ⭐⭐⭐ iOS 버튼 화면 제거 (자동 초기화로 변경)
-  // iOS도 데스크톱처럼 자동으로 처리하므로 이 화면은 불필요
-  
   const allVideos = [
     {
       peerId: user?.username,
@@ -1447,4 +1215,4 @@ function VideoMeetingRoom() {
   );
 }
 
-export default VideoMeetingRoom;    
+export default VideoMeetingRoom;

@@ -76,7 +76,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 )
         except Exception as e:
             logger.error(f"❌ 연결 종료 오류: {e}", exc_info=True)
-    
+
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
@@ -92,11 +92,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             if message_type in ['offer', 'answer', 'ice_candidate']:
                 await self.handle_webrtc_signal(data)
             
+            # ⭐⭐⭐ 새로 추가: track 상태 변경
+            elif message_type == 'track_state':
+                await self.handle_track_state(data)
+            
             # join_ready 처리
             elif message_type == 'join_ready':
                 await self.handle_join_ready(data)
             
-            # ⭐⭐⭐ join 처리 (수정!)
+            # join 처리
             elif message_type == 'join':
                 await self.handle_join(data)
             
@@ -126,6 +130,22 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"❌ 메시지 처리 오류: {e}", exc_info=True)
 
+   
+    # ⭐⭐⭐ 그룹 메시지 핸들러 추가
+    async def track_state_changed(self, event):
+        """
+        Track 상태 변경 알림 - 자신 제외
+        """
+        if event['username'] != self.username:
+            await self.send(text_data=json.dumps({
+                'type': 'track_state',
+                'username': event['username'],
+                'user_id': event['user_id'],
+                'kind': event['kind'],
+                'enabled': event['enabled'],
+                'timestamp': event.get('timestamp')
+            }))
+    
     # =========================================================================
     # ⭐⭐⭐ WebRTC 시그널링 (핵심 수정)
     # =========================================================================
@@ -155,6 +175,31 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }
         )
     
+    # ⭐⭐⭐ 새로 추가: Track 상태 동기화
+    async def handle_track_state(self, data):
+        """
+        마이크/비디오 상태 변경을 모든 참가자에게 브로드캐스트
+        """
+        track_kind = data.get('kind')  # 'audio' or 'video'
+        enabled = data.get('enabled')  # True or False
+        
+        logger.info(f"🎚️ Track 상태 변경: {self.username}")
+        logger.info(f"   Kind: {track_kind}")
+        logger.info(f"   Enabled: {enabled}")
+        
+        # 모든 참가자에게 브로드캐스트
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'track_state_changed',
+                'username': self.username,
+                'user_id': self.user_id,
+                'kind': track_kind,
+                'enabled': enabled,
+                'timestamp': datetime.now().isoformat()
+            }
+        )
+
     # =========================================================================
     # ⭐⭐⭐ join_ready 처리 (핵심 수정)
     # =========================================================================
