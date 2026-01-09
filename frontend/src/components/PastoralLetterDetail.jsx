@@ -1,17 +1,18 @@
-// frontend/src/components/PastoralLetterDetail.jsx (수정 버전)
-import React, { useState, useEffect } from 'react';
+// frontend/src/components/PastoralLetterDetail.jsx
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Document, Page } from 'react-pdf';
+import { Document, Page, pdfjs } from 'react-pdf';
 import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ArrowLeft, Calendar, User, Eye, 
   ExternalLink, Edit, Trash2, FileText,
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  Maximize2, Minimize2, AlertCircle
+  Maximize2, Minimize2, AlertCircle, Download
 } from 'lucide-react';
 
-// ⭐ PDF 설정은 main.jsx에서 전역 적용됨
+// PDF.js 워커 설정
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 function PastoralLetterDetail() {
   const { id } = useParams();
@@ -30,6 +31,13 @@ function PastoralLetterDetail() {
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // PDF options를 useMemo로 메모이제이션
+  const pdfOptions = useMemo(() => ({
+    cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  }), []);
 
   useEffect(() => {
     fetchLetter();
@@ -56,6 +64,7 @@ function PastoralLetterDetail() {
   const onDocumentLoadSuccess = ({ numPages }) => {
     console.log('✅ PDF 로딩 성공:', numPages, '페이지');
     setNumPages(numPages);
+    setPageNumber(1);
     setPdfLoading(false);
     setPdfError(null);
   };
@@ -214,16 +223,18 @@ function PastoralLetterDetail() {
                       onClick={goToPrevPage}
                       disabled={pageNumber <= 1}
                       className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      title="이전 페이지"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="text-sm font-medium px-2">
+                    <span className="text-sm font-medium px-2 min-w-[60px] text-center">
                       {pageNumber} / {numPages || '?'}
                     </span>
                     <button
                       onClick={goToNextPage}
                       disabled={pageNumber >= (numPages || 1)}
                       className="p-2 bg-white/10 rounded hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      title="다음 페이지"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
@@ -237,7 +248,7 @@ function PastoralLetterDetail() {
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
-                    <span className="text-sm font-medium px-2">
+                    <span className="text-sm font-medium px-2 min-w-[50px] text-center">
                       {Math.round(scale * 100)}%
                     </span>
                     <button
@@ -275,8 +286,9 @@ function PastoralLetterDetail() {
                       <p className="text-red-700 mb-4">{pdfError}</p>
                       <button
                         onClick={() => handlePdfView(letter.pdf_url)}
-                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm"
+                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm inline-flex items-center"
                       >
+                        <ExternalLink className="w-4 h-4 mr-2" />
                         새 창에서 열기
                       </button>
                     </div>
@@ -297,17 +309,14 @@ function PastoralLetterDetail() {
                           <p className="text-red-700 mb-4">PDF를 불러올 수 없습니다.</p>
                           <button
                             onClick={() => handlePdfView(letter.pdf_url)}
-                            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm"
+                            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition text-sm inline-flex items-center"
                           >
+                            <ExternalLink className="w-4 h-4 mr-2" />
                             새 창에서 열기
                           </button>
                         </div>
                       }
-                      options={{
-                        cMapUrl: 'https://unpkg.com/pdfjs-dist@5.4.394/cmaps/',
-                        cMapPacked: true,
-                        standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@5.4.394/standard_fonts/',
-                      }}
+                      options={pdfOptions}
                     >
                       <Page
                         pageNumber={pageNumber}

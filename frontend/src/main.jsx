@@ -7,7 +7,7 @@ import { pdfjs } from 'react-pdf';
 
 // ✅ Use Cloudflare CDN instead of unpkg// 
 // ✅ PDF.js Worker 설정 - package.json의 pdfjs-dist 버전과 일치
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
