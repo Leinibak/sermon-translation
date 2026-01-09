@@ -304,8 +304,9 @@ function PastoralLetterDetail() {
                         </div>
                       }
                       options={{
-                        cMapUrl: 'https://unpkg.com/pdfjs-dist@4.0.379/cmaps/',
+                        cMapUrl: 'https://unpkg.com/pdfjs-dist@5.4.394/cmaps/',
                         cMapPacked: true,
+                        standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@5.4.394/standard_fonts/',
                       }}
                     >
                       <Page

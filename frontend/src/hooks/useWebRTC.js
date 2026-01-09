@@ -1,4 +1,4 @@
-// frontend/src/hooks/useWebRTC.js (핵심 수정)
+// frontend/src/hooks/useWebRTC.js (iOS Safari 호환성 개선)
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -8,6 +8,15 @@ const ICE_SERVERS = {
     { urls: 'stun:stun1.l.google.com:19302' },
   ],
   iceCandidatePoolSize: 10,
+};
+
+// ⭐ iOS Safari 감지
+const isIOSSafari = () => {
+  const ua = navigator.userAgent;
+  const iOS = /iPad|iPhone|iPod/.test(ua);
+  const webkit = /WebKit/.test(ua);
+  const notChrome = !/CriOS/.test(ua);
+  return iOS && webkit && notChrome;
 };
 
 export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
@@ -63,6 +72,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       localStreamRef.current = stream;
       
       console.log('✅ 미디어 준비 완료');
+      console.log('   Video tracks:', stream.getVideoTracks().length);
+      console.log('   Audio tracks:', stream.getAudioTracks().length);
       
       return stream;
     } catch (err) {
@@ -72,7 +83,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
   }, []);
 
   // =========================================================================
-  // ⭐⭐⭐ Peer Connection 생성 (핵심 수정!)
+  // ⭐⭐⭐ Peer Connection 생성 (iOS Safari 호환성 개선!)
   // =========================================================================
   const createPeerConnection = useCallback(async (peerUsername, isInitiator) => {
     console.log(`\n${'='.repeat(60)}`);
@@ -80,6 +91,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log(`   Peer: ${peerUsername}`);
     console.log(`   Initiator: ${isInitiator}`);
     console.log(`   나: ${currentUser?.username}`);
+    console.log(`   iOS Safari: ${isIOSSafari()}`);
     console.log(`${'='.repeat(60)}\n`);
     
     // 중복 생성 방지
@@ -139,34 +151,32 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
       // PeerConnection 생성
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // ⭐ 트랙 추가
-      console.log('📤 로컬 트랙 추가 중...');
-      localStream.getTracks().forEach(track => {
-        try {
-          pc.addTrack(track, localStream);
-          console.log(`✅ Track 추가: ${track.kind} (enabled: ${track.enabled})`);
-        } catch (e) {
-          console.error(`❌ Track 추가 실패: ${track.kind}`, e);
-        }
-      });
-
-      // ⭐ ontrack - 상대방 영상 수신
+      // ⭐⭐⭐ iOS Safari: addTrack 전에 ontrack 핸들러 등록!
       pc.ontrack = (event) => {
         console.log(`\n${'='.repeat(60)}`);
         console.log(`🎥 Remote Track 수신`);
         console.log(`   Peer: ${peerUsername}`);
         console.log(`   Kind: ${event.track.kind}`);
         console.log(`   Enabled: ${event.track.enabled}`);
+        console.log(`   Streams: ${event.streams.length}`);
         console.log(`${'='.repeat(60)}\n`);
         
         if (event.streams.length === 0) {
-          console.warn('⚠️ No streams');
+          console.warn('⚠️ No streams in event');
           return;
         }
         
         const remoteStream = event.streams[0];
         
-        // ⭐ 상태 업데이트
+        // ⭐ iOS Safari: 트랙 활성화 상태 로그
+        const videoTrack = remoteStream.getVideoTracks()[0];
+        const audioTrack = remoteStream.getAudioTracks()[0];
+        
+        console.log('📊 Remote Stream 상세:');
+        console.log('   Video:', videoTrack ? `${videoTrack.id} (${videoTrack.readyState})` : 'none');
+        console.log('   Audio:', audioTrack ? `${audioTrack.id} (${audioTrack.readyState})` : 'none');
+        
+        // 상태 업데이트
         setRemoteStreams(prev => {
           const existingIndex = prev.findIndex(p => p.peerId === peerUsername);
           
@@ -174,8 +184,8 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             peerId: peerUsername,
             username: peerUsername,
             stream: remoteStream,
-            isMuted: !remoteStream.getAudioTracks()[0]?.enabled,
-            isVideoOff: !remoteStream.getVideoTracks()[0]?.enabled
+            isMuted: !audioTrack?.enabled,
+            isVideoOff: !videoTrack?.enabled
           };
           
           if (existingIndex >= 0) {
@@ -190,7 +200,28 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         });
       };
 
-      // ⭐ negotiationneeded
+      // ⭐⭐⭐ iOS Safari: 트랙 추가 (streams 배열 명시!)
+      console.log('📤 로컬 트랙 추가 중...');
+      
+      localStream.getTracks().forEach(track => {
+        try {
+          // ⭐ iOS Safari: streams 파라미터 명시적 전달
+          pc.addTrack(track, localStream);
+          console.log(`✅ Track 추가: ${track.kind} (enabled: ${track.enabled}, id: ${track.id})`);
+        } catch (e) {
+          console.error(`❌ Track 추가 실패: ${track.kind}`, e);
+        }
+      });
+
+      // ⭐ iOS Safari: 트랙 추가 직후 getSenders 확인
+      const senders = pc.getSenders();
+      console.log('📊 Senders:', senders.map(s => ({
+        kind: s.track?.kind,
+        enabled: s.track?.enabled,
+        id: s.track?.id
+      })));
+
+      // negotiationneeded
       pc.onnegotiationneeded = async () => {
         // Initiator만 Offer 생성
         if (!isInitiator) {
@@ -206,7 +237,19 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         console.log('🔄 Negotiation needed - Offer 생성');
         
         try {
-          const offer = await pc.createOffer();
+          // ⭐ iOS Safari: offerToReceiveAudio/Video 명시
+          const offerOptions = {
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+          };
+          
+          const offer = await pc.createOffer(offerOptions);
+          
+          // ⭐ iOS Safari: SDP 로그 (디버깅용)
+          if (isIOSSafari()) {
+            console.log('📄 iOS Safari Offer SDP:', offer.sdp.substring(0, 200) + '...');
+          }
+          
           await pc.setLocalDescription(offer);
           
           if (sendSignalRef.current) {
@@ -234,6 +277,12 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         const state = pc.iceConnectionState;
         console.log(`🔌 ICE (${peerUsername}): ${state}`);
         setConnectionStatus(prev => ({...prev, [peerUsername]: state}));
+        
+        // ⭐ iOS Safari: failed 상태에서 재시도
+        if (state === 'failed' && isIOSSafari()) {
+          console.log('🔄 iOS Safari: ICE restart 시도');
+          pc.restartIce();
+        }
       };
 
       pc.onconnectionstatechange = () => {
@@ -312,7 +361,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     try {
       switch (type) {
         case 'offer':
-          console.log('📥 Offer 처리');
+          console.log('🔥 Offer 처리');
           
           // Rollback 처리
           if (pc.signalingState === 'have-local-offer') {
@@ -322,7 +371,13 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           
           await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
           
-          const answer = await pc.createAnswer();
+          // ⭐ iOS Safari: answerToReceiveAudio/Video 명시
+          const answerOptions = isIOSSafari() ? {
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+          } : {};
+          
+          const answer = await pc.createAnswer(answerOptions);
           await pc.setLocalDescription(answer);
           
           if (sendSignalRef.current) {
@@ -347,7 +402,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           break;
 
         case 'answer':
-          console.log('📥 Answer 처리');
+          console.log('🔥 Answer 처리');
           
           if (pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
@@ -391,7 +446,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }
   }, [currentUser, createPeerConnection]);
 
-  // ⭐⭐⭐ Track 상태 변경 처리
+  // Track 상태 변경 처리
   const handleTrackStateChange = useCallback((data) => {
     const { username, kind, enabled } = data;
     
@@ -410,9 +465,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }));
   }, []);
 
-  // =========================================================================
   // Cleanup
-  // =========================================================================
   const cleanup = useCallback(() => {
     console.log('🧹 WebRTC 정리');
     
@@ -455,7 +508,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     getLocalMedia,
     createPeerConnection,
     handleWebSocketSignal,
-    handleTrackStateChange, // ⭐ 추가
+    handleTrackStateChange,
     removeRemoteStream,
     cleanup,
   };
