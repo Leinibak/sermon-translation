@@ -82,6 +82,30 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     }
   }, []);
 
+
+  // 📱 iOS 전용: 원격 스트림 재생 강제 트리거
+  const forceRemotePlayback = useCallback(async (stream, peerUsername) => {
+    if (!isIOSSafari()) return;
+    
+    console.log(`📱 iOS: ${peerUsername} 스트림 재생 강제 트리거`);
+    
+    // 🎬 임시 video 요소 생성하여 재생 시도
+    const tempVideo = document.createElement('video');
+    tempVideo.srcObject = stream;
+    tempVideo.autoplay = true;
+    tempVideo.playsInline = true;
+    tempVideo.muted = false;
+    
+    try {
+      await tempVideo.play();
+      console.log(`✅ iOS: 재생 성공`);
+      tempVideo.pause();
+      tempVideo.srcObject = null;
+    } catch (error) {
+      console.warn(`⚠️ iOS 재생 실패:`, error);
+    }
+  }, []);
+
   // =========================================================================
   // ⭐⭐⭐ Peer Connection 생성 (iOS Safari 호환성 개선!)
   // =========================================================================
@@ -94,7 +118,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     console.log(`   iOS Safari: ${isIOSSafari()}`);
     console.log(`${'='.repeat(60)}\n`);
     
-    // 중복 생성 방지
     if (isCreatingConnection.current[peerUsername]) {
       console.log(`⏳ 연결 생성 대기: ${peerUsername}`);
       
@@ -111,7 +134,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     isCreatingConnection.current[peerUsername] = true;
     
     try {
-      // 기존 연결 정리
       const existing = peerConnections.current[peerUsername];
       if (existing) {
         const state = existing.connectionState;
@@ -128,7 +150,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         delete peerConnections.current[peerUsername];
       }
       
-      // 로컬 스트림 확인
       if (!localStreamRef.current) {
         throw new Error('Local Stream 없음');
       }
@@ -148,16 +169,16 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         audioEnabled: audioTracks[0]?.enabled
       });
 
-      // PeerConnection 생성
       const pc = new RTCPeerConnection(ICE_SERVERS);
 
-      // ⭐⭐⭐ iOS Safari: addTrack 전에 ontrack 핸들러 등록!
-      pc.ontrack = (event) => {
+      // ⭐⭐⭐ iOS Safari: ontrack 핸들러 (강화)
+      pc.ontrack = async (event) => {
         console.log(`\n${'='.repeat(60)}`);
         console.log(`🎥 Remote Track 수신`);
         console.log(`   Peer: ${peerUsername}`);
         console.log(`   Kind: ${event.track.kind}`);
         console.log(`   Enabled: ${event.track.enabled}`);
+        console.log(`   ReadyState: ${event.track.readyState}`);
         console.log(`   Streams: ${event.streams.length}`);
         console.log(`${'='.repeat(60)}\n`);
         
@@ -168,15 +189,67 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         
         const remoteStream = event.streams[0];
         
-        // ⭐ iOS Safari: 트랙 활성화 상태 로그
         const videoTrack = remoteStream.getVideoTracks()[0];
         const audioTrack = remoteStream.getAudioTracks()[0];
         
         console.log('📊 Remote Stream 상세:');
         console.log('   Video:', videoTrack ? `${videoTrack.id} (${videoTrack.readyState})` : 'none');
         console.log('   Audio:', audioTrack ? `${audioTrack.id} (${audioTrack.readyState})` : 'none');
+
+        // ⭐⭐⭐ iOS 전용: 스트림 준비 대기
+        if (isIOSSafari()) {
+          console.log('📱 iOS: 스트림 안정화 대기...');
+          
+          // 1. 트랙이 live 상태가 될 때까지 대기
+          const waitForLiveTracks = async () => {
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (attempts < maxAttempts) {
+              const videoLive = videoTrack ? videoTrack.readyState === 'live' : true;
+              const audioLive = audioTrack ? audioTrack.readyState === 'live' : true;
+              
+              if (videoLive && audioLive) {
+                console.log(`✅ iOS: 트랙 준비 완료 (시도: ${attempts + 1})`);
+                break;
+              }
+              
+              console.log(`⏳ iOS: 트랙 대기 중... (${attempts + 1}/${maxAttempts})`);
+              await new Promise(r => setTimeout(r, 200));
+              attempts++;
+            }
+          };
+          
+          await waitForLiveTracks();
+          
+          // 2. 추가 안정화 대기
+          await new Promise(r => setTimeout(r, 500));
+          
+          // 3. 임시 video 요소로 재생 트리거 (iOS 최적화)
+          console.log('📱 iOS: 재생 트리거 시도');
+          
+          const tempVideo = document.createElement('video');
+          tempVideo.srcObject = remoteStream;
+          tempVideo.autoplay = true;
+          tempVideo.playsInline = true;
+          tempVideo.muted = false;
+          
+          try {
+            await tempVideo.play();
+            console.log('✅ iOS: 임시 재생 성공');
+            
+            // 즉시 정리
+            await new Promise(r => setTimeout(r, 100));
+            tempVideo.pause();
+            tempVideo.srcObject = null;
+          } catch (error) {
+            console.warn('⚠️ iOS 임시 재생 실패:', error.name);
+            
+            // 재생 실패 시에도 스트림은 추가 (수동 재생 버튼 표시용)
+          }
+        }
         
-        // 상태 업데이트
+        // ⭐⭐⭐ 스트림 추가 (중복 체크)
         setRemoteStreams(prev => {
           const existingIndex = prev.findIndex(p => p.peerId === peerUsername);
           
@@ -185,7 +258,9 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
             username: peerUsername,
             stream: remoteStream,
             isMuted: !audioTrack?.enabled,
-            isVideoOff: !videoTrack?.enabled
+            isVideoOff: !videoTrack?.enabled,
+            // ⭐ iOS 플래그 추가
+            isIOS: isIOSSafari()
           };
           
           if (existingIndex >= 0) {
@@ -198,14 +273,43 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           console.log('➕ 새 스트림 추가');
           return [...prev, streamData];
         });
+        
+        // ⭐⭐⭐ iOS: 스트림 추가 후 재생 상태 모니터링
+        if (isIOSSafari()) {
+          setTimeout(() => {
+            // VideoGrid의 video 요소들 확인
+            const videoElements = document.querySelectorAll('video:not([muted])');
+            
+            videoElements.forEach(video => {
+              if (video.srcObject === remoteStream) {
+                console.log('📱 iOS: 원격 비디오 재생 상태 확인:', {
+                  paused: video.paused,
+                  readyState: video.readyState,
+                  networkState: video.networkState
+                });
+                
+                if (video.paused && video.readyState >= 2) {
+                  console.log('⚠️ iOS: 비디오가 정지 상태 - 재생 필요');
+                  
+                  // IOSPlayButton 표시 이벤트 발송
+                  window.dispatchEvent(new CustomEvent('ios-play-required', {
+                    detail: { 
+                      streamId: remoteStream.id, 
+                      peerUsername,
+                      videoElement: video
+                    }
+                  }));
+                }
+              }
+            });
+          }, 1500); // ⭐ 1.5초 후 체크
+        }
       };
 
-      // ⭐⭐⭐ iOS Safari: 트랙 추가 (streams 배열 명시!)
       console.log('📤 로컬 트랙 추가 중...');
       
       localStream.getTracks().forEach(track => {
         try {
-          // ⭐ iOS Safari: streams 파라미터 명시적 전달
           pc.addTrack(track, localStream);
           console.log(`✅ Track 추가: ${track.kind} (enabled: ${track.enabled}, id: ${track.id})`);
         } catch (e) {
@@ -213,7 +317,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         }
       });
 
-      // ⭐ iOS Safari: 트랙 추가 직후 getSenders 확인
       const senders = pc.getSenders();
       console.log('📊 Senders:', senders.map(s => ({
         kind: s.track?.kind,
@@ -221,9 +324,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         id: s.track?.id
       })));
 
-      // negotiationneeded
       pc.onnegotiationneeded = async () => {
-        // Initiator만 Offer 생성
         if (!isInitiator) {
           console.log('⚠️ Non-initiator - 대기');
           return;
@@ -237,7 +338,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         console.log('🔄 Negotiation needed - Offer 생성');
         
         try {
-          // ⭐ iOS Safari: offerToReceiveAudio/Video 명시
           const offerOptions = {
             offerToReceiveAudio: true,
             offerToReceiveVideo: true
@@ -245,7 +345,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
           
           const offer = await pc.createOffer(offerOptions);
           
-          // ⭐ iOS Safari: SDP 로그 (디버깅용)
           if (isIOSSafari()) {
             console.log('📄 iOS Safari Offer SDP:', offer.sdp.substring(0, 200) + '...');
           }
@@ -263,7 +362,6 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         }
       };
 
-      // ICE Candidate
       pc.onicecandidate = (event) => {
         if (event.candidate && sendSignalRef.current) {
           sendSignalRef.current(peerUsername, 'ice_candidate', {
@@ -272,13 +370,11 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
         }
       };
 
-      // 연결 상태
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
         console.log(`🔌 ICE (${peerUsername}): ${state}`);
         setConnectionStatus(prev => ({...prev, [peerUsername]: state}));
         
-        // ⭐ iOS Safari: failed 상태에서 재시도
         if (state === 'failed' && isIOSSafari()) {
           console.log('🔄 iOS Safari: ICE restart 시도');
           pc.restartIce();
@@ -306,7 +402,7 @@ export function useWebRTC(roomId, currentUser, isHost, sendWebRTCSignal) {
     } finally {
       isCreatingConnection.current[peerUsername] = false;
     }
-  }, [currentUser]);
+  }, [currentUser, forceRemotePlayback]);
 
   // =========================================================================
   // WebSocket Signal Handler

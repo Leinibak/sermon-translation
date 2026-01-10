@@ -389,6 +389,15 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
                 'room_id': str(room.id),
                 'host_username': room.host.username,  # ⭐ 방장 username 추가
                 'host_user_id': room.host.id,         # ⭐ 방장 ID 추가
+                 # ✅ 추가: 기존 참가자 목록
+                'existing_participants': [
+                    {
+                        'username': p.user.username,
+                        'user_id': p.user.id
+                    }
+                    for p in room.participants.filter(status='approved')
+                    if p.user != participant.user
+                ],
                 'should_initialize': True,
                 'timestamp': datetime.now().isoformat()
             }
