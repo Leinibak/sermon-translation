@@ -1,18 +1,14 @@
-# mediasoup/Dockerfile
-FROM node:20-alpine
+FROM node:22-alpine
 
-# mediasoup 빌드에 필요한 네이티브 도구
-RUN apk add --no-cache python3 make g++ linux-headers
+RUN apk add --no-cache python3 py3-pip make g++ linux-headers
 
 WORKDIR /app
 
-# 의존성 먼저 복사 (레이어 캐시 활용)
 COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY src/ ./src/
 
-# 비루트 유저로 실행
 RUN addgroup -S sfu && adduser -S sfu -G sfu
 USER sfu
 
