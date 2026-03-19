@@ -4,7 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
-import { useWebRTC } from '../hooks/useWebRTC';
+// import { useWebRTC } from '../hooks/useWebRTC';
+import { useSFU } from '../hooks/useSFU';
 
 // 컴포넌트 임포트
 import { RoomHeader } from './VideoMeeting/RoomHeader';
@@ -141,18 +142,20 @@ function VideoMeetingRoom() {
   }, [user]);
 
   const {
-    localStreamRef,
-    peerConnections,
-    remoteStreams,
-    connectionStatus,
-    getLocalMedia,
-    createPeerConnection,
-    handleWebSocketSignal,
-    handleTrackStateChange,
-    removeRemoteStream,
-    cleanup: cleanupWebRTC,
-  } = useWebRTC(roomId, user, room?.is_host, sendWebRTCSignal);
-  
+  localStreamRef,
+  remoteStreams,
+  connectionStatus,
+  getLocalMedia,
+  initSFU,
+  startProducing,
+  muteAudio,
+  unmuteAudio,
+  muteVideo,
+  unmuteVideo,
+  handleSFUMessage,
+  cleanup: cleanupWebRTC,
+} = useSFU({ wsRef, roomId });
+
   const addChatMessage = useCallback((message) => {
     const messageId = message.message_id || message.id;
     
@@ -316,15 +319,15 @@ function VideoMeetingRoom() {
       console.log('📨 WebSocket 수신:', type);
     }
     
-    // WebRTC 시그널링 우선 처리
-    if (['offer', 'answer', 'ice_candidate'].includes(type)) {
-      handleWebSocketSignal(data);
+    // SFU 관련 메시지는 handleSFUMessage로 위임
+    if (['sfu_rtp_capabilities','sfu_joined','sfu_transport_created',
+        'sfu_transport_connected','sfu_produced','sfu_consumed',
+        'sfu_consumer_resumed','peer_joined','new_producer'].includes(type)) {
+      handleSFUMessage(data);
       return;
     }
-
-    // Track 상태 변경
     if (type === 'track_state') {
-      handleTrackStateChange(data);
+      handleSFUMessage(data);
       return;
     }
     
@@ -395,6 +398,8 @@ function VideoMeetingRoom() {
                 }
                 
                 console.log('✅ 미디어 초기화 완료');
+                await initSFU();
+                await startProducing(localStreamRef.current);
               } catch (mediaError) {
                 console.error('❌ 미디어 초기화 실패:', mediaError);
                 approvalInitializedRef.current = false;
@@ -982,31 +987,17 @@ function VideoMeetingRoom() {
   // =========================================================================
   // 마이크/비디오 토글
   // =========================================================================
-  const handleToggleMic = useCallback(() => {
-    if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        const newState = !isMicOn;
-        audioTrack.enabled = newState;
-        setIsMicOn(newState);
-        broadcastTrackState('audio', newState);
-        console.log('🎤 마이크:', newState ? 'ON' : 'OFF');
-      }
-    }
-  }, [isMicOn, localStreamRef, broadcastTrackState]);
+   const handleToggleMic = useCallback(() => {
+    const newState = !isMicOn;
+    setIsMicOn(newState);
+    if (newState) { unmuteAudio(); } else { muteAudio(); }
+  }, [isMicOn, muteAudio, unmuteAudio]);
 
   const handleToggleVideo = useCallback(() => {
-    if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        const newState = !isVideoOn;
-        videoTrack.enabled = newState;
-        setIsVideoOn(newState);
-        broadcastTrackState('video', newState);
-        console.log('📹 비디오:', newState ? 'ON' : 'OFF');
-      }
-    }
-  }, [isVideoOn, localStreamRef, broadcastTrackState]);
+    const newState = !isVideoOn;
+    setIsVideoOn(newState);
+    if (newState) { unmuteVideo(); } else { muteVideo(); }
+  }, [isVideoOn, muteVideo, unmuteVideo]);
 
   // =========================================================================
   // 회의 나가기
@@ -1338,10 +1329,11 @@ function VideoMeetingRoom() {
       ref: localVideoRef,
       isHandRaised,
     },
-    ...remoteStreams.map(stream => ({
-      ...stream,
-      isHandRaised: raisedHands.some(h => h.username === stream.username)
-    })),
+      ...[...remoteStreams.values()].map(stream => ({
+        ...stream,
+        username: stream.peerId,
+        isHandRaised: raisedHands.some(h => h.username === stream.peerId)
+      })),
   ].filter(v => v.stream || v.isLocal);
   
   return (
