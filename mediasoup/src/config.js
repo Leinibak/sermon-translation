@@ -17,7 +17,7 @@ module.exports = {
       logLevel: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
       logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
       rtcMinPort: parseInt(process.env.MEDIASOUP_RTP_MIN_PORT) || 40000,
-      rtcMaxPort: parseInt(process.env.MEDIASOUP_RTP_MAX_PORT) || 49999,
+      rtcMaxPort: parseInt(process.env.MEDIASOUP_RTP_MAX_PORT) || 40500,
     },
 
     // Router가 지원할 미디어 코덱
@@ -68,7 +68,7 @@ module.exports = {
           announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           portRange: {
             min: parseInt(process.env.MEDIASOUP_RTP_MIN_PORT) || 40000,
-            max: parseInt(process.env.MEDIASOUP_RTP_MAX_PORT) || 49999,
+            max: parseInt(process.env.MEDIASOUP_RTP_MAX_PORT) || 40500,
           },
         },
         {
