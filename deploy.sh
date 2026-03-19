@@ -125,6 +125,12 @@ echo "✅ backend/entrypoint.prod.sh permissions set"
 echo "✅ All pre-deployment checks passed!"
 echo ""
 
+# .env 동기화
+echo "🔄 Syncing .env.production → .env..."
+cp .env.production .env
+echo "✅ .env synced"
+echo ""
+
 # ================================================
 # 3️⃣ 백업 생성
 # ================================================
@@ -173,6 +179,24 @@ echo ""
 echo "🔨 Building Docker images..."
 echo "⚠️  This may take a few minutes..."
 echo ""
+
+
+# mediasoup는 캐시 사용 (C++ 컴파일 포함, 변경 거의 없음)
+# echo "📦 Building mediasoup (cache enabled)..."
+# if ! docker compose -f $COMPOSE_FILE build mediasoup; then
+#     echo "❌ mediasoup build failed!"
+#     exit 1
+# fi
+# echo "✅ mediasoup build complete"
+# echo ""
+
+# # backend, frontend는 매번 새로 빌드
+# echo "📦 Building backend and frontend (no cache)..."
+# if ! docker compose -f $COMPOSE_FILE build --no-cache backend frontend; then
+#     echo "❌ backend/frontend build failed!"
+#     exit 1
+# fi
+# echo "✅ Docker images built successfully!"
 
 if docker compose -f $COMPOSE_FILE build --no-cache; then
     echo "✅ Docker images built successfully!"
