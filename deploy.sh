@@ -285,6 +285,16 @@ if [ "$BACKEND_HEALTHY" = false ]; then
     fi
 fi
 
+
+# Nginx 헬스체크 바로 위에 추가
+echo "🔍 Checking mediasoup..."
+if docker exec webboard_mediasoup wget -qO- http://localhost:3000/health > /dev/null 2>&1; then
+    echo "✅ mediasoup is healthy!"
+else
+    echo "⚠️  mediasoup health check failed - check logs:"
+    echo "    docker logs webboard_mediasoup"
+fi
+ 
 # Nginx 헬스체크
 echo ""
 echo "🔍 Checking nginx..."
@@ -304,16 +314,7 @@ fi
 
 echo ""
 
-# Nginx 헬스체크 바로 위에 추가
-echo "🔍 Checking mediasoup..."
-if docker exec webboard_mediasoup wget -qO- http://localhost:3000/health > /dev/null 2>&1; then
-    echo "✅ mediasoup is healthy!"
-else
-    echo "⚠️  mediasoup health check failed - check logs:"
-    echo "    docker logs webboard_mediasoup"
-fi
 
-echo ""
 # ================================================
 # 8️⃣ 배포 후 작업
 # ================================================
