@@ -83,7 +83,7 @@ services:
       - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
       # ── 신규: mediasoup SFU 주소 ──────────────────────────────
-      - MEDIASOUP_API_URL=http://mediasoup:3000
+      - MEDIASOUP_API_URL=http://localhost:3000
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
       interval: 30s
@@ -210,14 +210,9 @@ services:
       - TRUSTED_ORIGINS=http://backend:8000
     # RTP UDP/TCP 포트 — host 네트워크 아니면 전체 범위 매핑 필요
     # 부하가 크지 않으면 아래처럼 범위 매핑, 부하 크면 network_mode: host 고려
-    ports:
-      - "40000-49999:40000-49999/udp"
-      - "40000-49999:40000-49999/tcp"
-    expose:
-      - "3000"   # 내부 API — 외부 노출 안 함
+    network_mode: host
     restart: always
-    networks:
-      - webboard_network
+
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 15s
