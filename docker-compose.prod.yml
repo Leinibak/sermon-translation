@@ -83,7 +83,7 @@ services:
       - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
       # ── 신규: mediasoup SFU 주소 ──────────────────────────────
-      - MEDIASOUP_API_URL=http://localhost:3000
+      - MEDIASOUP_API_URL=http://mediasoup:3000
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
       interval: 30s
@@ -201,14 +201,23 @@ services:
     environment:
       - NODE_ENV=production
       - MEDIASOUP_HTTP_PORT=3000
+      # ★ OCI 공인 IP를 .env에 MEDIASOUP_ANNOUNCED_IP=x.x.x.x 로 지정
       - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP}
       - MEDIASOUP_RTP_MIN_PORT=40000
       - MEDIASOUP_RTP_MAX_PORT=49999
       - MEDIASOUP_NUM_WORKERS=${MEDIASOUP_NUM_WORKERS:-2}
+      # Django만 접근 허용
       - TRUSTED_ORIGINS=http://backend:8000
-    network_mode: host
+    # RTP UDP/TCP 포트 — host 네트워크 아니면 전체 범위 매핑 필요
+    # 부하가 크지 않으면 아래처럼 범위 매핑, 부하 크면 network_mode: host 고려
+    ports:
+      - "40000-49999:40000-49999/udp"
+      - "40000-49999:40000-49999/tcp"
+    expose:
+      - "3000"   # 내부 API — 외부 노출 안 함
     restart: always
-
+    networks:
+      - webboard_network
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 15s
@@ -231,17 +240,16 @@ services:
     network_mode: host
     command: >
       -n
-      --log-file=stdout
+      --log-file=-
       --use-auth-secret
-      --static-auth-secret=${TURN_SECRET}
+      --static-auth-secret=3216c268e4ec2ee7cf4747d2b70eeb8ca35ff5ee44f384f952364e7bdcb887cd
       --realm=jounsori.org
-      --external-ip=${MEDIASOUP_ANNOUNCED_IP}
+      --external-ip=89.168.85.29
       --listening-port=3478
       --tls-listening-port=5349
       --min-port=49160
       --max-port=49200
       --no-multicast-peers
-      --no-loopback-peers
       --denied-peer-ip=10.0.0.0-10.255.255.255
       --denied-peer-ip=172.16.0.0-172.31.255.255
       --denied-peer-ip=192.168.0.0-192.168.255.255

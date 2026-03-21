@@ -1329,10 +1329,15 @@ function VideoMeetingRoom() {
       ref: localVideoRef,
       isHandRaised,
     },
-      ...[...remoteStreams.values()].map(stream => ({
-        ...stream,
-        username: stream.peerId,
-        isHandRaised: raisedHands.some(h => h.username === stream.peerId)
+      // ✅ SFU용 — Map을 배열로 변환
+      ...[...remoteStreams.entries()].map(([peerId, streamData]) => ({
+        peerId,
+        username: peerId.replace('user_', ''),  // "user_123" → "123"
+        stream: streamData.stream,
+        isLocal: false,
+        isMuted: false,
+        isVideoOff: false,
+        isHandRaised: raisedHands.some(h => h.username === peerId.replace('user_', ''))
       })),
   ].filter(v => v.stream || v.isLocal);
   
