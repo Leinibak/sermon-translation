@@ -425,34 +425,21 @@ function VideoMeetingRoom() {
         }
       }, 10000);
 
-        socket.onopen = () => {
+      socket.onopen = () => {
         console.log('✅ WebSocket 연결 성공');
         clearTimeout(connectionTimeout);
         setWsConnected(true);
         reconnectAttemptsRef.current = 0;
 
-        setTimeout(async () => {
-            if (socket.readyState === WebSocket.OPEN) {
+        setTimeout(() => {
+          if (socket.readyState === WebSocket.OPEN) {
             try {
-                socket.send(JSON.stringify({ type: 'join', username: user.username }));
-                
-                setTimeout(async () => {
-                setWsReady(true);
-                // ★ WebSocket 연결 완료 후 SFU 초기화 (방장만)
-                if (room?.is_host && localStreamRef.current) {
-                    try {
-                    await initSFU();
-                    await startProducing(localStreamRef.current);
-                    console.log('✅ SFU 초기화 완료');
-                    } catch (e) {
-                    console.error('❌ SFU 초기화 실패:', e);
-                    }
-                }
-                }, 500);
+              socket.send(JSON.stringify({ type: 'join', username: user.username }));
+              setTimeout(() => setWsReady(true), 500);
             } catch (e) {}
-            }
+          }
         }, 500);
-        };
+      };
 
       socket.onmessage = (event) => {
         try {
@@ -517,6 +504,12 @@ function VideoMeetingRoom() {
         if (isIOS()) {
           try { await localVideoRef.current.play(); } catch (e) {}
         }
+      }
+
+      // 방장은 바로 SFU 초기화
+      if (room?.is_host) {
+        await initSFU();
+        await startProducing(localStreamRef.current);
       }
 
     } catch (error) {
