@@ -239,7 +239,12 @@ export function useSFU({ wsRef, roomId }) {
       const existing = next.get(peerId) || {};
       const stream = existing.stream || new MediaStream();
       stream.addTrack(consumer.track);
-      next.set(peerId, { ...existing, stream, [`${kind}ConsumerId`]: consumer.id });
+      next.set(peerId, {
+        ...existing,
+        stream,
+        username: peerId,  // ← 이 줄 추가
+        [`${kind}ConsumerId`]: consumer.id,
+      });
       return next;
     });
 
