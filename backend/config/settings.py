@@ -214,8 +214,8 @@ CSRF_TRUSTED_ORIGINS = [
 if ENVIRONMENT == "prod":
     # CSRF 쿠키 보안 설정
     CSRF_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_SAMESITE = 'Strict'
+    CSRF_COOKIE_HTTPONLY = False
+    CSRF_COOKIE_SAMESITE = 'Lax'
     CSRF_USE_SESSIONS = False
     
     # CSRF 토큰 헤더
