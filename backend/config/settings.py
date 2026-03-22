@@ -211,7 +211,6 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(',')
 ]
 
-
 if ENVIRONMENT == "prod":
     # CSRF 쿠키 보안 설정
     CSRF_COOKIE_SECURE = True
