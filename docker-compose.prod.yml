@@ -1,7 +1,7 @@
 # docker-compose.prod.yml
 
 services:
-  # PostgreSQL 데이터베이스
+  # ── PostgreSQL ────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: webboard_db_prod
@@ -27,7 +27,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Redis (WebSocket 메시징 & 캐싱)
+  # ── Redis ─────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: webboard_redis_prod
@@ -49,7 +49,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Django 백엔드
+  # ── Django 백엔드 ──────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -60,37 +60,30 @@ services:
       - media_volume:/app/media
       - ./backend/logs:/app/logs
     environment:
-      # Django 환경변수
+      # Django
       - DJANGO_ENV=prod
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      
-      # 데이터베이스
+      # DB
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
       - DB_PORT=5432
-      
       # CORS
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
-      
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      
-      # Gunicorn 설정
+      # Gunicorn
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
       - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
-      
-      # # 슈퍼유저 (선택사항)
-      # - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-}
-      # - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
-      # - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      # ── 신규: mediasoup SFU 주소 ──────────────────────────────
+      - MEDIASOUP_API_URL=http://localhost:3000
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
       interval: 30s
@@ -101,6 +94,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mediasoup:
         condition: service_healthy
     restart: always
     networks:
@@ -114,7 +109,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # React 프론트엔드
+  # ── React 프론트엔드 ───────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -122,6 +117,9 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-https://jounsori.org/api}
         - VITE_WS_URL=${VITE_WS_URL:-wss://jounsori.org/ws}
+        # TURN 서버 정보 — 클라이언트 ICE 설정에 사용
+        - VITE_TURN_URL=${VITE_TURN_URL:-turn:jounsori.org:3478}
+        - VITE_TURN_SECRET=${VITE_TURN_SECRET}
     container_name: webboard_frontend_prod
     restart: always
     networks:
@@ -137,7 +135,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Nginx 리버스 프록시
+  # ── Nginx ─────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
     container_name: webboard_nginx
@@ -158,6 +156,8 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
+      mediasoup:
+        condition: service_healthy
     restart: always
     networks:
       - webboard_network
@@ -173,7 +173,7 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Certbot (SSL 인증서 갱신)
+  # ── Certbot ───────────────────────────────────────────────────
   certbot:
     image: certbot/certbot
     container_name: webboard_certbot
@@ -184,6 +184,73 @@ services:
     restart: unless-stopped
     networks:
       - webboard_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ────────────────────────────────────────────────────────────
+  # 신규: mediasoup SFU
+  # ────────────────────────────────────────────────────────────
+  mediasoup:
+    build:
+      context: ./mediasoup
+      dockerfile: Dockerfile
+    container_name: webboard_mediasoup
+    environment:
+      - NODE_ENV=production
+      - MEDIASOUP_HTTP_PORT=3000
+      # ★ OCI 공인 IP를 .env에 MEDIASOUP_ANNOUNCED_IP=x.x.x.x 로 지정
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP}
+      - MEDIASOUP_RTP_MIN_PORT=40000
+      - MEDIASOUP_RTP_MAX_PORT=49999
+      - MEDIASOUP_NUM_WORKERS=${MEDIASOUP_NUM_WORKERS:-2}
+      # Django만 접근 허용
+      - TRUSTED_ORIGINS=http://backend:8000
+    # RTP UDP/TCP 포트 — host 네트워크 아니면 전체 범위 매핑 필요
+    # 부하가 크지 않으면 아래처럼 범위 매핑, 부하 크면 network_mode: host 고려
+    network_mode: host
+    restart: always
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ────────────────────────────────────────────────────────────
+  # 신규: coturn TURN/STUN 서버
+  # ────────────────────────────────────────────────────────────
+  coturn:
+    image: coturn/coturn:latest
+    container_name: webboard_coturn
+    # host 네트워크 사용 — TURN 릴레이는 호스트 IP가 필요
+    network_mode: host
+    command: >
+      -n
+      --log-file=-
+      --use-auth-secret
+      --static-auth-secret=3216c268e4ec2ee7cf4747d2b70eeb8ca35ff5ee44f384f952364e7bdcb887cd
+      --realm=jounsori.org
+      --external-ip=89.168.85.29
+      --listening-port=3478
+      --tls-listening-port=5349
+      --min-port=49160
+      --max-port=49200
+      --no-multicast-peers
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      --total-quota=100
+      --stale-nonce=600
+    restart: always
     logging:
       driver: "json-file"
       options:
