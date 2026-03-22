@@ -15,6 +15,7 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
+
 // ✅ CSRF 토큰 헬퍼 함수
 function getCsrfToken() {
   return document.cookie
