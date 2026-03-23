@@ -17,6 +17,25 @@ import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton
 import { IOSPlayButton } from './VideoMeeting/IOSPlayButton';
 
 // 유틸리티 함수들
+// SFU Promise 응답 타입 — waitForMessage 큐로 처리 (onmessage에서 dispatchSFUMessage 호출)
+const SFU_PROMISE_TYPES = new Set([
+  'sfu_rtp_capabilities',
+  'sfu_joined',
+  'sfu_transport_created',
+  'sfu_transport_connected',
+  'sfu_produced',
+  'sfu_consumed',
+  'sfu_consumer_resumed',
+  'sfu_error',
+]);
+
+// SFU 이벤트 기반 타입 — handleSFUMessage로 처리
+const SFU_EVENT_TYPES = new Set([
+  'peer_joined',
+  'new_producer',
+  'track_state',
+]);
+
 const isIOS = () => {
   if (navigator.userAgentData) {
     return navigator.userAgentData.platform === 'iOS';
@@ -106,6 +125,7 @@ function VideoMeetingRoom() {
     muteVideo,
     unmuteVideo,
     handleSFUMessage,
+    dispatchSFUMessage,   // ← [추가] Promise 큐 투입 함수
     cleanup: cleanupWebRTC,
   } = useSFU({ wsRef, roomId });
 
@@ -196,15 +216,14 @@ function VideoMeetingRoom() {
 
     console.log('📨 WebSocket 수신:', type);
 
-    // SFU 관련 메시지
-    if (['sfu_rtp_capabilities', 'sfu_joined', 'sfu_transport_created',
-         'sfu_transport_connected', 'sfu_produced', 'sfu_consumed',
-         'sfu_consumer_resumed', 'peer_joined', 'new_producer'].includes(type)) {
-      handleSFUMessage(data);
+    // [수정] Promise 대기 중인 SFU 응답 타입 → 큐에 투입
+    if (SFU_PROMISE_TYPES.has(type)) {
+      dispatchSFUMessage(data);
       return;
     }
 
-    if (type === 'track_state') {
+    // 이벤트 기반 SFU 메시지 → handleSFUMessage로 위임
+    if (SFU_EVENT_TYPES.has(type)) {
       handleSFUMessage(data);
       return;
     }
@@ -377,6 +396,7 @@ function VideoMeetingRoom() {
     room?.is_host,
     localStreamRef,
     handleSFUMessage,
+    dispatchSFUMessage,   // ← [추가]
     addChatMessage,
     fetchRoomDetails,
     fetchPendingRequests,
