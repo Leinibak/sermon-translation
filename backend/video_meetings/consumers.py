@@ -159,11 +159,13 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         """SFU 방 참가 — 현재 Producer 목록도 함께 반환"""
         try:
             result = await sfu_client.join_room(self.room_id, self.peer_id)
-
             await self.send(text_data=json.dumps({
                 'type': 'sfu_joined',
                 'rtpCapabilities': result['rtpCapabilities'],
-                'producers': result['producers'],  # 이미 방에 있는 참가자들의 producer 목록
+                'producers': [
+                    {**p, 'username': p.get('peerId', '').replace('user_', '')}
+                    for p in result['producers']
+                ],
             }))
 
             # 다른 참가자들에게 새 peer 알림

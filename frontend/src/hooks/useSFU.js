@@ -141,7 +141,7 @@ export function useSFU({ wsRef, roomId }) {
 
       // 5. 이미 방에 있는 producer들 consume
       for (const prod of existingProducers) {
-        await consumeProducer(prod.peerId, prod.producerId, prod.kind);
+        await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
       setConnectionStatus('connected');
@@ -309,7 +309,8 @@ export function useSFU({ wsRef, roomId }) {
       next.set(peerId, {
         ...existing,
         stream,
-        username: peerId,
+        // ✅ username이 있으면 사용, 없으면 peerId 폴백
+        username: username || existing.username || peerId,
         [`${kind}ConsumerId`]: consumer.id,
       });
       return next;
@@ -384,12 +385,14 @@ export function useSFU({ wsRef, roomId }) {
 
       case 'new_producer':
         if (deviceRef.current && recvTransportRef.current) {
-          await consumeProducer(data.peerId, data.producerId, data.kind);
+          await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         }
         break;
 
       case 'user_left':
-        removeRemoteStream(data.user_id);
+      // ❌ removeRemoteStream(data.user_id)  → 숫자, key와 불일치
+        // ✅ peerId 형식으로 변환
+        removeRemoteStream(`user_${data.user_id}`);
         break;
 
       default:

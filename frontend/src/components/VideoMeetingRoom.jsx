@@ -460,15 +460,15 @@ function VideoMeetingRoom() {
                 setWsReady(true);
                 console.log('✅ WebSocket 완전 준비');
                 // WebSocket 연결 완료 후 SFU 초기화 (방장만)
-                if (room?.is_host && localStreamRef.current) {
-                  try {
-                    await initSFU();
-                    await startProducing(localStreamRef.current);
-                    console.log('✅ SFU 초기화 완료 (방장)');
-                  } catch (e) {
-                    console.error('❌ SFU 초기화 실패:', e);
-                  }
-                }
+                // if (room?.is_host && localStreamRef.current) {
+                //   try {
+                //     await initSFU();
+                //     await startProducing(localStreamRef.current);
+                //     console.log('✅ SFU 초기화 완료 (방장)');
+                //   } catch (e) {
+                //     console.error('❌ SFU 초기화 실패:', e);
+                //   }
+                // }
               }, 500);
             } catch (e) {}
           }
