@@ -60,19 +60,19 @@ services:
       - media_volume:/app/media
       - ./backend/logs:/app/logs
     environment:
-      # Django
-      - DJANGO_ENV=prod
-      - DEBUG=False
+      - DJANGO_ENV=${DJANGO_ENV}
+      - DEBUG=${DEBUG}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - ADMIN_URL=${ADMIN_URL}
       # DB
-      - DB_ENGINE=django.db.backends.postgresql
-      - DB_NAME=${POSTGRES_DB}
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_ENGINE=${DB_ENGINE}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=db
       - DB_PORT=5432
-      # CORS
+      # CORS / CSRF
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
       # Redis
@@ -81,9 +81,9 @@ services:
       # Gunicorn
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
       - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
-      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
-      # ── 신규: mediasoup SFU 주소 ──────────────────────────────
-      - MEDIASOUP_API_URL=http://localhost:3000
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
+      # ✅ [수정] localhost → mediasoup (Docker 서비스명으로 내부 통신)
+      - MEDIASOUP_API_URL=http://mediasoup:3000
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 8000 && nc -z localhost 8001 || exit 1"]
       interval: 30s
@@ -117,7 +117,6 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-https://jounsori.org/api}
         - VITE_WS_URL=${VITE_WS_URL:-wss://jounsori.org/ws}
-        # TURN 서버 정보 — 클라이언트 ICE 설정에 사용
         - VITE_TURN_URL=${VITE_TURN_URL:-turn:jounsori.org:3478}
         - VITE_TURN_SECRET=${VITE_TURN_SECRET}
     container_name: webboard_frontend_prod
@@ -190,9 +189,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ────────────────────────────────────────────────────────────
-  # 신규: mediasoup SFU
-  # ────────────────────────────────────────────────────────────
+  # ── mediasoup SFU ─────────────────────────────────────────────
   mediasoup:
     build:
       context: ./mediasoup
@@ -201,18 +198,20 @@ services:
     environment:
       - NODE_ENV=production
       - MEDIASOUP_HTTP_PORT=3000
-      # ★ OCI 공인 IP를 .env에 MEDIASOUP_ANNOUNCED_IP=x.x.x.x 로 지정
       - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP}
-      - MEDIASOUP_RTP_MIN_PORT=40000
-      - MEDIASOUP_RTP_MAX_PORT=49999
+      - MEDIASOUP_RTP_MIN_PORT=${MEDIASOUP_RTP_MIN_PORT:-40000}
+      - MEDIASOUP_RTP_MAX_PORT=${MEDIASOUP_RTP_MAX_PORT:-40499}
       - MEDIASOUP_NUM_WORKERS=${MEDIASOUP_NUM_WORKERS:-2}
-      # Django만 접근 허용
       - TRUSTED_ORIGINS=http://backend:8000
-    # RTP UDP/TCP 포트 — host 네트워크 아니면 전체 범위 매핑 필요
-    # 부하가 크지 않으면 아래처럼 범위 매핑, 부하 크면 network_mode: host 고려
-    network_mode: host
+    ports:
+      # ✅ RTP 미디어 포트 — 클라이언트 WebRTC가 호스트 IP로 직접 접속
+      - "${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40499}:${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40499}/udp"
+      - "${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40499}:${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40499}/tcp"
+    # ✅ [수정] network_mode: host 제거 → webboard_network 합류
+    #    backend가 http://mediasoup:3000 으로 내부 통신 가능
+    networks:
+      - webboard_network
     restart: always
-
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 15s
@@ -225,21 +224,19 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # ────────────────────────────────────────────────────────────
-  # 신규: coturn TURN/STUN 서버
-  # ────────────────────────────────────────────────────────────
+  # ── coturn TURN/STUN 서버 ─────────────────────────────────────
+  # coturn은 호스트 IP 바인딩이 필요하므로 network_mode: host 유지 (정상)
   coturn:
     image: coturn/coturn:latest
     container_name: webboard_coturn
-    # host 네트워크 사용 — TURN 릴레이는 호스트 IP가 필요
     network_mode: host
     command: >
       -n
       --log-file=-
       --use-auth-secret
-      --static-auth-secret=3216c268e4ec2ee7cf4747d2b70eeb8ca35ff5ee44f384f952364e7bdcb887cd
+      --static-auth-secret=${TURN_SECRET}
       --realm=jounsori.org
-      --external-ip=89.168.85.29
+      --external-ip=${MEDIASOUP_ANNOUNCED_IP}
       --listening-port=3478
       --tls-listening-port=5349
       --min-port=49160
