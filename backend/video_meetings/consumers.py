@@ -454,12 +454,12 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'timestamp': datetime.now().isoformat(),
             }
         )
-
+        
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'chat',
-            'username': event['username'],
-            'user_id': event['user_id'],
+            'type': 'chat_message',
+            'sender_username': event['username'],  # ← 필드명 변경
+            'sender_user_id': event['user_id'],    # ← 필드명 변경
             'content': event['content'],
             'message_id': event['message_id'],
             'timestamp': event['timestamp'],
@@ -590,4 +590,5 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             return User.objects.get(id=user_id).username
         except (ValueError, User.DoesNotExist):
             return peer_id  # fallback
+
     

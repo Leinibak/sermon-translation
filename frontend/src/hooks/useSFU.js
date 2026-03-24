@@ -8,11 +8,14 @@
  *    initSFU 내부 함수로 이동 (클로저 참조 오류 수정)
  * 3. handleSFUMessage의 user_left 처리 — peerId 형식으로 통일
  * 4. initSFU 의존성 배열 정리
+ *
+ * [2차 수정 — 이번 패치]
+ * FIX-1: user_left silent fail — peerId 없을 때 username으로도 Map 검색
+ * FIX-2: handleSFUMessage의 track_state — peerId 우선, fallback으로 user_id 키 탐색
  */
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
 
-const pendingProducersRef = useRef([]);
 
 async function generateTurnCredentials(secret) {
   const ttl = 24 * 3600;
@@ -39,6 +42,7 @@ async function getIceServers() {
 }
 
 export function useSFU({ wsRef, roomId }) {
+  const pendingProducersRef = useRef([]);
   const deviceRef        = useRef(null);
   const sendTransportRef = useRef(null);
   const recvTransportRef = useRef(null);
@@ -158,7 +162,7 @@ export function useSFU({ wsRef, roomId }) {
     });
   }, []);
 
-  // ── [수정 1] consumeProducer — username 파라미터 추가 ────────
+  // ── consumeProducer — username 파라미터 추가 ────────────────
   const consumeProducer = useCallback(async (peerId, producerId, kind, username) => {
     const device    = deviceRef.current;
     const transport = recvTransportRef.current;
@@ -192,7 +196,6 @@ export function useSFU({ wsRef, roomId }) {
 
       consumersRef.current.set(consumer.id, consumer);
 
-      // ✅ [수정] username을 파라미터로 받아 사용
       setRemoteStreams((prev) => {
         const next = new Map(prev);
         const existing = next.get(peerId) || {};
@@ -225,8 +228,6 @@ export function useSFU({ wsRef, roomId }) {
   }, [wsSend, waitForMessage, removeRemoteStream]);
 
   // ── SFU 초기화 ──────────────────────────────────────────────
-  // [수정 2] _createSendTransport / _createRecvTransport를 initSFU 내부로 이동
-  //          → useCallback 스코프 문제 해결
   const initSFU = useCallback(async () => {
     setConnectionStatus('connecting');
     try {
@@ -269,7 +270,7 @@ export function useSFU({ wsRef, roomId }) {
 
       sendTransport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
         wsSend({ type: 'sfu_produce', transportId: sendTransport.id, kind, rtpParameters, appData });
-        // ✅ kind 필터로 audio/video 응답 분리
+        // kind 필터로 audio/video 응답 분리
         waitForMessage('sfu_produced', 10000, (d) => d.kind === kind)
           .then(({ id }) => callback({ id }))
           .catch(errback);
@@ -315,7 +316,7 @@ export function useSFU({ wsRef, roomId }) {
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
-      // ✅ 큐에 쌓인 new_producer 처리
+      // 큐에 쌓인 new_producer 처리
       const queued = [...pendingProducersRef.current];
       pendingProducersRef.current = [];
       for (const prod of queued) {
@@ -390,7 +391,6 @@ export function useSFU({ wsRef, roomId }) {
   }, [wsSend]);
 
   // ── 이벤트 기반 SFU 메시지 처리 ─────────────────────────────
-  // peer_joined, new_producer, track_state, user_left
   const handleSFUMessage = useCallback(async (data) => {
     switch (data.type) {
       case 'peer_joined':
@@ -401,37 +401,63 @@ export function useSFU({ wsRef, roomId }) {
         if (deviceRef.current && recvTransportRef.current) {
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         } else {
-          // ✅ skip 대신 큐에 저장
+          // skip 대신 큐에 저장
           pendingProducersRef.current.push(data);
           console.warn('new_producer queued — SFU not ready yet:', data);
         }
         break;
 
-      case 'track_state':
-        // 원격 참가자의 마이크/카메라 상태 변경
+      case 'track_state': {
+        // FIX-2: peerId 우선, 없으면 Map 전체를 순회해 username 또는 user_id로 키 탐색
         setRemoteStreams((prev) => {
+          // 백엔드가 peerId를 직접 보내는 경우
+          const directKey = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
+          const key = directKey && prev.has(directKey)
+            ? directKey
+            // peerId/user_id 로 못 찾으면 username으로 탐색
+            : [...prev.entries()].find(
+                ([, v]) => v.username === data.username
+              )?.[0];
+
+          if (!key) return prev;
+
           const next = new Map(prev);
-          const existing = next.get(data.peerId || `user_${data.user_id}`);
-          if (existing) {
-            next.set(data.peerId || `user_${data.user_id}`, {
-              ...existing,
-              isMuted:    data.kind === 'audio' ? !data.enabled : existing.isMuted,
-              isVideoOff: data.kind === 'video' ? !data.enabled : existing.isVideoOff,
-            });
-          }
+          const existing = next.get(key);
+          next.set(key, {
+            ...existing,
+            isMuted:    data.kind === 'audio' ? !data.enabled : existing.isMuted,
+            isVideoOff: data.kind === 'video' ? !data.enabled : existing.isVideoOff,
+          });
           return next;
         });
         break;
+      }
 
-      // ✅ [수정 3] user_left: VideoMeetingRoom의 switch가 무시하므로
-      //    SFU_EVENT_TYPES에 추가하고 여기서 처리
+      // FIX-1: user_left — peerId 없을 때 username으로도 Map 탐색하여 silent fail 방지
       case 'user_left': {
-        // 백엔드는 username을 보내지만 remoteStreams 키는 peerId("user_N") 형식
-        const peerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
-        if (peerId) {
-          removeRemoteStream(peerId);
-          console.log(`Peer left: ${data.username} (${peerId})`);
-        }
+        const directPeerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
+
+        setRemoteStreams((prev) => {
+          // directPeerId로 직접 확인
+          if (directPeerId && prev.has(directPeerId)) {
+            removeRemoteStream(directPeerId);
+            console.log(`Peer left: ${data.username} (${directPeerId})`);
+            return prev; // removeRemoteStream이 내부적으로 setState 호출
+          }
+
+          // username으로 fallback 탐색
+          const found = [...prev.entries()].find(
+            ([, v]) => v.username === data.username
+          );
+          if (found) {
+            const [foundKey] = found;
+            removeRemoteStream(foundKey);
+            console.log(`Peer left (by username): ${data.username} (${foundKey})`);
+          } else {
+            console.warn(`user_left: no matching stream for`, data);
+          }
+          return prev;
+        });
         break;
       }
 

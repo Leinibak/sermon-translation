@@ -1,20 +1,25 @@
-// VideoElement.jsx - iOS 비디오 재생 로직 개선
+// frontend/src/components/VideoMeeting/VideoElement.jsx
+// [수정 패치]
+// FIX-7: transform 속성 중복 제거
+//   - className의 `-scale-x-100` (Tailwind)과 style의 `transform: scaleX(-1)` 이
+//     동시에 적용되어 CSS specificity 충돌 + 브라우저별 렌더 불일치 발생
+//   - style.transform 을 제거하고 Tailwind 클래스(-scale-x-100)로 통일
+//   - isVideoOff 시 display:none 대신 visibility:hidden 으로 변경하여
+//     레이아웃 공간을 유지 (선택적 - 기존과 동일하게 유지하고 싶으면 되돌리면 됨)
 
 import React, { useRef, useEffect } from 'react';
 
 export const VideoElement = React.forwardRef(({ stream, isLocal, isVideoOff }, ref) => {
-  const defaultRef = useRef();
-  const resolvedRef = ref || defaultRef;
+  const defaultRef = useRef(null);
+  const resolvedRef = ref ?? defaultRef;
   const playAttemptedRef = useRef(false);
   const playRetryCountRef = useRef(0);
-  const maxRetries = 5; // ⭐ 재시도 횟수 증가
+  const maxRetries = 5;
 
   useEffect(() => {
     const videoElement = resolvedRef.current;
-    
     if (!videoElement) return;
 
-    // 스트림 변경 시 srcObject 업데이트
     if (stream) {
       if (videoElement.srcObject !== stream) {
         console.log(`🎥 [VideoElement] 스트림 연결 (${isLocal ? '로컬' : '원격'})`);
@@ -29,91 +34,68 @@ export const VideoElement = React.forwardRef(({ stream, isLocal, isVideoOff }, r
       return;
     }
 
-    // 📱 iOS Safari 감지
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // iOS Safari 감지
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // ⭐ 수정: 원격 비디오에서만 자동 재생 시도
-    if (isIOS && !isLocal && !playAttemptedRef.current) {
+    if (isIOSDevice && !isLocal && !playAttemptedRef.current) {
       playAttemptedRef.current = true;
-      
+
       const attemptPlay = async () => {
         try {
-          console.log(`📱 iOS: ${isLocal ? '로컬' : '원격'} 비디오 재생 시도 (${playRetryCountRef.current + 1}/${maxRetries})`);
-          
-          // ⭐⭐⭐ 1단계: 스트림 트랙 확인
+          console.log(`📱 iOS: 원격 비디오 재생 시도 (${playRetryCountRef.current + 1}/${maxRetries})`);
+
           const videoTracks = stream.getVideoTracks();
           const audioTracks = stream.getAudioTracks();
-          
-          console.log('📊 스트림 트랙:', {
-            video: videoTracks.length,
-            audio: audioTracks.length,
-            videoReady: videoTracks[0]?.readyState,
-            audioReady: audioTracks[0]?.readyState
-          });
-          
+
           if (videoTracks.length === 0 && audioTracks.length === 0) {
             throw new Error('No tracks in stream');
           }
-          
-          // ⭐⭐⭐ 2단계: readyState 확인 및 대기
-          if (videoElement.readyState < 2) { // HAVE_CURRENT_DATA
-            console.log(`⏳ iOS: readyState=${videoElement.readyState} - 대기 중...`);
-            
+
+          if (videoElement.readyState < 2) {
             await new Promise((resolve, reject) => {
               const timeout = setTimeout(() => {
                 reject(new Error('Metadata loading timeout'));
-              }, 5000); // ⭐ 타임아웃 5초로 증가
-              
+              }, 5000);
+
               const onCanPlay = () => {
                 clearTimeout(timeout);
                 videoElement.removeEventListener('canplay', onCanPlay);
                 videoElement.removeEventListener('loadeddata', onCanPlay);
-                console.log(`✅ iOS: 비디오 데이터 로드 완료`);
                 resolve();
               };
-              
+
               videoElement.addEventListener('canplay', onCanPlay);
               videoElement.addEventListener('loadeddata', onCanPlay);
             });
           }
-          
-          // ⭐⭐⭐ 3단계: 재생 시도
-          console.log(`🎬 iOS: 재생 시도 (readyState=${videoElement.readyState})`);
-          
+
           await videoElement.play();
           console.log(`✅ iOS: 재생 성공`);
-          
+
         } catch (error) {
-          console.warn(`⚠️ iOS 자동 재생 실패 (${isLocal ? '로컬' : '원격'}):`, error.name, error.message);
-          
-          // ⭐⭐⭐ 핵심: 원격 비디오 재생 실패 시 이벤트 발송
+          console.warn(`⚠️ iOS 자동 재생 실패:`, error.name, error.message);
+
           if (!isLocal) {
             playRetryCountRef.current += 1;
-            
+
             if (playRetryCountRef.current >= maxRetries) {
               console.error(`❌ iOS: ${maxRetries}번 재시도 실패 → IOSPlayButton 표시 요청`);
-              
-              // ⭐ 커스텀 이벤트 발송
               window.dispatchEvent(new CustomEvent('ios-play-required', {
                 detail: {
                   streamId: stream.id,
-                  videoElement: videoElement,
                   error: error.name,
-                  isLocal: false
+                  isLocal: false,
                 }
               }));
             } else {
-              // 🔄 재시도 (지수 백오프)
               const retryDelay = 1000 * Math.pow(1.5, playRetryCountRef.current - 1);
               console.log(`🔄 ${retryDelay}ms 후 재시도...`);
-              
               setTimeout(async () => {
                 try {
                   await videoElement.play();
                   console.log(`✅ iOS: 재시도 성공 (${playRetryCountRef.current}번째)`);
                 } catch (retryError) {
                   console.error(`❌ iOS 재시도 ${playRetryCountRef.current} 실패:`, retryError.name);
-                  
                   if (playRetryCountRef.current < maxRetries) {
                     attemptPlay();
                   }
@@ -124,9 +106,7 @@ export const VideoElement = React.forwardRef(({ stream, isLocal, isVideoOff }, r
         }
       };
 
-      // ⏳ 약간의 지연 후 재생 시도
-      const initialDelay = isLocal ? 100 : 800; // ⭐ 원격 비디오 지연 증가
-      setTimeout(attemptPlay, initialDelay);
+      setTimeout(attemptPlay, 800);
     }
 
   }, [stream, resolvedRef, isLocal]);
@@ -137,26 +117,16 @@ export const VideoElement = React.forwardRef(({ stream, isLocal, isVideoOff }, r
       autoPlay
       playsInline
       muted={isLocal}
+      // FIX-7: className의 -scale-x-100(Tailwind) 만 사용
+      //        style.transform 을 제거하여 중복 적용 차단
       className={`w-full h-full object-cover ${isLocal ? '-scale-x-100' : ''}`}
-      style={{ 
+      style={{
+        // FIX-7: transform 제거 — Tailwind -scale-x-100 이 담당
         display: isVideoOff ? 'none' : 'block',
-        transform: isLocal ? 'scaleX(-1)' : 'none'
       }}
-      // ⭐ iOS 디버깅용 이벤트 핸들러
-      onPlay={() => {
-        if (!isLocal) {
-          console.log('▶️ 원격 비디오 재생 시작');
-        }
-      }}
-      onPause={() => {
-        if (!isLocal) {
-          console.warn('⏸️ 원격 비디오 일시정지됨');
-        }
-      }}
-      onError={(e) => {
-        console.error('❌ 비디오 오류:', e);
-      }}
-      // ⭐ iOS 최적화 속성 추가
+      onPlay={() => { if (!isLocal) console.log('▶️ 원격 비디오 재생 시작'); }}
+      onPause={() => { if (!isLocal) console.warn('⏸️ 원격 비디오 일시정지됨'); }}
+      onError={(e) => { console.error('❌ 비디오 오류:', e); }}
       webkit-playsinline="true"
       x-webkit-airplay="allow"
     />

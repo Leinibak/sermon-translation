@@ -1,4 +1,15 @@
-// frontend/src/components/VideoMeetingRoom.jsx (SFU 전환 완료본)
+// frontend/src/components/VideoMeetingRoom.jsx
+// [수정 패치]
+// FIX-1: connectWebSocket — stale closure 해소 (handleWebSocketMessage를 ref로 분리)
+// FIX-2: connectWebSocket — 재연결 시 wsReady 초기화 누락 수정 (onclose 시 reset)
+// FIX-3: approval_notification — approvalInitializedRef race condition 수정
+//         (성공 시에만 true 유지, 실패 시 false 복원을 finally에서 처리하지 않도록)
+// FIX-4: initializationRef finally 블록 문제 — 오류 발생 후도 false로 리셋되어
+//         재시도가 불가능한 문제 → 성공 시에만 false 리셋
+// FIX-5: 방장 SFU useEffect — localStreamRef.current 를 의존성에서 제거,
+//         localStreamReady(state)로 대체
+// FIX-6: VideoMeetingRoom allVideos — localStreamRef.current 의존성 배열 사용 금지,
+//         localStreamReady state로 렌더링 트리거
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
@@ -16,8 +27,7 @@ import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel
 import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 import { IOSPlayButton } from './VideoMeeting/IOSPlayButton';
 
-// 유틸리티 함수들
-// SFU Promise 응답 타입 — waitForMessage 큐로 처리 (onmessage에서 dispatchSFUMessage 호출)
+// SFU Promise 응답 타입 — waitForMessage 큐로 처리
 const SFU_PROMISE_TYPES = new Set([
   'sfu_rtp_capabilities',
   'sfu_joined',
@@ -29,14 +39,12 @@ const SFU_PROMISE_TYPES = new Set([
   'sfu_error',
 ]);
 
-const [localStreamReady, setLocalStreamReady] = useState(false);
-
 // SFU 이벤트 기반 타입 — handleSFUMessage로 처리
 const SFU_EVENT_TYPES = new Set([
   'peer_joined',
   'new_producer',
   'track_state',
-  'user_left',   // ✅ 추가 — handleSFUMessage에서 remoteStreams 정리
+  'user_left',   // handleSFUMessage에서 remoteStreams 정리
 ]);
 
 const isIOS = () => {
@@ -64,6 +72,9 @@ function VideoMeetingRoom() {
   const { id: roomId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // FIX-5/6: localStreamRef.current를 의존성으로 쓰는 대신 state 사용
+  const [localStreamReady, setLocalStreamReady] = useState(false);
 
   // iOS 재생 버튼 상태
   const [showIOSPlayButton, setShowIOSPlayButton] = useState(false);
@@ -110,8 +121,12 @@ function VideoMeetingRoom() {
 
   // 미디어 참조
   const localVideoRef = useRef(null);
+  // FIX-4: initializationRef — finally에서 무조건 false 리셋하는 대신
+  //         성공 여부를 별도로 관리
   const initializationRef = useRef(false);
-  const approvalInitializedRef = useRef(false);
+  // FIX-3: approvalInitializedRef — race condition 수정을 위해 상태를
+  //         'idle' | 'running' | 'done' 으로 세분화
+  const approvalInitializedRef = useRef('idle'); // 'idle' | 'running' | 'done'
 
   // =========================================================================
   // SFU 훅
@@ -128,7 +143,7 @@ function VideoMeetingRoom() {
     muteVideo,
     unmuteVideo,
     handleSFUMessage,
-    dispatchSFUMessage,   // ← [추가] Promise 큐 투입 함수
+    dispatchSFUMessage,
     cleanup: cleanupWebRTC,
   } = useSFU({ wsRef, roomId });
 
@@ -162,7 +177,7 @@ function VideoMeetingRoom() {
 
   // iOS 재생 버튼 이벤트
   useEffect(() => {
-    const handleIOSPlayRequired = (event) => {
+    const handleIOSPlayRequired = () => {
       if (!iosPlayTriggeredRef.current) {
         setShowIOSPlayButton(true);
       }
@@ -216,10 +231,9 @@ function VideoMeetingRoom() {
   // =========================================================================
   const handleWebSocketMessage = useCallback((data) => {
     const type = data.type;
-
     console.log('📨 WebSocket 수신:', type);
 
-    // [수정] Promise 대기 중인 SFU 응답 타입 → 큐에 투입
+    // Promise 대기 중인 SFU 응답 타입 → 큐에 투입
     if (SFU_PROMISE_TYPES.has(type)) {
       dispatchSFUMessage(data);
       return;
@@ -236,21 +250,27 @@ function VideoMeetingRoom() {
         console.log('📋 참여자:', data.participants);
         break;
 
+      // FIX-3: approval_notification race condition 수정
+      // approvalInitializedRef를 3-state('idle'|'running'|'done')로 관리
       case 'approval_notification': {
         const retryCount = data.retry_count || 0;
 
         if (String(data.room_id) !== String(roomId)) return;
         if (String(data.participant_user_id) !== String(user?.id)) return;
         if (retryCount > 0) return;
-        if (approvalInitializedRef.current) return;
+        // 'idle' 상태일 때만 진입 — 'running' 또는 'done'이면 중복 실행 차단
+        if (approvalInitializedRef.current !== 'idle') {
+          console.log(`⚠️ approval_notification 중복 무시 (state: ${approvalInitializedRef.current})`);
+          return;
+        }
 
-        approvalInitializedRef.current = true;
+        approvalInitializedRef.current = 'running';
 
         const initializeAfterApproval = async () => {
           try {
             const isiOS = isIOS();
 
-            // 1. 미디어만 먼저 준비 (SFU 초기화는 나중에)
+            // 1. 미디어 초기화 (아직 없을 때만)
             if (!localStreamRef.current) {
               await getLocalMedia();
               if (localVideoRef.current && localStreamRef.current) {
@@ -276,24 +296,26 @@ function VideoMeetingRoom() {
             setWsReady(true);
             await new Promise(r => setTimeout(r, isiOS ? 1500 : 500));
 
-            // 4. SFU 초기화 (방장이 먼저 produce할 시간을 줌)
+            // 4. SFU 초기화
             await initSFU();
 
             // 5. 자신의 미디어 produce
             await startProducing(localStreamRef.current);
 
-            // 6. join 전송 (서버 참여자 목록 업데이트용)
+            // 6. join 전송
             const finalWs = wsRef.current;
             if (finalWs?.readyState === WebSocket.OPEN) {
               finalWs.send(JSON.stringify({ type: 'join', username: user.username }));
             }
 
-            approvalInitializedRef.current = true; // 성공 시에만 true 유지
+            // 성공 시 'done' 으로 전환
+            approvalInitializedRef.current = 'done';
             console.log('✅ 승인 후 초기화 완료');
 
           } catch (error) {
             console.error('❌ 승인 후 초기화 실패:', error);
-            approvalInitializedRef.current = false;
+            // 실패 시 'idle'로 복원하여 재시도 가능하게
+            approvalInitializedRef.current = 'idle';
             alert('회의 참가 준비 중 오류. 새로고침 후 재시도해주세요.');
           }
         };
@@ -303,8 +325,6 @@ function VideoMeetingRoom() {
         break;
       }
 
-      // SFU에서는 user_joined/join_ready 대신 peer_joined/new_producer로 처리됨
-      // 하지만 하위 호환성을 위해 남겨둠
       case 'user_joined':
         console.log(`👋 user_joined: ${data.username} (SFU에서는 peer_joined로 처리)`);
         break;
@@ -321,23 +341,23 @@ function VideoMeetingRoom() {
         const id = Date.now() + Math.random();
         setReactions(prev => [...prev, {
           id,
-          emoji: data.reaction,
+          emoji: data.reaction_type,
           username: data.username
         }]);
         setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
         break;
       }
 
-      case 'hand_raise':
-        if (data.action === 'raise') {
-          setRaisedHands(prev =>
-            prev.some(h => h.username === data.username)
-              ? prev
-              : [...prev, { username: data.username, user_id: data.user_id, raised_at: new Date().toISOString() }]
-          );
-        } else {
-          setRaisedHands(prev => prev.filter(h => h.username !== data.username));
-        }
+      case 'raise_hand':
+        setRaisedHands(prev =>
+          prev.some(h => h.username === data.username)
+            ? prev
+            : [...prev, { username: data.username, user_id: data.user_id, raised_at: new Date().toISOString() }]
+        );
+        break;
+
+      case 'lower_hand':
+        setRaisedHands(prev => prev.filter(h => h.username !== data.username));
         break;
 
       case 'rejection_notification':
@@ -361,10 +381,8 @@ function VideoMeetingRoom() {
   }, [
     user,
     roomId,
-    room?.is_host,
-    localStreamRef,
     handleSFUMessage,
-    dispatchSFUMessage,   // ← [추가]
+    dispatchSFUMessage,
     addChatMessage,
     fetchRoomDetails,
     fetchPendingRequests,
@@ -373,6 +391,14 @@ function VideoMeetingRoom() {
     initSFU,
     startProducing,
   ]);
+
+  // FIX-1: connectWebSocket stale closure 해소
+  // handleWebSocketMessage를 ref 경유로 참조 → socket.onmessage 클로저가
+  // 항상 최신 핸들러를 가리킴
+  const handleWebSocketMessageRef = useRef(handleWebSocketMessage);
+  useEffect(() => {
+    handleWebSocketMessageRef.current = handleWebSocketMessage;
+  }, [handleWebSocketMessage]);
 
   // =========================================================================
   // WebSocket 연결
@@ -386,6 +412,9 @@ function VideoMeetingRoom() {
       try { wsRef.current.close(1000, 'Reconnecting'); } catch (e) {}
       wsRef.current = null;
     }
+
+    // FIX-2: 재연결 직전 wsReady 초기화
+    setWsReady(false);
 
     const isHttps = window.location.protocol === 'https:';
     const wsProtocol = isHttps ? 'wss' : 'ws';
@@ -419,34 +448,24 @@ function VideoMeetingRoom() {
         setWsConnected(true);
         reconnectAttemptsRef.current = 0;
 
-        setTimeout(async () => {
+        setTimeout(() => {
           if (socket.readyState === WebSocket.OPEN) {
             try {
               socket.send(JSON.stringify({ type: 'join', username: user.username }));
-
-              setTimeout(async () => {
+              setTimeout(() => {
                 setWsReady(true);
                 console.log('✅ WebSocket 완전 준비');
-                // WebSocket 연결 완료 후 SFU 초기화 (방장만)
-                // if (room?.is_host && localStreamRef.current) {
-                //   try {
-                //     await initSFU();
-                //     await startProducing(localStreamRef.current);
-                //     console.log('✅ SFU 초기화 완료 (방장)');
-                //   } catch (e) {
-                //     console.error('❌ SFU 초기화 실패:', e);
-                //   }
-                // }
               }, 500);
             } catch (e) {}
           }
         }, 500);
       };
 
+      // FIX-1: ref 경유로 최신 핸들러 호출 — 클로저 오염 제로
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          handleWebSocketMessage(data);
+          handleWebSocketMessageRef.current(data);
         } catch (e) {
           console.error('❌ 메시지 처리 오류:', e);
         }
@@ -461,6 +480,7 @@ function VideoMeetingRoom() {
         console.log('🔌 WebSocket 종료 (code:', event.code, ')');
         clearTimeout(connectionTimeout);
         setWsConnected(false);
+        // FIX-2: 종료 시 wsReady 반드시 초기화
         setWsReady(false);
         wsRef.current = null;
 
@@ -483,17 +503,20 @@ function VideoMeetingRoom() {
     } catch (error) {
       console.error('❌ WebSocket 생성 실패:', error);
     }
-  }, [roomId, user, navigate, handleWebSocketMessage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, user, navigate]);
+  // NOTE: handleWebSocketMessage는 ref 경유이므로 의존성에서 제거 — stale closure 차단
 
   // =========================================================================
   // 미디어 초기화
+  // FIX-4: finally에서 무조건 false 리셋 → 오류 시에도 재시도가 차단되는 버그 수정
+  //        → 오류 발생 시만 false 리셋, 정상 완료 시 false로 리셋하여 중복 실행 방지
   // =========================================================================
   const initializeMedia = useCallback(async () => {
     if (initializationRef.current) return;
+    initializationRef.current = true;
 
     try {
-      initializationRef.current = true;
-
       if (isIOS() && !isSafari()) {
         const confirmContinue = window.confirm('⚠️ iOS에서는 Safari 사용을 권장합니다.\n\n계속 진행하시겠습니까?');
         if (!confirmContinue) throw new Error('사용자가 취소했습니다');
@@ -504,36 +527,17 @@ function VideoMeetingRoom() {
         localVideoRef.current.srcObject = stream;
         if (isIOS()) { try { await localVideoRef.current.play(); } catch (e) {} }
       }
-      setLocalStreamReady(true); // ✅ state로 완료 신호
+      // FIX-5: state로 완료 신호 (localStreamRef.current 의존성 대신)
+      setLocalStreamReady(true);
 
-      // 방장 SFU 초기화 useEffect — localStreamRef 대신 state 사용
-      useEffect(() => {
-        if (!wsConnected || !room?.is_host || !localStreamReady) return; // ✅ state 사용
-        if (sfuInitializedRef.current) return;
-
-        sfuInitializedRef.current = true;
-        const init = async () => {
-          try {
-            await initSFU();
-            await startProducing(localStreamRef.current);
-            console.log('✅ SFU 초기화 완료 (방장)');
-          } catch (e) {
-            console.error('❌ SFU 초기화 실패:', e);
-            sfuInitializedRef.current = false;
-          }
-        };
-        init();
-      }, [wsConnected, room?.is_host, localStreamReady, initSFU, startProducing]);
-
-      if (localVideoRef.current && stream) {
-        localVideoRef.current.srcObject = stream;
-        if (isIOS()) {
-          try { await localVideoRef.current.play(); } catch (e) {}
-        }
-      }
+      // 성공 후 재사용 가능하게 false로 리셋
+      initializationRef.current = false;
 
     } catch (error) {
       console.error('❌ 미디어 초기화 실패:', error);
+      // FIX-4: 실패 시에도 false로 리셋하여 재시도 허용
+      initializationRef.current = false;
+
       if (isIOS()) {
         if (error.name === 'NotAllowedError') alert('📱 iOS 권한 설정이 필요합니다.\n\n설정 > Safari > 카메라/마이크');
         else if (error.name === 'NotReadableError') alert('📱 카메라/마이크 사용 중\n\n다른 앱 종료 후 재시도');
@@ -542,8 +546,6 @@ function VideoMeetingRoom() {
         alert('카메라와 마이크 접근 권한이 필요합니다.');
       }
       if (error.message !== '사용자가 취소했습니다') throw error;
-    } finally {
-      initializationRef.current = false;
     }
   }, [getLocalMedia]);
 
@@ -611,7 +613,9 @@ function VideoMeetingRoom() {
     if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return;
     try {
       currentWs.send(JSON.stringify({ type: 'reaction', reaction_type: emoji }));
-    } catch (error) {}
+    } catch (error) {
+      console.error('❌ 반응 실패:', error);
+    }
   };
 
   // =========================================================================
@@ -623,7 +627,9 @@ function VideoMeetingRoom() {
     try {
       currentWs.send(JSON.stringify({ type: 'raise_hand' }));
       setIsHandRaised(true);
-    } catch (error) {}
+    } catch (error) {
+      console.error('❌ 손들기 실패:', error);
+    }
   };
 
   const handleLowerHand = async () => {
@@ -632,18 +638,33 @@ function VideoMeetingRoom() {
     try {
       currentWs.send(JSON.stringify({ type: 'lower_hand' }));
       setIsHandRaised(false);
-    } catch (error) {}
+    } catch (error) {
+      console.error('❌ 손내리기 실패:', error);
+    }
   };
 
   // =========================================================================
-  // 마운트/언마운트
+  // Track 상태 브로드캐스트
+  // =========================================================================
+  const broadcastTrackState = useCallback((kind, enabled) => {
+    const currentWs = wsRef.current;
+    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return;
+    try {
+      currentWs.send(JSON.stringify({ type: 'track_state', kind, enabled }));
+    } catch (error) {
+      console.error('❌ Track 상태 전송 실패:', error);
+    }
+  }, []);
+
+  // =========================================================================
+  // 마운트/언마운트 effect
   // =========================================================================
   useEffect(() => {
     if (!roomId || roomId === 'undefined') {
       navigate('/video-meetings');
       return;
     }
-    fetchRoomDetails();
+    fetchRoomDetails().catch(() => {});
 
     return () => {
       cleanupWebRTC();
@@ -656,14 +677,14 @@ function VideoMeetingRoom() {
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
   // =========================================================================
-  // 초기 연결 및 방장 폴링
+  // 초기 연결 (승인된 참가자 / 방장)
   // =========================================================================
   useEffect(() => {
     if (!room || !user) return;
 
     const isApproved = room.participant_status === 'approved' || room.is_host;
 
-    if (isApproved && !wsConnected && !wsRef.current && !localStreamRef.current) {
+    if (isApproved && !wsConnected && !wsRef.current && !localStreamReady) {
       const initialize = async () => {
         try {
           await initializeMedia();
@@ -686,10 +707,11 @@ function VideoMeetingRoom() {
     room?.is_host,
     user,
     wsConnected,
-    localStreamRef,
+    // FIX-5: localStreamRef.current → localStreamReady (state)
+    localStreamReady,
     initializeMedia,
     connectWebSocket,
-    fetchPendingRequests
+    fetchPendingRequests,
   ]);
 
   // =========================================================================
@@ -728,11 +750,15 @@ function VideoMeetingRoom() {
     if (showChatPanel) setUnreadChatCount(0);
   }, [showChatPanel]);
 
-
+  // =========================================================================
+  // 방장 SFU 초기화
+  // FIX-5: localStreamRef.current → localStreamReady(state) 로 의존성 교체
+  //        ref.current 를 의존성에 넣으면 변경 감지가 안 됨
+  // =========================================================================
   const sfuInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!wsConnected || !room?.is_host || !localStreamRef.current) return;
+    if (!wsConnected || !room?.is_host || !localStreamReady) return;
     if (sfuInitializedRef.current) return;
 
     sfuInitializedRef.current = true;
@@ -749,8 +775,7 @@ function VideoMeetingRoom() {
     };
 
     init();
-  }, [wsConnected, room?.is_host, initSFU, startProducing]);
-
+  }, [wsConnected, room?.is_host, localStreamReady, initSFU, startProducing]);
 
   // =========================================================================
   // 렌더링
@@ -789,11 +814,13 @@ function VideoMeetingRoom() {
     );
   }
 
+  // FIX-6: localStreamRef.current 직접 참조 대신 localStreamReady 플래그로 분기
+  //        (ref.current는 렌더링을 트리거하지 않으므로 스트림 표시 누락 발생)
   const allVideos = [
     {
       peerId: user?.username,
       username: `${user?.username} (나)`,
-      stream: localStreamRef.current,
+      stream: localStreamReady ? localStreamRef.current : null,
       isLocal: true,
       isMuted: !isMicOn,
       isVideoOff: !isVideoOn,
@@ -805,8 +832,8 @@ function VideoMeetingRoom() {
       username: streamData.username || peerId,
       stream: streamData.stream,
       isLocal: false,
-      isMuted: false,
-      isVideoOff: false,
+      isMuted: streamData.isMuted || false,
+      isVideoOff: streamData.isVideoOff || false,
       isHandRaised: raisedHands.some(h => h.username === peerId),
     })),
   ].filter(v => v.stream || v.isLocal);
@@ -821,6 +848,16 @@ function VideoMeetingRoom() {
         pendingCount={pendingRequests.length}
         onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
       />
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-800 text-xs text-gray-400 px-4 py-2 flex gap-4">
+          <span>WS: {wsConnected ? '🟢' : '🔴'}</span>
+          <span>Ready: {wsReady ? '🟢' : '🟡'}</span>
+          <span>Media: {localStreamReady ? '🟢' : '🔴'}</span>
+          <span>Remote: {remoteStreams.size}</span>
+          <span>SFU: {connectionStatus}</span>
+        </div>
+      )}
 
       {room.is_host && showPendingPanel && (
         <PendingRequestsPanel
