@@ -29,6 +29,8 @@ const SFU_PROMISE_TYPES = new Set([
   'sfu_error',
 ]);
 
+const [localStreamReady, setLocalStreamReady] = useState(false);
+
 // SFU 이벤트 기반 타입 — handleSFUMessage로 처리
 const SFU_EVENT_TYPES = new Set([
   'peer_joined',
@@ -248,82 +250,51 @@ function VideoMeetingRoom() {
           try {
             const isiOS = isIOS();
 
-            // 1. 미디어 초기화
+            // 1. 미디어만 먼저 준비 (SFU 초기화는 나중에)
             if (!localStreamRef.current) {
-              try {
-                await getLocalMedia();
-
-                if (localVideoRef.current && localStreamRef.current) {
-                  localVideoRef.current.srcObject = localStreamRef.current;
-                  if (isiOS) {
-                    try { await localVideoRef.current.play(); } catch (e) {}
-                  }
-                }
-
-                console.log('✅ 미디어 초기화 완료');
-                await initSFU();
-                await startProducing(localStreamRef.current);
-              } catch (mediaError) {
-                console.error('❌ 미디어 초기화 실패:', mediaError);
-                approvalInitializedRef.current = false;
-                throw mediaError;
+              await getLocalMedia();
+              if (localVideoRef.current && localStreamRef.current) {
+                localVideoRef.current.srcObject = localStreamRef.current;
+                if (isiOS) { try { await localVideoRef.current.play(); } catch (e) {} }
               }
+              setLocalStreamReady(true);
             }
-
-            const mediaStabilizeTime = isiOS ? 2500 : 1000;
-            await new Promise(r => setTimeout(r, mediaStabilizeTime));
 
             // 2. 방 정보 갱신
             await fetchRoomDetails();
 
-            await new Promise(r => setTimeout(r, 500));
-
-            // 3. WebSocket 확인
+            // 3. WS 확인
             const currentWs = wsRef.current;
             if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
               connectWebSocket();
               await new Promise(r => setTimeout(r, isiOS ? 3000 : 2000));
-              const reconnectedWs = wsRef.current;
-              if (!reconnectedWs || reconnectedWs.readyState !== WebSocket.OPEN) {
+              if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
                 throw new Error('WebSocket 재연결 실패');
               }
             }
 
             setWsReady(true);
+            await new Promise(r => setTimeout(r, isiOS ? 1500 : 500));
 
-            const wsStabilizeTime = isiOS ? 1500 : 800;
-            await new Promise(r => setTimeout(r, wsStabilizeTime));
+            // 4. SFU 초기화 (방장이 먼저 produce할 시간을 줌)
+            await initSFU();
 
-            // 4. join_ready 전송
-            if (!data.host_username) throw new Error('host_username이 없습니다');
+            // 5. 자신의 미디어 produce
+            await startProducing(localStreamRef.current);
 
+            // 6. join 전송 (서버 참여자 목록 업데이트용)
             const finalWs = wsRef.current;
-            if (finalWs && finalWs.readyState === WebSocket.OPEN) {
-              const joinReadyMessage = {
-                type: 'join_ready',
-                from_username: user.username,
-                to_username: data.host_username,
-                room_id: String(roomId),
-                is_ios: isiOS
-              };
-
-              for (let i = 0; i < 5; i++) {
-                finalWs.send(JSON.stringify(joinReadyMessage));
-                if (i < 4) await new Promise(r => setTimeout(r, isiOS ? 800 : 500));
-              }
-            } else {
-              throw new Error('WebSocket 연결 상태 불안정');
+            if (finalWs?.readyState === WebSocket.OPEN) {
+              finalWs.send(JSON.stringify({ type: 'join', username: user.username }));
             }
 
-            // 5. join 전송
-            finalWs.send(JSON.stringify({ type: 'join', username: user.username }));
+            approvalInitializedRef.current = true; // 성공 시에만 true 유지
+            console.log('✅ 승인 후 초기화 완료');
 
           } catch (error) {
             console.error('❌ 승인 후 초기화 실패:', error);
             approvalInitializedRef.current = false;
-            if (error.message !== 'WebSocket 연결 상태 불안정') {
-              alert('회의 참가 준비 중 오류가 발생했습니다.\n\n페이지를 새로고침하고 다시 시도해주세요.');
-            }
+            alert('회의 참가 준비 중 오류. 새로고침 후 재시도해주세요.');
           }
         };
 
@@ -529,6 +500,30 @@ function VideoMeetingRoom() {
       }
 
       const stream = await getLocalMedia();
+      if (localVideoRef.current && stream) {
+        localVideoRef.current.srcObject = stream;
+        if (isIOS()) { try { await localVideoRef.current.play(); } catch (e) {} }
+      }
+      setLocalStreamReady(true); // ✅ state로 완료 신호
+
+      // 방장 SFU 초기화 useEffect — localStreamRef 대신 state 사용
+      useEffect(() => {
+        if (!wsConnected || !room?.is_host || !localStreamReady) return; // ✅ state 사용
+        if (sfuInitializedRef.current) return;
+
+        sfuInitializedRef.current = true;
+        const init = async () => {
+          try {
+            await initSFU();
+            await startProducing(localStreamRef.current);
+            console.log('✅ SFU 초기화 완료 (방장)');
+          } catch (e) {
+            console.error('❌ SFU 초기화 실패:', e);
+            sfuInitializedRef.current = false;
+          }
+        };
+        init();
+      }, [wsConnected, room?.is_host, localStreamReady, initSFU, startProducing]);
 
       if (localVideoRef.current && stream) {
         localVideoRef.current.srcObject = stream;

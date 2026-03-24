@@ -382,9 +382,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         )
 
     async def handle_join_ready(self, data):
-        # SFU 모드에서는 peer_joined / new_producer 이벤트로 연결이 자동 처리됨
-        # join_ready는 더 이상 approval_notification을 다시 보내지 않음
-        logger.info(f"join_ready received from {self.username} (SFU mode — no-op)")
+        """SFU 모드: 참가자가 SFU 초기화 완료를 방장에게 알림"""
+        logger.info(f"join_ready received from {self.username} (SFU mode)")
+        # 방장에게 브로드캐스트 — 방장이 이미 produce했는지 확인 트리거용
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'peer_joined',
+                'peerId': self.peer_id,
+                'username': self.username,
+                'userId': self.user_id,
+            }
+        )
 
     async def approval_notification(self, event):
         participant_user_id = event.get('participant_user_id')

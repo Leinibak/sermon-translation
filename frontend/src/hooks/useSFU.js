@@ -12,6 +12,8 @@
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
 
+const pendingProducersRef = useRef([]);
+
 async function generateTurnCredentials(secret) {
   const ttl = 24 * 3600;
   const username = Math.floor(Date.now() / 1000) + ttl;
@@ -267,7 +269,8 @@ export function useSFU({ wsRef, roomId }) {
 
       sendTransport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
         wsSend({ type: 'sfu_produce', transportId: sendTransport.id, kind, rtpParameters, appData });
-        waitForMessage('sfu_produced')
+        // ✅ kind 필터로 audio/video 응답 분리
+        waitForMessage('sfu_produced', 10000, (d) => d.kind === kind)
           .then(({ id }) => callback({ id }))
           .catch(errback);
       });
@@ -309,7 +312,13 @@ export function useSFU({ wsRef, roomId }) {
 
       // 6. 이미 방에 있는 producers consume
       for (const prod of existingProducers) {
-        // ✅ username 파라미터 전달 (백엔드에서 오는 username 필드 사용)
+        await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
+      }
+
+      // ✅ 큐에 쌓인 new_producer 처리
+      const queued = [...pendingProducersRef.current];
+      pendingProducersRef.current = [];
+      for (const prod of queued) {
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
@@ -389,11 +398,12 @@ export function useSFU({ wsRef, roomId }) {
         break;
 
       case 'new_producer':
-        // ✅ [수정] device와 recvTransport 준비 확인 후 consume
         if (deviceRef.current && recvTransportRef.current) {
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         } else {
-          console.warn('new_producer received but SFU not ready — skipping');
+          // ✅ skip 대신 큐에 저장
+          pendingProducersRef.current.push(data);
+          console.warn('new_producer queued — SFU not ready yet:', data);
         }
         break;
 
