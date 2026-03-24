@@ -34,6 +34,7 @@ const SFU_EVENT_TYPES = new Set([
   'peer_joined',
   'new_producer',
   'track_state',
+  'user_left',   // ✅ 추가 — handleSFUMessage에서 remoteStreams 정리
 ]);
 
 const isIOS = () => {
@@ -339,10 +340,6 @@ function VideoMeetingRoom() {
 
       case 'join_ready':
         console.log(`🔥 join_ready: ${data.from_username} (SFU에서는 서버가 처리)`);
-        break;
-
-      case 'user_left':
-        console.log(`👋 user_left: ${data.username}`);
         break;
 
       case 'chat_message':
@@ -735,6 +732,30 @@ function VideoMeetingRoom() {
   useEffect(() => {
     if (showChatPanel) setUnreadChatCount(0);
   }, [showChatPanel]);
+
+
+  const sfuInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!wsConnected || !room?.is_host || !localStreamRef.current) return;
+    if (sfuInitializedRef.current) return;
+
+    sfuInitializedRef.current = true;
+
+    const init = async () => {
+      try {
+        await initSFU();
+        await startProducing(localStreamRef.current);
+        console.log('✅ SFU 초기화 완료 (방장)');
+      } catch (e) {
+        console.error('❌ SFU 초기화 실패:', e);
+        sfuInitializedRef.current = false;
+      }
+    };
+
+    init();
+  }, [wsConnected, room?.is_host, initSFU, startProducing]);
+
 
   // =========================================================================
   // 렌더링

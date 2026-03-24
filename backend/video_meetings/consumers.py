@@ -159,16 +159,20 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         """SFU 방 참가 — 현재 Producer 목록도 함께 반환"""
         try:
             result = await sfu_client.join_room(self.room_id, self.peer_id)
+        
+            # peerId → username 매핑 (DB 조회)
+            producers_with_username = []
+            for p in result['producers']:
+                peer_id = p.get('peerId', '')
+                username = await self.get_username_by_peer_id(peer_id)
+                producers_with_username.append({**p, 'username': username})
+        
             await self.send(text_data=json.dumps({
                 'type': 'sfu_joined',
                 'rtpCapabilities': result['rtpCapabilities'],
-                'producers': [
-                    {**p, 'username': p.get('peerId', '').replace('user_', '')}
-                    for p in result['producers']
-                ],
+                'producers': producers_with_username,
             }))
-
-            # 다른 참가자들에게 새 peer 알림
+        
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -352,6 +356,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             'type': 'user_left',
             'username': event['username'],
             'user_id': event['user_id'],
+            'peerId': f"user_{event['user_id']}",   # ✅ 추가 — useSFU에서 remoteStreams 키로 사용
         }))
 
     async def meeting_ended(self, event):
@@ -377,23 +382,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         )
 
     async def handle_join_ready(self, data):
-        to_username = data.get('to_username')
-        is_host = await self.check_is_host_by_username(to_username)
-        if not is_host:
-            return
-
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'approval_notification',
-                'participant_user_id': self.user_id,
-                'participant_username': self.username,
-                'host_username': to_username,
-                'message': f"{self.username}님의 참가가 승인되었습니다.",
-                'room_id': self.room_id,
-                'timestamp': datetime.now().isoformat(),
-            }
-        )
+        # SFU 모드에서는 peer_joined / new_producer 이벤트로 연결이 자동 처리됨
+        # join_ready는 더 이상 approval_notification을 다시 보내지 않음
+        logger.info(f"join_ready received from {self.username} (SFU mode — no-op)")
 
     async def approval_notification(self, event):
         participant_user_id = event.get('participant_user_id')
@@ -580,3 +571,14 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'lowered_at': None if is_raised else timezone.now(),
             }
         )
+
+    @database_sync_to_async
+    def get_username_by_peer_id(self, peer_id: str) -> str:
+        """'user_N' 형식의 peerId에서 실제 username 조회"""
+        from django.contrib.auth.models import User
+        try:
+            user_id = int(peer_id.replace('user_', ''))
+            return User.objects.get(id=user_id).username
+        except (ValueError, User.DoesNotExist):
+            return peer_id  # fallback
+    

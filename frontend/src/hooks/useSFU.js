@@ -2,20 +2,16 @@
 /**
  * useSFU — mediasoup-client 기반 SFU 훅
  *
- * [수정 내용] waitForMessage를 addEventListener 방식에서 내부 큐(pendingRef) 방식으로 교체
- *   - 기존 문제: onmessage가 메시지를 먼저 소비한 뒤 addEventListener를 붙이면 이미 지나간
- *     메시지를 받지 못해 "Timeout waiting for sfu_rtp_capabilities" 발생
- *   - 해결: 컴포넌트의 onmessage에서 dispatchSFUMessage()를 먼저 호출하여 큐에 투입하고,
- *     waitForMessage는 큐에서 꺼내는 방식으로 동작
- *   - sfu_transport_created를 direction(send/recv)으로 구분해 두 번 연속 호출 시 뒤섞이지 않게 수정
+ * [수정 내역]
+ * 1. consumeProducer 파라미터에 username 추가 (치명적 버그 수정)
+ * 2. _createSendTransport / _createRecvTransport를 useCallback 대신
+ *    initSFU 내부 함수로 이동 (클로저 참조 오류 수정)
+ * 3. handleSFUMessage의 user_left 처리 — peerId 형식으로 통일
+ * 4. initSFU 의존성 배열 정리
  */
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
 
-/**
- * TURN 서버 credentials 생성 (HMAC-SHA1 시간기반)
- * coturn의 --use-auth-secret 방식과 호환
- */
 async function generateTurnCredentials(secret) {
   const ttl = 24 * 3600;
   const username = Math.floor(Date.now() / 1000) + ttl;
@@ -28,6 +24,18 @@ async function generateTurnCredentials(secret) {
   return { username: String(username), credential };
 }
 
+async function getIceServers() {
+  const turnUrl    = import.meta.env.VITE_TURN_URL;
+  const turnSecret = import.meta.env.VITE_TURN_SECRET;
+  const servers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (turnUrl && turnSecret) {
+    const { username, credential } = await generateTurnCredentials(turnSecret);
+    servers.push({ urls: turnUrl, username, credential });
+    servers.push({ urls: turnUrl.replace('turn:', 'turns:'), username, credential });
+  }
+  return servers;
+}
+
 export function useSFU({ wsRef, roomId }) {
   const deviceRef        = useRef(null);
   const sendTransportRef = useRef(null);
@@ -36,21 +44,13 @@ export function useSFU({ wsRef, roomId }) {
   const consumersRef     = useRef(new Map()); // consumerId → consumer
   const localStreamRef   = useRef(null);
 
-  // ── [추가] 메시지 큐 ──────────────────────────────────────────
-  // key: messageType (+ 선택적 filter key), value: Array<{resolve, reject, timer, filter}>
+  // 메시지 큐: key = messageType, value = Array<{resolve, reject, timer, filter}>
   const pendingRef = useRef(new Map());
 
   const [remoteStreams, setRemoteStreams]       = useState(new Map());
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
-  // ── 미디어 디바이스 초기화 ────────────────────────────────────
-  const getLocalMedia = useCallback(async ({ video = true, audio = true } = {}) => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video, audio });
-    localStreamRef.current = stream;
-    return stream;
-  }, []);
-
-  // ── WebSocket 메시지 전송 헬퍼 ──────────────────────────────
+  // ── WebSocket 전송 헬퍼 ─────────────────────────────────────
   const wsSend = useCallback((msg) => {
     const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
@@ -58,17 +58,13 @@ export function useSFU({ wsRef, roomId }) {
     }
   }, [wsRef]);
 
-  // ── [교체] 컴포넌트 onmessage에서 호출 → 큐에 투입 ──────────
-  // 컴포넌트의 socket.onmessage 안에서 반드시 이 함수를 먼저 호출해야 합니다.
-  // 반환값: true = waitForMessage 대기 중이던 Promise가 resolve됨 (이벤트 기반 처리는 불필요)
-  //         false = 대기 중인 waiter 없음 (peer_joined, new_producer 등 이벤트 처리 계속 진행)
+  // ── 메시지 큐 투입 (컴포넌트 onmessage에서 반드시 먼저 호출) ──
   const dispatchSFUMessage = useCallback((data) => {
-    // sfu_error는 request 필드로 매핑
+    // sfu_error → 해당 request 타입의 waiter에게 reject
     if (data.type === 'sfu_error') {
       const targetType = `sfu_${data.request}`;
       const waiters = pendingRef.current.get(targetType);
-      if (waiters && waiters.length > 0) {
-        // filter 조건 없는 첫 번째 waiter에게 전달
+      if (waiters?.length > 0) {
         const idx = waiters.findIndex(w => !w.filter || w.filter(data));
         if (idx !== -1) {
           const { reject, timer } = waiters.splice(idx, 1)[0];
@@ -82,9 +78,8 @@ export function useSFU({ wsRef, roomId }) {
     }
 
     const waiters = pendingRef.current.get(data.type);
-    if (!waiters || waiters.length === 0) return false;
+    if (!waiters?.length) return false;
 
-    // filter 조건을 통과하는 첫 번째 waiter에게 전달
     const idx = waiters.findIndex(w => !w.filter || w.filter(data));
     if (idx === -1) return false;
 
@@ -95,12 +90,10 @@ export function useSFU({ wsRef, roomId }) {
     return true;
   }, []);
 
-  // ── [교체] waitForMessage: 큐에 등록하고 Promise 반환 ────────
-  // filter: (data) => boolean — 선택적 필터 (direction 구분 등에 사용)
+  // ── 큐 대기 Promise ─────────────────────────────────────────
   const waitForMessage = useCallback((type, timeoutMs = 10000, filter = null) => {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        // 타임아웃 시 큐에서 자신을 제거
         const waiters = pendingRef.current.get(type);
         if (waiters) {
           const idx = waiters.findIndex(w => w.resolve === resolve);
@@ -110,18 +103,132 @@ export function useSFU({ wsRef, roomId }) {
         reject(new Error(`Timeout waiting for ${type}`));
       }, timeoutMs);
 
-      if (!pendingRef.current.has(type)) {
-        pendingRef.current.set(type, []);
-      }
+      if (!pendingRef.current.has(type)) pendingRef.current.set(type, []);
       pendingRef.current.get(type).push({ resolve, reject, timer, filter });
     });
   }, []);
 
-  // ── SFU 초기화 (방 입장 시 호출) ────────────────────────────
+  // ── 미디어 초기화 ───────────────────────────────────────────
+  const getLocalMedia = useCallback(async ({ video = true, audio = true } = {}) => {
+    const stream = await navigator.mediaDevices.getUserMedia({ video, audio });
+    localStreamRef.current = stream;
+    return stream;
+  }, []);
+
+  // ── 원격 스트림 제거 ────────────────────────────────────────
+  const removeRemoteStream = useCallback((peerId, kind) => {
+    setRemoteStreams((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(peerId);
+      if (!existing) return prev;
+      if (kind) {
+        // 특정 트랙만 제거
+        const consumerId = existing[`${kind}ConsumerId`];
+        if (consumerId) {
+          const consumer = consumersRef.current.get(consumerId);
+          try { consumer?.close(); } catch (_) {}
+          consumersRef.current.delete(consumerId);
+        }
+        delete existing[`${kind}ConsumerId`];
+        // 남은 트랙이 없으면 스트림 전체 제거
+        const hasAudio = !!existing.audioConsumerId;
+        const hasVideo = !!existing.videoConsumerId;
+        if (!hasAudio && !hasVideo) {
+          next.delete(peerId);
+        } else {
+          next.set(peerId, { ...existing });
+        }
+      } else {
+        // peerId 전체 제거
+        if (existing.audioConsumerId) {
+          const c = consumersRef.current.get(existing.audioConsumerId);
+          try { c?.close(); } catch (_) {}
+          consumersRef.current.delete(existing.audioConsumerId);
+        }
+        if (existing.videoConsumerId) {
+          const c = consumersRef.current.get(existing.videoConsumerId);
+          try { c?.close(); } catch (_) {}
+          consumersRef.current.delete(existing.videoConsumerId);
+        }
+        next.delete(peerId);
+      }
+      return next;
+    });
+  }, []);
+
+  // ── [수정 1] consumeProducer — username 파라미터 추가 ────────
+  const consumeProducer = useCallback(async (peerId, producerId, kind, username) => {
+    const device    = deviceRef.current;
+    const transport = recvTransportRef.current;
+    if (!device || !transport) {
+      console.warn('consumeProducer: device or recvTransport not ready');
+      return;
+    }
+
+    try {
+      wsSend({
+        type: 'sfu_consume',
+        producerPeerId: peerId,
+        producerId,
+        transportId: transport.id,
+        rtpCapabilities: device.rtpCapabilities,
+      });
+
+      // producerId 필터로 동시 consume 시 응답 뒤섞임 방지
+      const consumerData = await waitForMessage(
+        'sfu_consumed',
+        10000,
+        (d) => d.producerId === producerId
+      );
+
+      const consumer = await transport.consume({
+        id: consumerData.id,
+        producerId: consumerData.producerId,
+        kind: consumerData.kind,
+        rtpParameters: consumerData.rtpParameters,
+      });
+
+      consumersRef.current.set(consumer.id, consumer);
+
+      // ✅ [수정] username을 파라미터로 받아 사용
+      setRemoteStreams((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(peerId) || {};
+        const stream = existing.stream || new MediaStream();
+        stream.addTrack(consumer.track);
+        next.set(peerId, {
+          ...existing,
+          stream,
+          username: username || existing.username || peerId,
+          [`${kind}ConsumerId`]: consumer.id,
+        });
+        return next;
+      });
+
+      // SFU는 consumer를 paused=true로 생성하므로 resume 필요
+      wsSend({ type: 'sfu_resume_consumer', consumerId: consumer.id });
+      await waitForMessage(
+        'sfu_consumer_resumed',
+        10000,
+        (d) => d.consumerId === consumer.id
+      );
+
+      consumer.on('trackended', () => removeRemoteStream(peerId, kind));
+      consumer.on('transportclose', () => removeRemoteStream(peerId, kind));
+
+      console.log(`✅ Consumed ${kind} from ${username || peerId}`);
+    } catch (e) {
+      console.error(`consumeProducer error (${kind} from ${peerId}):`, e);
+    }
+  }, [wsSend, waitForMessage, removeRemoteStream]);
+
+  // ── SFU 초기화 ──────────────────────────────────────────────
+  // [수정 2] _createSendTransport / _createRecvTransport를 initSFU 내부로 이동
+  //          → useCallback 스코프 문제 해결
   const initSFU = useCallback(async () => {
     setConnectionStatus('connecting');
     try {
-      // 1. Router RTP Capabilities 요청
+      // 1. Router RTP Capabilities
       wsSend({ type: 'sfu_get_rtp_capabilities' });
       const { rtpCapabilities } = await waitForMessage('sfu_rtp_capabilities');
 
@@ -130,17 +237,79 @@ export function useSFU({ wsRef, roomId }) {
       await device.load({ routerRtpCapabilities: rtpCapabilities });
       deviceRef.current = device;
 
-      // 3. SFU 방 참가 (현재 producers 목록 수신)
+      // 3. SFU 방 참가 (기존 producers 목록 수신)
       wsSend({ type: 'sfu_join' });
       const { producers: existingProducers } = await waitForMessage('sfu_joined');
 
-      // 4. Send / Recv Transport 생성
-      //    ※ direction 필터로 sfu_transport_created 응답을 정확히 구분
-      await _createSendTransport(device);
-      await _createRecvTransport(device);
+      const iceServers = await getIceServers();
 
-      // 5. 이미 방에 있는 producer들 consume
+      // 4. Send Transport 생성 ─────────────────────────────────
+      wsSend({ type: 'sfu_create_transport', direction: 'send' });
+      const sendParams = await waitForMessage(
+        'sfu_transport_created', 10000,
+        (d) => d.direction === 'send'
+      );
+
+      const sendTransport = device.createSendTransport({
+        id: sendParams.id,
+        iceParameters: sendParams.iceParameters,
+        iceCandidates: sendParams.iceCandidates,
+        dtlsParameters: sendParams.dtlsParameters,
+        iceServers,
+      });
+
+      sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+        wsSend({ type: 'sfu_connect_transport', transportId: sendTransport.id, dtlsParameters });
+        waitForMessage('sfu_transport_connected', 10000,
+          (d) => d.transportId === sendTransport.id
+        ).then(callback).catch(errback);
+      });
+
+      sendTransport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
+        wsSend({ type: 'sfu_produce', transportId: sendTransport.id, kind, rtpParameters, appData });
+        waitForMessage('sfu_produced')
+          .then(({ id }) => callback({ id }))
+          .catch(errback);
+      });
+
+      sendTransport.on('connectionstatechange', (state) => {
+        console.log(`Send transport: ${state}`);
+        if (state === 'failed') setConnectionStatus('failed');
+      });
+
+      sendTransportRef.current = sendTransport;
+
+      // 5. Recv Transport 생성 ─────────────────────────────────
+      wsSend({ type: 'sfu_create_transport', direction: 'recv' });
+      const recvParams = await waitForMessage(
+        'sfu_transport_created', 10000,
+        (d) => d.direction === 'recv'
+      );
+
+      const recvTransport = device.createRecvTransport({
+        id: recvParams.id,
+        iceParameters: recvParams.iceParameters,
+        iceCandidates: recvParams.iceCandidates,
+        dtlsParameters: recvParams.dtlsParameters,
+        iceServers,
+      });
+
+      recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+        wsSend({ type: 'sfu_connect_transport', transportId: recvTransport.id, dtlsParameters });
+        waitForMessage('sfu_transport_connected', 10000,
+          (d) => d.transportId === recvTransport.id
+        ).then(callback).catch(errback);
+      });
+
+      recvTransport.on('connectionstatechange', (state) => {
+        console.log(`Recv transport: ${state}`);
+      });
+
+      recvTransportRef.current = recvTransport;
+
+      // 6. 이미 방에 있는 producers consume
       for (const prod of existingProducers) {
+        // ✅ username 파라미터 전달 (백엔드에서 오는 username 필드 사용)
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
@@ -151,98 +320,7 @@ export function useSFU({ wsRef, roomId }) {
       console.error('SFU init error:', e);
       throw e;
     }
-  }, [wsSend, waitForMessage]);
-
-  // ── Send Transport 생성 ─────────────────────────────────────
-  const _createSendTransport = useCallback(async (device) => {
-    wsSend({ type: 'sfu_create_transport', direction: 'send' });
-    // [수정] direction === 'send' 인 응답만 수신
-    const params = await waitForMessage(
-      'sfu_transport_created',
-      10000,
-      (d) => d.direction === 'send'
-    );
-
-    const transport = device.createSendTransport({
-      id: params.id,
-      iceParameters: params.iceParameters,
-      iceCandidates: params.iceCandidates,
-      dtlsParameters: params.dtlsParameters,
-      iceServers: await _getIceServers(),
-    });
-
-    transport.on('connect', ({ dtlsParameters }, callback, errback) => {
-      wsSend({
-        type: 'sfu_connect_transport',
-        transportId: transport.id,
-        dtlsParameters,
-      });
-      // transportId 필터로 자신의 응답만 수신
-      waitForMessage(
-        'sfu_transport_connected',
-        10000,
-        (d) => d.transportId === transport.id
-      ).then(callback).catch(errback);
-    });
-
-    transport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
-      wsSend({
-        type: 'sfu_produce',
-        transportId: transport.id,
-        kind,
-        rtpParameters,
-        appData,
-      });
-      waitForMessage('sfu_produced')
-        .then(({ id }) => callback({ id }))
-        .catch(errback);
-    });
-
-    transport.on('connectionstatechange', (state) => {
-      console.log(`Send transport state: ${state}`);
-      if (state === 'failed') setConnectionStatus('failed');
-    });
-
-    sendTransportRef.current = transport;
-  }, [wsSend, waitForMessage]);
-
-  // ── Recv Transport 생성 ─────────────────────────────────────
-  const _createRecvTransport = useCallback(async (device) => {
-    wsSend({ type: 'sfu_create_transport', direction: 'recv' });
-    // [수정] direction === 'recv' 인 응답만 수신
-    const params = await waitForMessage(
-      'sfu_transport_created',
-      10000,
-      (d) => d.direction === 'recv'
-    );
-
-    const transport = device.createRecvTransport({
-      id: params.id,
-      iceParameters: params.iceParameters,
-      iceCandidates: params.iceCandidates,
-      dtlsParameters: params.dtlsParameters,
-      iceServers: await _getIceServers(),
-    });
-
-    transport.on('connect', ({ dtlsParameters }, callback, errback) => {
-      wsSend({
-        type: 'sfu_connect_transport',
-        transportId: transport.id,
-        dtlsParameters,
-      });
-      waitForMessage(
-        'sfu_transport_connected',
-        10000,
-        (d) => d.transportId === transport.id
-      ).then(callback).catch(errback);
-    });
-
-    transport.on('connectionstatechange', (state) => {
-      console.log(`Recv transport state: ${state}`);
-    });
-
-    recvTransportRef.current = transport;
-  }, [wsSend, waitForMessage]);
+  }, [wsSend, waitForMessage, consumeProducer]);
 
   // ── 로컬 미디어 송신 시작 ───────────────────────────────────
   const startProducing = useCallback(async (stream) => {
@@ -255,6 +333,7 @@ export function useSFU({ wsRef, roomId }) {
     if (audioTrack) {
       const audioProducer = await transport.produce({ track: audioTrack });
       producersRef.current.set('audio', audioProducer);
+      console.log('✅ Audio producing');
     }
 
     if (videoTrack) {
@@ -268,82 +347,8 @@ export function useSFU({ wsRef, roomId }) {
         codecOptions: { videoGoogleStartBitrate: 500 },
       });
       producersRef.current.set('video', videoProducer);
+      console.log('✅ Video producing');
     }
-  }, []);
-
-  // ── 타 참가자 미디어 수신 ───────────────────────────────────
-  const consumeProducer = useCallback(async (peerId, producerId, kind) => {
-    const device    = deviceRef.current;
-    const transport = recvTransportRef.current;
-    if (!device || !transport) return;
-
-    wsSend({
-      type: 'sfu_consume',
-      producerPeerId: peerId,
-      producerId,
-      transportId: transport.id,
-      rtpCapabilities: device.rtpCapabilities,
-    });
-
-    // [수정] producerId 필터로 자신의 응답만 수신 (동시 consume 시 뒤섞임 방지)
-    const consumerData = await waitForMessage(
-      'sfu_consumed',
-      10000,
-      (d) => d.producerId === producerId
-    );
-
-    const consumer = await transport.consume({
-      id: consumerData.id,
-      producerId: consumerData.producerId,
-      kind: consumerData.kind,
-      rtpParameters: consumerData.rtpParameters,
-    });
-
-    consumersRef.current.set(consumer.id, consumer);
-
-    setRemoteStreams((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(peerId) || {};
-      const stream = existing.stream || new MediaStream();
-      stream.addTrack(consumer.track);
-      next.set(peerId, {
-        ...existing,
-        stream,
-        // ✅ username이 있으면 사용, 없으면 peerId 폴백
-        username: username || existing.username || peerId,
-        [`${kind}ConsumerId`]: consumer.id,
-      });
-      return next;
-    });
-
-    // SFU에게 resume 요청 (paused=true로 생성되었으므로)
-    wsSend({ type: 'sfu_resume_consumer', consumerId: consumer.id });
-    await waitForMessage(
-      'sfu_consumer_resumed',
-      10000,
-      (d) => d.consumerId === consumer.id
-    );
-
-    consumer.on('trackended', () => removeRemoteStream(peerId, kind));
-    consumer.on('transportclose', () => removeRemoteStream(peerId, kind));
-  }, [wsSend, waitForMessage]);
-
-  // ── 수신 중단 ──────────────────────────────────────────────
-  const removeRemoteStream = useCallback((peerId, kind) => {
-    setRemoteStreams((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(peerId);
-      if (!existing) return prev;
-      if (kind) {
-        delete existing[`${kind}ConsumerId`];
-        const hasMedia = existing.stream?.getTracks().length > 0;
-        if (!hasMedia) next.delete(peerId);
-        else next.set(peerId, { ...existing });
-      } else {
-        next.delete(peerId);
-      }
-      return next;
-    });
   }, []);
 
   // ── Mute / Unmute ──────────────────────────────────────────
@@ -375,25 +380,50 @@ export function useSFU({ wsRef, roomId }) {
     wsSend({ type: 'sfu_producer_resume', producerId: producer.id, kind: 'video' });
   }, [wsSend]);
 
-  // ── WebSocket 이벤트 기반 메시지 처리 ─────────────────────
-  // peer_joined, new_producer, user_left 등 Promise 대기 없이 이벤트로만 처리하는 타입
+  // ── 이벤트 기반 SFU 메시지 처리 ─────────────────────────────
+  // peer_joined, new_producer, track_state, user_left
   const handleSFUMessage = useCallback(async (data) => {
     switch (data.type) {
       case 'peer_joined':
-        console.log(`Peer joined: ${data.username}`);
+        console.log(`Peer joined: ${data.username} (${data.peerId})`);
         break;
 
       case 'new_producer':
+        // ✅ [수정] device와 recvTransport 준비 확인 후 consume
         if (deviceRef.current && recvTransportRef.current) {
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
+        } else {
+          console.warn('new_producer received but SFU not ready — skipping');
         }
         break;
 
-      case 'user_left':
-      // ❌ removeRemoteStream(data.user_id)  → 숫자, key와 불일치
-        // ✅ peerId 형식으로 변환
-        removeRemoteStream(`user_${data.user_id}`);
+      case 'track_state':
+        // 원격 참가자의 마이크/카메라 상태 변경
+        setRemoteStreams((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(data.peerId || `user_${data.user_id}`);
+          if (existing) {
+            next.set(data.peerId || `user_${data.user_id}`, {
+              ...existing,
+              isMuted:    data.kind === 'audio' ? !data.enabled : existing.isMuted,
+              isVideoOff: data.kind === 'video' ? !data.enabled : existing.isVideoOff,
+            });
+          }
+          return next;
+        });
         break;
+
+      // ✅ [수정 3] user_left: VideoMeetingRoom의 switch가 무시하므로
+      //    SFU_EVENT_TYPES에 추가하고 여기서 처리
+      case 'user_left': {
+        // 백엔드는 username을 보내지만 remoteStreams 키는 peerId("user_N") 형식
+        const peerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
+        if (peerId) {
+          removeRemoteStream(peerId);
+          console.log(`Peer left: ${data.username} (${peerId})`);
+        }
+        break;
+      }
 
       default:
         break;
@@ -402,7 +432,6 @@ export function useSFU({ wsRef, roomId }) {
 
   // ── 정리 ──────────────────────────────────────────────────
   const cleanup = useCallback(() => {
-    // 대기 중인 Promise 전부 reject
     pendingRef.current.forEach((waiters) => {
       waiters.forEach(({ reject, timer }) => {
         clearTimeout(timer);
@@ -418,25 +447,12 @@ export function useSFU({ wsRef, roomId }) {
     recvTransportRef.current?.close();
     producersRef.current.clear();
     consumersRef.current.clear();
+    sendTransportRef.current = null;
+    recvTransportRef.current = null;
+    deviceRef.current = null;
     setRemoteStreams(new Map());
     setConnectionStatus('disconnected');
   }, []);
-
-  // ── ICE 서버 설정 ──────────────────────────────────────────
-  async function _getIceServers() {
-    const turnUrl    = import.meta.env.VITE_TURN_URL;
-    const turnSecret = import.meta.env.VITE_TURN_SECRET;
-
-    const servers = [{ urls: 'stun:stun.l.google.com:19302' }];
-
-    if (turnUrl && turnSecret) {
-      const { username, credential } = await generateTurnCredentials(turnSecret);
-      servers.push({ urls: turnUrl, username, credential });
-      servers.push({ urls: turnUrl.replace('turn:', 'turns:'), username, credential });
-    }
-
-    return servers;
-  }
 
   return {
     localStreamRef,
@@ -452,7 +468,7 @@ export function useSFU({ wsRef, roomId }) {
     muteVideo,
     unmuteVideo,
     handleSFUMessage,
-    dispatchSFUMessage,   // ← [추가] 컴포넌트 onmessage에서 반드시 호출
+    dispatchSFUMessage,
     cleanup,
   };
 }
