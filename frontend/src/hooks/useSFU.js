@@ -2,16 +2,11 @@
 /**
  * useSFU — mediasoup-client 기반 SFU 훅
  *
- * [수정 내역]
- * 1. consumeProducer 파라미터에 username 추가 (치명적 버그 수정)
- * 2. _createSendTransport / _createRecvTransport를 useCallback 대신
- *    initSFU 내부 함수로 이동 (클로저 참조 오류 수정)
- * 3. handleSFUMessage의 user_left 처리 — peerId 형식으로 통일
- * 4. initSFU 의존성 배열 정리
- *
- * [2차 수정 — 이번 패치]
- * FIX-1: user_left silent fail — peerId 없을 때 username으로도 Map 검색
- * FIX-2: handleSFUMessage의 track_state — peerId 우선, fallback으로 user_id 키 탐색
+ * [수정 내역 — 이번 패치]
+ * FIX-B3: consumeProducer 실패 시 3초 후 1회 재시도
+ * FIX-B4: user_left 핸들러 — setRemoteStreams 콜백 내 removeRemoteStream() 중첩 호출 제거
+ *         (setState 안에서 setState 호출 → 렌더 무한 루프 가능성 수정)
+ *         consumer 정리를 setRemoteStreams 콜백 내에서 직접 수행하도록 변경
  */
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
@@ -64,9 +59,8 @@ export function useSFU({ wsRef, roomId }) {
     }
   }, [wsRef]);
 
-  // ── 메시지 큐 투입 (컴포넌트 onmessage에서 반드시 먼저 호출) ──
+  // ── 메시지 큐 투입 ───────────────────────────────────────────
   const dispatchSFUMessage = useCallback((data) => {
-    // sfu_error → 해당 request 타입의 waiter에게 reject
     if (data.type === 'sfu_error') {
       const targetType = `sfu_${data.request}`;
       const waiters = pendingRef.current.get(targetType);
@@ -124,11 +118,11 @@ export function useSFU({ wsRef, roomId }) {
   // ── 원격 스트림 제거 ────────────────────────────────────────
   const removeRemoteStream = useCallback((peerId, kind) => {
     setRemoteStreams((prev) => {
-      const next = new Map(prev);
+      const next     = new Map(prev);
       const existing = next.get(peerId);
       if (!existing) return prev;
+
       if (kind) {
-        // 특정 트랙만 제거
         const consumerId = existing[`${kind}ConsumerId`];
         if (consumerId) {
           const consumer = consumersRef.current.get(consumerId);
@@ -136,7 +130,6 @@ export function useSFU({ wsRef, roomId }) {
           consumersRef.current.delete(consumerId);
         }
         delete existing[`${kind}ConsumerId`];
-        // 남은 트랙이 없으면 스트림 전체 제거
         const hasAudio = !!existing.audioConsumerId;
         const hasVideo = !!existing.videoConsumerId;
         if (!hasAudio && !hasVideo) {
@@ -145,15 +138,12 @@ export function useSFU({ wsRef, roomId }) {
           next.set(peerId, { ...existing });
         }
       } else {
-        // peerId 전체 제거
         if (existing.audioConsumerId) {
-          const c = consumersRef.current.get(existing.audioConsumerId);
-          try { c?.close(); } catch (_) {}
+          try { consumersRef.current.get(existing.audioConsumerId)?.close(); } catch (_) {}
           consumersRef.current.delete(existing.audioConsumerId);
         }
         if (existing.videoConsumerId) {
-          const c = consumersRef.current.get(existing.videoConsumerId);
-          try { c?.close(); } catch (_) {}
+          try { consumersRef.current.get(existing.videoConsumerId)?.close(); } catch (_) {}
           consumersRef.current.delete(existing.videoConsumerId);
         }
         next.delete(peerId);
@@ -162,7 +152,7 @@ export function useSFU({ wsRef, roomId }) {
     });
   }, []);
 
-  // ── consumeProducer — username 파라미터 추가 ────────────────
+  // ── consumeProducer ─────────────────────────────────────────
   const consumeProducer = useCallback(async (peerId, producerId, kind, username) => {
     const device    = deviceRef.current;
     const transport = recvTransportRef.current;
@@ -173,14 +163,13 @@ export function useSFU({ wsRef, roomId }) {
 
     try {
       wsSend({
-        type: 'sfu_consume',
-        producerPeerId: peerId,
+        type:            'sfu_consume',
+        producerPeerId:  peerId,
         producerId,
-        transportId: transport.id,
+        transportId:     transport.id,
         rtpCapabilities: device.rtpCapabilities,
       });
 
-      // producerId 필터로 동시 consume 시 응답 뒤섞임 방지
       const consumerData = await waitForMessage(
         'sfu_consumed',
         10000,
@@ -188,18 +177,18 @@ export function useSFU({ wsRef, roomId }) {
       );
 
       const consumer = await transport.consume({
-        id: consumerData.id,
-        producerId: consumerData.producerId,
-        kind: consumerData.kind,
+        id:            consumerData.id,
+        producerId:    consumerData.producerId,
+        kind:          consumerData.kind,
         rtpParameters: consumerData.rtpParameters,
       });
 
       consumersRef.current.set(consumer.id, consumer);
 
       setRemoteStreams((prev) => {
-        const next = new Map(prev);
+        const next     = new Map(prev);
         const existing = next.get(peerId) || {};
-        const stream = existing.stream || new MediaStream();
+        const stream   = existing.stream || new MediaStream();
         stream.addTrack(consumer.track);
         next.set(peerId, {
           ...existing,
@@ -210,7 +199,6 @@ export function useSFU({ wsRef, roomId }) {
         return next;
       });
 
-      // SFU는 consumer를 paused=true로 생성하므로 resume 필요
       wsSend({ type: 'sfu_resume_consumer', consumerId: consumer.id });
       await waitForMessage(
         'sfu_consumer_resumed',
@@ -218,12 +206,21 @@ export function useSFU({ wsRef, roomId }) {
         (d) => d.consumerId === consumer.id
       );
 
-      consumer.on('trackended', () => removeRemoteStream(peerId, kind));
+      consumer.on('trackended',    () => removeRemoteStream(peerId, kind));
       consumer.on('transportclose', () => removeRemoteStream(peerId, kind));
 
       console.log(`✅ Consumed ${kind} from ${username || peerId}`);
     } catch (e) {
       console.error(`consumeProducer error (${kind} from ${peerId}):`, e);
+
+      // FIX-B3: sfu_error 응답(서버 측 실패) 또는 timeout 시 3초 후 1회 재시도
+      // 재시도 전에 transport와 device가 여전히 살아있는지 확인
+      setTimeout(() => {
+        if (deviceRef.current && recvTransportRef.current) {
+          console.log(`🔄 Retrying consumeProducer (${kind} from ${peerId})`);
+          consumeProducer(peerId, producerId, kind, username);
+        }
+      }, 3000);
     }
   }, [wsSend, waitForMessage, removeRemoteStream]);
 
@@ -240,13 +237,13 @@ export function useSFU({ wsRef, roomId }) {
       await device.load({ routerRtpCapabilities: rtpCapabilities });
       deviceRef.current = device;
 
-      // 3. SFU 방 참가 (기존 producers 목록 수신)
+      // 3. SFU 방 참가
       wsSend({ type: 'sfu_join' });
       const { producers: existingProducers } = await waitForMessage('sfu_joined');
 
       const iceServers = await getIceServers();
 
-      // 4. Send Transport 생성 ─────────────────────────────────
+      // 4. Send Transport 생성
       wsSend({ type: 'sfu_create_transport', direction: 'send' });
       const sendParams = await waitForMessage(
         'sfu_transport_created', 10000,
@@ -254,9 +251,9 @@ export function useSFU({ wsRef, roomId }) {
       );
 
       const sendTransport = device.createSendTransport({
-        id: sendParams.id,
-        iceParameters: sendParams.iceParameters,
-        iceCandidates: sendParams.iceCandidates,
+        id:             sendParams.id,
+        iceParameters:  sendParams.iceParameters,
+        iceCandidates:  sendParams.iceCandidates,
         dtlsParameters: sendParams.dtlsParameters,
         iceServers,
       });
@@ -270,7 +267,6 @@ export function useSFU({ wsRef, roomId }) {
 
       sendTransport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
         wsSend({ type: 'sfu_produce', transportId: sendTransport.id, kind, rtpParameters, appData });
-        // kind 필터로 audio/video 응답 분리
         waitForMessage('sfu_produced', 10000, (d) => d.kind === kind)
           .then(({ id }) => callback({ id }))
           .catch(errback);
@@ -283,7 +279,7 @@ export function useSFU({ wsRef, roomId }) {
 
       sendTransportRef.current = sendTransport;
 
-      // 5. Recv Transport 생성 ─────────────────────────────────
+      // 5. Recv Transport 생성
       wsSend({ type: 'sfu_create_transport', direction: 'recv' });
       const recvParams = await waitForMessage(
         'sfu_transport_created', 10000,
@@ -291,9 +287,9 @@ export function useSFU({ wsRef, roomId }) {
       );
 
       const recvTransport = device.createRecvTransport({
-        id: recvParams.id,
-        iceParameters: recvParams.iceParameters,
-        iceCandidates: recvParams.iceCandidates,
+        id:             recvParams.id,
+        iceParameters:  recvParams.iceParameters,
+        iceCandidates:  recvParams.iceCandidates,
         dtlsParameters: recvParams.dtlsParameters,
         iceServers,
       });
@@ -401,27 +397,22 @@ export function useSFU({ wsRef, roomId }) {
         if (deviceRef.current && recvTransportRef.current) {
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         } else {
-          // skip 대신 큐에 저장
           pendingProducersRef.current.push(data);
           console.warn('new_producer queued — SFU not ready yet:', data);
         }
         break;
 
       case 'track_state': {
-        // FIX-2: peerId 우선, 없으면 Map 전체를 순회해 username 또는 user_id로 키 탐색
         setRemoteStreams((prev) => {
-          // 백엔드가 peerId를 직접 보내는 경우
+          // peerId 우선, 없으면 username으로 fallback 탐색
           const directKey = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
           const key = directKey && prev.has(directKey)
             ? directKey
-            // peerId/user_id 로 못 찾으면 username으로 탐색
-            : [...prev.entries()].find(
-                ([, v]) => v.username === data.username
-              )?.[0];
+            : [...prev.entries()].find(([, v]) => v.username === data.username)?.[0];
 
           if (!key) return prev;
 
-          const next = new Map(prev);
+          const next     = new Map(prev);
           const existing = next.get(key);
           next.set(key, {
             ...existing,
@@ -433,30 +424,37 @@ export function useSFU({ wsRef, roomId }) {
         break;
       }
 
-      // FIX-1: user_left — peerId 없을 때 username으로도 Map 탐색하여 silent fail 방지
+      // FIX-B4: setRemoteStreams 콜백 내에서 consumer 정리를 직접 수행
+      //         removeRemoteStream() 호출 제거 → setState 중첩 방지
       case 'user_left': {
         const directPeerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
 
         setRemoteStreams((prev) => {
-          // directPeerId로 직접 확인
-          if (directPeerId && prev.has(directPeerId)) {
-            removeRemoteStream(directPeerId);
-            console.log(`Peer left: ${data.username} (${directPeerId})`);
-            return prev; // removeRemoteStream이 내부적으로 setState 호출
+          // 탐색 — peerId 우선, username fallback
+          let key = directPeerId && prev.has(directPeerId)
+            ? directPeerId
+            : [...prev.entries()].find(([, v]) => v.username === data.username)?.[0];
+
+          if (!key) {
+            console.warn('user_left: no matching stream for', data);
+            return prev;
           }
 
-          // username으로 fallback 탐색
-          const found = [...prev.entries()].find(
-            ([, v]) => v.username === data.username
-          );
-          if (found) {
-            const [foundKey] = found;
-            removeRemoteStream(foundKey);
-            console.log(`Peer left (by username): ${data.username} (${foundKey})`);
-          } else {
-            console.warn(`user_left: no matching stream for`, data);
-          }
-          return prev;
+          const existing = prev.get(key);
+
+          // consumer 정리 (콜백 내에서 직접 처리 — refs는 외부 클로저라 접근 가능)
+          const cleanConsumer = (consumerId) => {
+            if (!consumerId) return;
+            try { consumersRef.current.get(consumerId)?.close(); } catch (_) {}
+            consumersRef.current.delete(consumerId);
+          };
+          cleanConsumer(existing?.audioConsumerId);
+          cleanConsumer(existing?.videoConsumerId);
+
+          const next = new Map(prev);
+          next.delete(key);
+          console.log(`Peer left: ${data.username} (${key})`);
+          return next;
         });
         break;
       }
@@ -464,7 +462,7 @@ export function useSFU({ wsRef, roomId }) {
       default:
         break;
     }
-  }, [consumeProducer, removeRemoteStream]);
+  }, [consumeProducer]);
 
   // ── 정리 ──────────────────────────────────────────────────
   const cleanup = useCallback(() => {

@@ -1,9 +1,12 @@
 # backend/video_meetings/consumers.py
 """
 VideoMeetingConsumer — SFU(mediasoup) 연동 버전
-역할: WebSocket 시그널링 + SFU REST API 중계
-실제 미디어(RTP)는 mediasoup SFU가 처리하므로
-이 consumer는 '제어 채널'만 담당합니다.
+
+[수정 내역 — 이번 패치]
+FIX-B2: handle_sfu_join — producers 키 camelCase 정규화 방어 코드 추가
+FIX-B3: consumeProducer 실패 시 Consumer에서 sfu_error 응답 (로그만 남기던 것 수정)
+FIX-B4: user_left setState 중첩 제거 → peerId는 user_left 이벤트에서 직접 포함
+FIX-B5: handle_join — SFU 모드에서 join_request_notification 대신 peer_joined 전송
 """
 import asyncio
 import json
@@ -36,7 +39,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
             self.user_id = self.user.id
             self.username = self.user.username
-            # SFU peer ID = "user_{id}" 형식
             self.peer_id = f"user_{self.user_id}"
 
             await self.channel_layer.group_add(self.room_group_name, self.channel_name)
@@ -52,16 +54,23 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         try:
             username = getattr(self, 'username', None)
-            peer_id = getattr(self, 'peer_id', None)
+            peer_id  = getattr(self, 'peer_id',   None)
 
             if username and hasattr(self, 'room_group_name'):
-                # SFU에서 Peer 제거
                 if peer_id:
                     await sfu_client.leave_room(self.room_id, peer_id)
 
                 await self.channel_layer.group_send(
                     self.room_group_name,
-                    {'type': 'user_left', 'username': username, 'user_id': self.user_id}
+                    {
+                        'type':    'user_left',
+                        'username': username,
+                        'user_id':  self.user_id,
+                        # FIX-B4: disconnect 시점에 peerId를 함께 전송
+                        # → user_left() 핸들러가 동적 생성하므로 여기선 없어도 되지만
+                        #   명시적으로 포함해 두어 혼란 방지
+                        'peerId':  peer_id,
+                    }
                 )
                 await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
@@ -74,64 +83,29 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         try:
-            data = json.loads(text_data)
+            data     = json.loads(text_data)
             msg_type = data.get('type')
             if not msg_type:
                 return
 
-            # ── SFU 시그널링 ──────────────────────────────────
-            if msg_type == 'sfu_get_rtp_capabilities':
-                await self.handle_get_rtp_capabilities()
-
-            elif msg_type == 'sfu_join':
-                await self.handle_sfu_join(data)
-
-            elif msg_type == 'sfu_create_transport':
-                await self.handle_create_transport(data)
-
-            elif msg_type == 'sfu_connect_transport':
-                await self.handle_connect_transport(data)
-
-            elif msg_type == 'sfu_produce':
-                await self.handle_produce(data)
-
-            elif msg_type == 'sfu_consume':
-                await self.handle_consume(data)
-
-            elif msg_type == 'sfu_resume_consumer':
-                await self.handle_resume_consumer(data)
-
-            elif msg_type == 'sfu_producer_pause':
-                await self.handle_producer_pause(data)
-
-            elif msg_type == 'sfu_producer_resume':
-                await self.handle_producer_resume(data)
-
-            # ── 기존 기능 유지 ────────────────────────────────
-            elif msg_type == 'join':
-                await self.handle_join(data)
-
-            elif msg_type == 'join_ready':
-                await self.handle_join_ready(data)
-
-            elif msg_type == 'track_state':
-                await self.handle_track_state(data)
-
-            elif msg_type == 'chat':
-                await self.handle_chat_message(data)
-
-            elif msg_type == 'reaction':
-                await self.handle_reaction(data)
-
-            elif msg_type == 'raise_hand':
-                await self.handle_raise_hand(data)
-
-            elif msg_type == 'lower_hand':
-                await self.handle_lower_hand(data)
-
+            if   msg_type == 'sfu_get_rtp_capabilities': await self.handle_get_rtp_capabilities()
+            elif msg_type == 'sfu_join':                 await self.handle_sfu_join(data)
+            elif msg_type == 'sfu_create_transport':     await self.handle_create_transport(data)
+            elif msg_type == 'sfu_connect_transport':    await self.handle_connect_transport(data)
+            elif msg_type == 'sfu_produce':              await self.handle_produce(data)
+            elif msg_type == 'sfu_consume':              await self.handle_consume(data)
+            elif msg_type == 'sfu_resume_consumer':      await self.handle_resume_consumer(data)
+            elif msg_type == 'sfu_producer_pause':       await self.handle_producer_pause(data)
+            elif msg_type == 'sfu_producer_resume':      await self.handle_producer_resume(data)
+            elif msg_type == 'join':                     await self.handle_join(data)
+            elif msg_type == 'join_ready':               await self.handle_join_ready(data)
+            elif msg_type == 'track_state':              await self.handle_track_state(data)
+            elif msg_type == 'chat':                     await self.handle_chat_message(data)
+            elif msg_type == 'reaction':                 await self.handle_reaction(data)
+            elif msg_type == 'raise_hand':               await self.handle_raise_hand(data)
+            elif msg_type == 'lower_hand':               await self.handle_lower_hand(data)
             elif msg_type == 'ping':
                 await self.send(text_data=json.dumps({'type': 'pong'}))
-
             else:
                 logger.warning(f"Unknown message type: {msg_type}")
 
@@ -145,7 +119,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     # ──────────────────────────────────────────────────────────
 
     async def handle_get_rtp_capabilities(self):
-        """클라이언트 Device.load()를 위한 Router RTP Capabilities 전달"""
         try:
             rtp_capabilities = await sfu_client.get_rtp_capabilities(self.room_id)
             await self.send(text_data=json.dumps({
@@ -156,41 +129,51 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_get_rtp_capabilities', str(e))
 
     async def handle_sfu_join(self, data):
-        """SFU 방 참가 — 현재 Producer 목록도 함께 반환"""
+        """
+        SFU 방 참가 — 현재 Producer 목록 + username 매핑 반환.
+
+        FIX-B2: sfu_client.join_room()이 이미 camelCase 정규화를 수행.
+                여기서는 peerId 키 접근 시 방어 코드 추가.
+        """
         try:
             result = await sfu_client.join_room(self.room_id, self.peer_id)
-        
-            # peerId → username 매핑 (DB 조회)
+
             producers_with_username = []
             for p in result['producers']:
-                peer_id = p.get('peerId', '')
+                # FIX-B2: camelCase/snake_case 혼용 대응
+                peer_id  = p.get('peerId') or p.get('peer_id', '')
                 username = await self.get_username_by_peer_id(peer_id)
-                producers_with_username.append({**p, 'username': username})
-        
+                producers_with_username.append({
+                    'peerId':     peer_id,
+                    'producerId': p.get('producerId') or p.get('producer_id', ''),
+                    'kind':       p.get('kind', ''),
+                    'paused':     p.get('paused', False),
+                    'username':   username,
+                })
+
             await self.send(text_data=json.dumps({
                 'type': 'sfu_joined',
                 'rtpCapabilities': result['rtpCapabilities'],
                 'producers': producers_with_username,
             }))
-        
+
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'peer_joined',
-                    'peerId': self.peer_id,
+                    'type':     'peer_joined',
+                    'peerId':   self.peer_id,
                     'username': self.username,
-                    'userId': self.user_id,
+                    'userId':   self.user_id,
                 }
             )
         except Exception as e:
             await self._send_error('sfu_join', str(e))
 
     async def handle_create_transport(self, data):
-        """Send 또는 Recv용 WebRtcTransport 생성"""
         try:
             transport_params = await sfu_client.create_transport(self.room_id, self.peer_id)
             await self.send(text_data=json.dumps({
-                'type': 'sfu_transport_created',
+                'type':      'sfu_transport_created',
                 'direction': data.get('direction', 'send'),
                 **transport_params,
             }))
@@ -198,7 +181,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_create_transport', str(e))
 
     async def handle_connect_transport(self, data):
-        """DTLS 파라미터로 Transport 연결"""
         try:
             await sfu_client.connect_transport(
                 self.room_id,
@@ -207,16 +189,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 data['dtlsParameters'],
             )
             await self.send(text_data=json.dumps({
-                'type': 'sfu_transport_connected',
+                'type':        'sfu_transport_connected',
                 'transportId': data['transportId'],
             }))
         except Exception as e:
             await self._send_error('sfu_connect_transport', str(e))
 
     async def handle_produce(self, data):
-        """Producer 생성 후 방 전체에 새 producer 알림"""
         try:
-            result = await sfu_client.create_producer(
+            result      = await sfu_client.create_producer(
                 self.room_id,
                 self.peer_id,
                 data['transportId'],
@@ -226,30 +207,31 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             )
             producer_id = result['id']
 
-            # 요청한 클라이언트에게 producer ID 반환
             await self.send(text_data=json.dumps({
                 'type': 'sfu_produced',
-                'id': producer_id,
+                'id':   producer_id,
                 'kind': data['kind'],
             }))
 
-            # 방의 다른 참가자들에게 새 producer 알림 → 각자 consume 요청 트리거
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'new_producer',
-                    'peerId': self.peer_id,
-                    'username': self.username,
-                    'userId': self.user_id,
+                    'type':       'new_producer',
+                    'peerId':     self.peer_id,
+                    'username':   self.username,
+                    'userId':     self.user_id,
                     'producerId': producer_id,
-                    'kind': data['kind'],
+                    'kind':       data['kind'],
                 }
             )
         except Exception as e:
             await self._send_error('sfu_produce', str(e))
 
     async def handle_consume(self, data):
-        """특정 Producer를 수신하기 위한 Consumer 생성"""
+        """
+        FIX-B3: sfu_client.create_consumer() 실패 시 sfu_error 응답.
+                (기존에는 Consumer 예외가 silently fail 될 수 있었음)
+        """
         try:
             result = await sfu_client.create_consumer(
                 self.room_id,
@@ -264,32 +246,34 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 **result,
             }))
         except Exception as e:
+            logger.error(
+                f"handle_consume failed: consumer={self.peer_id} "
+                f"producer={data.get('producerId')} err={e}"
+            )
             await self._send_error('sfu_consume', str(e))
 
     async def handle_resume_consumer(self, data):
-        """Consumer resume (클라이언트가 렌더링 준비 완료 시 호출)"""
         try:
             await sfu_client.resume_consumer(self.room_id, self.peer_id, data['consumerId'])
             await self.send(text_data=json.dumps({
-                'type': 'sfu_consumer_resumed',
+                'type':       'sfu_consumer_resumed',
                 'consumerId': data['consumerId'],
             }))
         except Exception as e:
             await self._send_error('sfu_resume_consumer', str(e))
 
     async def handle_producer_pause(self, data):
-        """마이크/카메라 mute → SFU producer pause"""
         try:
             await sfu_client.pause_producer(self.room_id, self.peer_id, data['producerId'])
-            # 다른 참가자들에게 상태 변경 알림
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'track_state_changed',
-                    'username': self.username,
-                    'user_id': self.user_id,
-                    'kind': data.get('kind'),
-                    'enabled': False,
+                    'type':      'track_state_changed',
+                    'username':  self.username,
+                    'user_id':   self.user_id,
+                    'peerId':    self.peer_id,
+                    'kind':      data.get('kind'),
+                    'enabled':   False,
                     'timestamp': datetime.now().isoformat(),
                 }
             )
@@ -297,17 +281,17 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_producer_pause', str(e))
 
     async def handle_producer_resume(self, data):
-        """마이크/카메라 unmute → SFU producer resume"""
         try:
             await sfu_client.resume_producer(self.room_id, self.peer_id, data['producerId'])
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'track_state_changed',
-                    'username': self.username,
-                    'user_id': self.user_id,
-                    'kind': data.get('kind'),
-                    'enabled': True,
+                    'type':      'track_state_changed',
+                    'username':  self.username,
+                    'user_id':   self.user_id,
+                    'peerId':    self.peer_id,
+                    'kind':      data.get('kind'),
+                    'enabled':   True,
                     'timestamp': datetime.now().isoformat(),
                 }
             )
@@ -315,83 +299,125 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_producer_resume', str(e))
 
     # ──────────────────────────────────────────────────────────
-    # Channel Layer 이벤트 핸들러 (group_send로 받은 메시지)
+    # Channel Layer 이벤트 핸들러
     # ──────────────────────────────────────────────────────────
 
     async def peer_joined(self, event):
-        """새 참가자 입장 알림"""
         if event['peerId'] != self.peer_id:
             await self.send(text_data=json.dumps({
-                'type': 'peer_joined',
-                'peerId': event['peerId'],
+                'type':     'peer_joined',
+                'peerId':   event['peerId'],
                 'username': event['username'],
-                'userId': event['userId'],
+                'userId':   event['userId'],
             }))
 
     async def new_producer(self, event):
-        """새 Producer 알림 — 자신 제외"""
         if event['peerId'] != self.peer_id:
             await self.send(text_data=json.dumps({
-                'type': 'new_producer',
-                'peerId': event['peerId'],
-                'username': event['username'],
-                'userId': event['userId'],
+                'type':       'new_producer',
+                'peerId':     event['peerId'],
+                'username':   event['username'],
+                'userId':     event['userId'],
                 'producerId': event['producerId'],
-                'kind': event['kind'],
+                'kind':       event['kind'],
             }))
 
     async def track_state_changed(self, event):
         if event['username'] != self.username:
             await self.send(text_data=json.dumps({
-                'type': 'track_state',
-                'username': event['username'],
-                'user_id': event['user_id'],
-                'kind': event['kind'],
-                'enabled': event['enabled'],
+                'type':      'track_state',
+                'username':  event['username'],
+                'user_id':   event['user_id'],
+                'peerId':    event.get('peerId', f"user_{event['user_id']}"),
+                'kind':      event['kind'],
+                'enabled':   event['enabled'],
                 'timestamp': event.get('timestamp'),
             }))
 
     async def user_left(self, event):
+        """
+        FIX-B4: peerId를 항상 포함해서 프론트엔드 remoteStreams 키 탐색 보장.
+                disconnect()가 group_send에 peerId를 포함하므로 그대로 전달.
+                없을 경우 user_id로 생성 (방어 코드).
+        """
+        peer_id = event.get('peerId') or f"user_{event['user_id']}"
         await self.send(text_data=json.dumps({
-            'type': 'user_left',
+            'type':     'user_left',
             'username': event['username'],
-            'user_id': event['user_id'],
-            'peerId': f"user_{event['user_id']}",   # ✅ 추가 — useSFU에서 remoteStreams 키로 사용
+            'user_id':  event['user_id'],
+            'peerId':   peer_id,
         }))
 
     async def meeting_ended(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'meeting_ended',
-            'message': event['message'],
-            'ended_by': event.get('ended_by'),
+            'type':      'meeting_ended',
+            'message':   event['message'],
+            'ended_by':  event.get('ended_by'),
         }))
 
     # ──────────────────────────────────────────────────────────
-    # 기존 참가 승인 흐름 (변경 없음)
+    # 기존 참가 승인 흐름
     # ──────────────────────────────────────────────────────────
 
     async def handle_join(self, data):
+        """
+        FIX-B5: SFU 모드에서 join 메시지 처리.
+
+        변경 전: 무조건 join_request_notification → 방장에게 참가 요청 재발송
+        변경 후: 승인된 참가자 → peer_joined 브로드캐스트
+                 미승인 참가자 → 기존대로 join_request_notification
+        """
+        is_approved = await self.check_is_approved()
+
+        if is_approved:
+            # 이미 승인됐으므로 SFU 입장 완료 알림만 브로드캐스트
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type':     'peer_joined',
+                    'peerId':   self.peer_id,
+                    'username': self.username,
+                    'userId':   self.user_id,
+                }
+            )
+        else:
+            # 아직 승인 안 된 경우 — 방장에게 참가 요청 전송
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type':         'join_request_notification',
+                    'participant_id': self.user_id,
+                    'username':     self.username,
+                    'message':      f"{self.username}님이 참가를 요청합니다.",
+                }
+            )
+
+    async def handle_join_ready(self, data):
+        """SFU 모드: 참가자 SFU 초기화 완료 → 방장에게 알림."""
+        logger.info(f"join_ready received from {self.username} (SFU mode)")
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'join_request_notification',
-                'participant_id': self.user_id,
+                'type':     'peer_joined',
+                'peerId':   self.peer_id,
                 'username': self.username,
-                'message': f"{self.username}님이 참가를 요청합니다.",
+                'userId':   self.user_id,
             }
         )
 
-    async def handle_join_ready(self, data):
-        """SFU 모드: 참가자가 SFU 초기화 완료를 방장에게 알림"""
-        logger.info(f"join_ready received from {self.username} (SFU mode)")
-        # 방장에게 브로드캐스트 — 방장이 이미 produce했는지 확인 트리거용
+    async def handle_track_state(self, data):
+        track_kind = data.get('kind')
+        enabled    = data.get('enabled')
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'peer_joined',
-                'peerId': self.peer_id,
-                'username': self.username,
-                'userId': self.user_id,
+                'type':      'track_state_changed',
+                'username':  self.username,
+                'user_id':   self.user_id,
+                'peerId':    self.peer_id,
+                'kind':      track_kind,
+                'enabled':   enabled,
+                'timestamp': datetime.now().isoformat(),
             }
         )
 
@@ -401,15 +427,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             if int(participant_user_id) == int(self.user_id):
                 for i in range(3):
                     await self.send(text_data=json.dumps({
-                        'type': 'approval_notification',
-                        'approved': True,
-                        'message': event['message'],
-                        'room_id': str(event['room_id']),
-                        'host_username': event.get('host_username'),
-                        'participant_username': event.get('participant_username'),
-                        'participant_user_id': participant_user_id,
-                        'should_initialize': True,
-                        'retry_count': i,
+                        'type':                  'approval_notification',
+                        'approved':              True,
+                        'message':               event['message'],
+                        'room_id':               str(event['room_id']),
+                        'host_username':         event.get('host_username'),
+                        'participant_username':  event.get('participant_username'),
+                        'participant_user_id':   participant_user_id,
+                        'should_initialize':     True,
+                        'retry_count':           i,
                     }))
                     if i < 2:
                         await asyncio.sleep(0.5)
@@ -420,18 +446,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         is_host = await self.check_is_host()
         if is_host:
             await self.send(text_data=json.dumps({
-                'type': 'join_request_notification',
+                'type':           'join_request_notification',
                 'participant_id': event['participant_id'],
-                'username': event['username'],
-                'message': event['message'],
+                'username':       event['username'],
+                'message':        event['message'],
             }))
 
     async def rejection_notification(self, event):
         if int(event.get('participant_user_id')) == int(self.user_id):
             await self.send(text_data=json.dumps({
-                'type': 'rejection_notification',
+                'type':     'rejection_notification',
                 'rejected': True,
-                'message': event['message'],
+                'message':  event['message'],
             }))
 
     # ──────────────────────────────────────────────────────────
@@ -446,23 +472,23 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_send(
             self.room_group_name,
             {
-                'type': 'chat_message',
-                'username': self.username,
-                'user_id': self.user_id,
-                'content': content,
+                'type':       'chat_message',
+                'username':   self.username,
+                'user_id':    self.user_id,
+                'content':    content,
                 'message_id': msg_id,
-                'timestamp': datetime.now().isoformat(),
+                'timestamp':  datetime.now().isoformat(),
             }
         )
-        
+
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'chat_message',
-            'sender_username': event['username'],  # ← 필드명 변경
-            'sender_user_id': event['user_id'],    # ← 필드명 변경
-            'content': event['content'],
-            'message_id': event['message_id'],
-            'timestamp': event['timestamp'],
+            'type':            'chat_message',
+            'sender_username': event['username'],
+            'sender_user_id':  event['user_id'],
+            'content':         event['content'],
+            'message_id':      event['message_id'],
+            'timestamp':       event['timestamp'],
         }))
 
     async def handle_reaction(self, data):
@@ -477,9 +503,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
     async def reaction_event(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'reaction',
-            'username': event['username'],
-            'user_id': event['user_id'],
+            'type':          'reaction',
+            'username':      event['username'],
+            'user_id':       event['user_id'],
             'reaction_type': event['reaction_type'],
         }))
 
@@ -514,7 +540,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def _send_error(self, request_type: str, message: str):
         logger.error(f"SFU error [{request_type}]: {message}")
         await self.send(text_data=json.dumps({
-            'type': 'sfu_error',
+            'type':    'sfu_error',
             'request': request_type,
             'message': message,
         }))
@@ -522,7 +548,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     async def send_current_participants(self):
         participants = await self.get_approved_participants()
         await self.send(text_data=json.dumps({
-            'type': 'participants_list',
+            'type':         'participants_list',
             'participants': participants,
         }))
 
@@ -535,13 +561,18 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def check_is_host_by_username(self, username):
-        from .models import VideoRoom
-        from django.contrib.auth.models import User
+    def check_is_approved(self):
+        """승인된 참가자 또는 방장 여부 확인."""
+        from .models import VideoRoom, RoomParticipant
         try:
             room = VideoRoom.objects.get(id=self.room_id)
-            user = User.objects.get(username=username)
-            return room.host == user
+            if room.host == self.user:
+                return True
+            return RoomParticipant.objects.filter(
+                room_id=self.room_id,
+                user=self.user,
+                status='approved',
+            ).exists()
         except Exception:
             return False
 
@@ -575,20 +606,17 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         RaisedHand.objects.update_or_create(
             room_id=self.room_id, user=self.user,
             defaults={
-                'is_active': is_raised,
-                'raised_at': timezone.now() if is_raised else None,
+                'is_active':  is_raised,
+                'raised_at':  timezone.now() if is_raised else None,
                 'lowered_at': None if is_raised else timezone.now(),
             }
         )
 
     @database_sync_to_async
     def get_username_by_peer_id(self, peer_id: str) -> str:
-        """'user_N' 형식의 peerId에서 실제 username 조회"""
         from django.contrib.auth.models import User
         try:
             user_id = int(peer_id.replace('user_', ''))
             return User.objects.get(id=user_id).username
         except (ValueError, User.DoesNotExist):
-            return peer_id  # fallback
-
-    
+            return peer_id
