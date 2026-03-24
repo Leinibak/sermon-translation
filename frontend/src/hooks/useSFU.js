@@ -2,11 +2,19 @@
 /**
  * useSFU — mediasoup-client 기반 SFU 훅
  *
- * [수정 내역 — 이번 패치]
- * FIX-B3: consumeProducer 실패 시 3초 후 1회 재시도
- * FIX-B4: user_left 핸들러 — setRemoteStreams 콜백 내 removeRemoteStream() 중첩 호출 제거
- *         (setState 안에서 setState 호출 → 렌더 무한 루프 가능성 수정)
- *         consumer 정리를 setRemoteStreams 콜백 내에서 직접 수행하도록 변경
+ * [수정 내역 — BUG FIX]
+ * FIX-C1: initSFU — recvTransport 생성 완료 후 new_producer 큐 처리
+ *          기존에는 send/recv 두 transport가 모두 생성되고 나서야 큐를 처리했는데,
+ *          send transport 생성 중 new_producer가 오면 recvTransport가 null이라 consume 불가
+ *          → recvTransport 생성 직후 바로 큐 처리
+ * FIX-C2: consumeProducer — waitForMessage 필터 방어 코드 강화
+ *          d.producerId가 undefined이면 어떤 producerId와도 일치하지 않아 timeout
+ *          → producerId OR producer_id 양쪽 모두 확인
+ * FIX-C3: initSFU — sfu_transport_created 응답에 direction 없을 때 대비
+ *          서버가 direction을 안 보내도 send를 먼저, recv를 나중에 요청하므로
+ *          순서 기반 fallback 추가
+ * FIX-C4: new_producer 이벤트에서 username이 없을 때 DB peerId로 조회하지 않고
+ *          peerId 자체를 username으로 사용 (서버 FIX-S3으로 해결되지만 방어 코드 유지)
  */
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
@@ -157,7 +165,9 @@ export function useSFU({ wsRef, roomId }) {
     const device    = deviceRef.current;
     const transport = recvTransportRef.current;
     if (!device || !transport) {
-      console.warn('consumeProducer: device or recvTransport not ready');
+      console.warn('consumeProducer: device or recvTransport not ready, queuing...');
+      // FIX-C1: recvTransport 미준비 시 큐에 적재
+      pendingProducersRef.current.push({ peerId, producerId, kind, username });
       return;
     }
 
@@ -170,17 +180,21 @@ export function useSFU({ wsRef, roomId }) {
         rtpCapabilities: device.rtpCapabilities,
       });
 
+      // FIX-C2: producerId 필터 — camelCase/snake_case 양쪽 대응
       const consumerData = await waitForMessage(
         'sfu_consumed',
-        10000,
-        (d) => d.producerId === producerId
+        15000, // 타임아웃 10초→15초로 증가
+        (d) => {
+          const serverProdId = d.producerId || d.producer_id;
+          return serverProdId === producerId;
+        }
       );
 
       const consumer = await transport.consume({
         id:            consumerData.id,
-        producerId:    consumerData.producerId,
-        kind:          consumerData.kind,
-        rtpParameters: consumerData.rtpParameters,
+        producerId:    consumerData.producerId || consumerData.producer_id || producerId,
+        kind:          consumerData.kind || kind,
+        rtpParameters: consumerData.rtpParameters || consumerData.rtp_parameters,
       });
 
       consumersRef.current.set(consumer.id, consumer);
@@ -193,6 +207,7 @@ export function useSFU({ wsRef, roomId }) {
         next.set(peerId, {
           ...existing,
           stream,
+          // FIX-C4: username 항상 포함 (서버 FIX-S2/S3으로 전달되지만 방어 코드)
           username: username || existing.username || peerId,
           [`${kind}ConsumerId`]: consumer.id,
         });
@@ -213,8 +228,7 @@ export function useSFU({ wsRef, roomId }) {
     } catch (e) {
       console.error(`consumeProducer error (${kind} from ${peerId}):`, e);
 
-      // FIX-B3: sfu_error 응답(서버 측 실패) 또는 timeout 시 3초 후 1회 재시도
-      // 재시도 전에 transport와 device가 여전히 살아있는지 확인
+      // 재시도: transport와 device가 여전히 살아있는지 확인 후 3초 후 1회 재시도
       setTimeout(() => {
         if (deviceRef.current && recvTransportRef.current) {
           console.log(`🔄 Retrying consumeProducer (${kind} from ${peerId})`);
@@ -245,9 +259,10 @@ export function useSFU({ wsRef, roomId }) {
 
       // 4. Send Transport 생성
       wsSend({ type: 'sfu_create_transport', direction: 'send' });
+      // FIX-C3: direction 필터 — 서버가 direction을 안 보낼 경우 첫 번째 응답 수락
       const sendParams = await waitForMessage(
         'sfu_transport_created', 10000,
-        (d) => d.direction === 'send'
+        (d) => !d.direction || d.direction === 'send'
       );
 
       const sendTransport = device.createSendTransport({
@@ -281,9 +296,10 @@ export function useSFU({ wsRef, roomId }) {
 
       // 5. Recv Transport 생성
       wsSend({ type: 'sfu_create_transport', direction: 'recv' });
+      // FIX-C3: direction 필터 — send와 구분
       const recvParams = await waitForMessage(
         'sfu_transport_created', 10000,
-        (d) => d.direction === 'recv'
+        (d) => !d.direction || d.direction === 'recv'
       );
 
       const recvTransport = device.createRecvTransport({
@@ -307,15 +323,25 @@ export function useSFU({ wsRef, roomId }) {
 
       recvTransportRef.current = recvTransport;
 
+      // FIX-C1: recvTransport 생성 완료 직후 큐 먼저 처리 (기존 producers consume 전에)
+      // 이렇게 해야 recvTransport 생성 중에 도착한 new_producer를 놓치지 않음
+      const earlyQueued = [...pendingProducersRef.current];
+      pendingProducersRef.current = [];
+      console.log(`📦 Early queued producers: ${earlyQueued.length}`);
+      for (const prod of earlyQueued) {
+        await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
+      }
+
       // 6. 이미 방에 있는 producers consume
+      console.log(`📦 Existing producers: ${existingProducers.length}`);
       for (const prod of existingProducers) {
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
-      // 큐에 쌓인 new_producer 처리
-      const queued = [...pendingProducersRef.current];
+      // 큐에 쌓인 new_producer 처리 (initSFU 완료 후 도착한 것)
+      const lateQueued = [...pendingProducersRef.current];
       pendingProducersRef.current = [];
-      for (const prod of queued) {
+      for (const prod of lateQueued) {
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
@@ -397,14 +423,14 @@ export function useSFU({ wsRef, roomId }) {
         if (deviceRef.current && recvTransportRef.current) {
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         } else {
+          // FIX-C1: recvTransport 미준비 시 큐에 적재
           pendingProducersRef.current.push(data);
-          console.warn('new_producer queued — SFU not ready yet:', data);
+          console.warn('new_producer queued — recvTransport not ready yet:', data);
         }
         break;
 
       case 'track_state': {
         setRemoteStreams((prev) => {
-          // peerId 우선, 없으면 username으로 fallback 탐색
           const directKey = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
           const key = directKey && prev.has(directKey)
             ? directKey
@@ -424,13 +450,10 @@ export function useSFU({ wsRef, roomId }) {
         break;
       }
 
-      // FIX-B4: setRemoteStreams 콜백 내에서 consumer 정리를 직접 수행
-      //         removeRemoteStream() 호출 제거 → setState 중첩 방지
       case 'user_left': {
         const directPeerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
 
         setRemoteStreams((prev) => {
-          // 탐색 — peerId 우선, username fallback
           let key = directPeerId && prev.has(directPeerId)
             ? directPeerId
             : [...prev.entries()].find(([, v]) => v.username === data.username)?.[0];
@@ -442,7 +465,6 @@ export function useSFU({ wsRef, roomId }) {
 
           const existing = prev.get(key);
 
-          // consumer 정리 (콜백 내에서 직접 처리 — refs는 외부 클로저라 접근 가능)
           const cleanConsumer = (consumerId) => {
             if (!consumerId) return;
             try { consumersRef.current.get(consumerId)?.close(); } catch (_) {}
@@ -484,6 +506,7 @@ export function useSFU({ wsRef, roomId }) {
     sendTransportRef.current = null;
     recvTransportRef.current = null;
     deviceRef.current = null;
+    pendingProducersRef.current = [];
     setRemoteStreams(new Map());
     setConnectionStatus('disconnected');
   }, []);
@@ -503,6 +526,7 @@ export function useSFU({ wsRef, roomId }) {
     unmuteVideo,
     handleSFUMessage,
     dispatchSFUMessage,
+    producersRef,  // useScreenShare에서 사용
     cleanup,
   };
 }

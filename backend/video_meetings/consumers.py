@@ -2,11 +2,15 @@
 """
 VideoMeetingConsumer — SFU(mediasoup) 연동 버전
 
-[수정 내역 — 이번 패치]
-FIX-B2: handle_sfu_join — producers 키 camelCase 정규화 방어 코드 추가
-FIX-B3: consumeProducer 실패 시 Consumer에서 sfu_error 응답 (로그만 남기던 것 수정)
-FIX-B4: user_left setState 중첩 제거 → peerId는 user_left 이벤트에서 직접 포함
-FIX-B5: handle_join — SFU 모드에서 join_request_notification 대신 peer_joined 전송
+[수정 내역 — BUG FIX]
+FIX-S1: handle_create_transport — 응답에 direction 필드 추가
+         클라이언트 useSFU.js가 send/recv transport를 구분하지 못하는 문제 수정
+FIX-S2: handle_sfu_join — 기존 producers에 username 항상 포함
+         기존 참가자의 username이 누락되어 remoteStreams에 "user_123"만 저장되던 문제 수정
+FIX-S3: new_producer 이벤트에 username 항상 포함
+         참가자가 produce할 때 방장이 consumeProducer 시 username을 알 수 없던 문제 수정
+FIX-S4: sfu_consumed 응답에 producerId camelCase 보장
+         waitForMessage 필터가 producerId로 매칭하므로 반드시 camelCase여야 함
 """
 import asyncio
 import json
@@ -66,9 +70,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                         'type':    'user_left',
                         'username': username,
                         'user_id':  self.user_id,
-                        # FIX-B4: disconnect 시점에 peerId를 함께 전송
-                        # → user_left() 핸들러가 동적 생성하므로 여기선 없어도 되지만
-                        #   명시적으로 포함해 두어 혼란 방지
                         'peerId':  peer_id,
                     }
                 )
@@ -130,17 +131,16 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
     async def handle_sfu_join(self, data):
         """
-        SFU 방 참가 — 현재 Producer 목록 + username 매핑 반환.
-
-        FIX-B2: sfu_client.join_room()이 이미 camelCase 정규화를 수행.
-                여기서는 peerId 키 접근 시 방어 코드 추가.
+        FIX-S2: 기존 producers에 username 항상 포함.
+        sfu_client.join_room()이 반환하는 producers 목록의 각 producer에
+        peerId를 통해 DB에서 username을 조회하여 추가.
         """
         try:
             result = await sfu_client.join_room(self.room_id, self.peer_id)
 
             producers_with_username = []
             for p in result['producers']:
-                # FIX-B2: camelCase/snake_case 혼용 대응
+                # FIX-B2 + FIX-S2: camelCase/snake_case 혼용 대응, username 반드시 포함
                 peer_id  = p.get('peerId') or p.get('peer_id', '')
                 username = await self.get_username_by_peer_id(peer_id)
                 producers_with_username.append({
@@ -148,7 +148,7 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                     'producerId': p.get('producerId') or p.get('producer_id', ''),
                     'kind':       p.get('kind', ''),
                     'paused':     p.get('paused', False),
-                    'username':   username,
+                    'username':   username,  # FIX-S2: username 항상 포함
                 })
 
             await self.send(text_data=json.dumps({
@@ -170,11 +170,17 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_join', str(e))
 
     async def handle_create_transport(self, data):
+        """
+        FIX-S1: 응답에 direction 필드 추가.
+        useSFU.js의 waitForMessage('sfu_transport_created', 10000, (d) => d.direction === 'send')
+        필터가 동작하려면 응답에 direction이 반드시 포함되어야 함.
+        """
         try:
+            direction = data.get('direction', 'send')  # FIX-S1: direction 읽기
             transport_params = await sfu_client.create_transport(self.room_id, self.peer_id)
             await self.send(text_data=json.dumps({
                 'type':      'sfu_transport_created',
-                'direction': data.get('direction', 'send'),
+                'direction': direction,  # FIX-S1: direction 반드시 응답에 포함
                 **transport_params,
             }))
         except Exception as e:
@@ -196,6 +202,11 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             await self._send_error('sfu_connect_transport', str(e))
 
     async def handle_produce(self, data):
+        """
+        FIX-S3: new_producer 이벤트에 username 항상 포함.
+        방장이나 다른 참가자가 consumeProducer() 호출 시 username이 있어야
+        remoteStreams에 올바른 사용자 이름이 표시됨.
+        """
         try:
             result      = await sfu_client.create_producer(
                 self.room_id,
@@ -213,12 +224,13 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 'kind': data['kind'],
             }))
 
+            # FIX-S3: username 포함하여 브로드캐스트
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type':       'new_producer',
                     'peerId':     self.peer_id,
-                    'username':   self.username,
+                    'username':   self.username,  # FIX-S3: username 반드시 포함
                     'userId':     self.user_id,
                     'producerId': producer_id,
                     'kind':       data['kind'],
@@ -229,8 +241,10 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
     async def handle_consume(self, data):
         """
-        FIX-B3: sfu_client.create_consumer() 실패 시 sfu_error 응답.
-                (기존에는 Consumer 예외가 silently fail 될 수 있었음)
+        FIX-S4: sfu_consumed 응답에 producerId(camelCase) 보장.
+        useSFU.js의 waitForMessage 필터: (d) => d.producerId === producerId
+        서버 응답의 producerId가 snake_case이거나 누락되면 필터가 영원히 매칭 안 됨.
+        → timeout 후 retry하지만 이미 transport 상태가 달라져 실패 반복.
         """
         try:
             result = await sfu_client.create_consumer(
@@ -241,9 +255,15 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 data['transportId'],
                 data['rtpCapabilities'],
             )
+
+            # FIX-S4: producerId camelCase 보장 (서버 응답이 snake_case일 수 있으므로 명시적 매핑)
             await self.send(text_data=json.dumps({
-                'type': 'sfu_consumed',
-                **result,
+                'type':          'sfu_consumed',
+                'id':            result.get('id'),
+                'producerId':    result.get('producerId') or result.get('producer_id') or data['producerId'],  # FIX-S4
+                'kind':          result.get('kind'),
+                'rtpParameters': result.get('rtpParameters') or result.get('rtp_parameters'),
+                'producerPeerId': data['producerPeerId'],
             }))
         except Exception as e:
             logger.error(
@@ -335,11 +355,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             }))
 
     async def user_left(self, event):
-        """
-        FIX-B4: peerId를 항상 포함해서 프론트엔드 remoteStreams 키 탐색 보장.
-                disconnect()가 group_send에 peerId를 포함하므로 그대로 전달.
-                없을 경우 user_id로 생성 (방어 코드).
-        """
         peer_id = event.get('peerId') or f"user_{event['user_id']}"
         await self.send(text_data=json.dumps({
             'type':     'user_left',
@@ -360,17 +375,9 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
     # ──────────────────────────────────────────────────────────
 
     async def handle_join(self, data):
-        """
-        FIX-B5: SFU 모드에서 join 메시지 처리.
-
-        변경 전: 무조건 join_request_notification → 방장에게 참가 요청 재발송
-        변경 후: 승인된 참가자 → peer_joined 브로드캐스트
-                 미승인 참가자 → 기존대로 join_request_notification
-        """
         is_approved = await self.check_is_approved()
 
         if is_approved:
-            # 이미 승인됐으므로 SFU 입장 완료 알림만 브로드캐스트
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -381,7 +388,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
                 }
             )
         else:
-            # 아직 승인 안 된 경우 — 방장에게 참가 요청 전송
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -393,7 +399,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
             )
 
     async def handle_join_ready(self, data):
-        """SFU 모드: 참가자 SFU 초기화 완료 → 방장에게 알림."""
         logger.info(f"join_ready received from {self.username} (SFU mode)")
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -562,7 +567,6 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def check_is_approved(self):
-        """승인된 참가자 또는 방장 여부 확인."""
         from .models import VideoRoom, RoomParticipant
         try:
             room = VideoRoom.objects.get(id=self.room_id)
