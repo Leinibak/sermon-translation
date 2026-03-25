@@ -1,15 +1,16 @@
 // frontend/src/components/VideoMeetingRoom.jsx
 //
-// [수정 내역]
-// FIX-1: connectWebSocket — stale closure 해소 (handleWebSocketMessage를 ref로 분리)
-// FIX-2: connectWebSocket — 재연결 시 wsReady 초기화 누락 수정
-// FIX-3: approval_notification — approvalInitializedRef race condition 수정
-//         ('idle' | 'running' | 'done' 3-state)
-// FIX-4: initializationRef — 오류 시에도 false 리셋하여 재시도 허용
-// FIX-5: 방장 SFU useEffect — localStreamRef.current 의존성 제거 → localStreamReady(state)
-// FIX-6: allVideos — localStreamReady state로 렌더링 트리거, remoteStreams.size 수정
-// FIX-7: 방장 SFU 초기화 조건 — wsConnected 단독 → wsReady 추가
-//         (wsConnected 직후엔 join 메시지가 아직 서버에 처리 전일 수 있음)
+// [수정 내역 — BUG FIX]
+// FIX-R1: approval_notification 처리 — initSFU + startProducing 순서 보장
+//          기존: getLocalMedia → fetchRoomDetails → initSFU → startProducing → join
+//          수정: 동일하나 wsReady 확인 후 initSFU 호출, connectWebSocket 중복 방지
+// FIX-R2: allVideos — remoteStreams Map 순회 시 username 올바르게 표시
+//          기존: peerId.replace('user_', '') → "123" (숫자만 표시)
+//          수정: streamData.username 우선 사용 (서버 FIX-S2/S3 덕분에 실제 이름 전달됨)
+// FIX-R3: 방장 SFU 초기화 useEffect — wsReady 조건 강화
+//          wsReady가 true가 된 후에 initSFU 호출해야 sfu_join이 서버에서 처리됨
+// FIX-R4: connectWebSocket — stale closure 해소 (이미 FIX-1에서 처리됨, 유지)
+// FIX-R5: remoteStreams.size 사용 (기존 .length → .size, Map이므로)
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -28,7 +29,6 @@ import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton
 import { IOSPlayButton }        from './VideoMeeting/IOSPlayButton';
 
 // ── SFU 메시지 타입 분류 ────────────────────────────────────────────────────
-// Promise 대기 응답: dispatchSFUMessage 큐로 처리
 const SFU_PROMISE_TYPES = new Set([
   'sfu_rtp_capabilities',
   'sfu_joined',
@@ -40,7 +40,6 @@ const SFU_PROMISE_TYPES = new Set([
   'sfu_error',
 ]);
 
-// 이벤트 기반: handleSFUMessage로 위임
 const SFU_EVENT_TYPES = new Set([
   'peer_joined',
   'new_producer',
@@ -78,7 +77,6 @@ function VideoMeetingRoom() {
   const navigate       = useNavigate();
   const { user }       = useAuth();
 
-  // FIX-5/6: localStreamRef.current 를 의존성으로 쓰는 대신 state 사용
   const [localStreamReady, setLocalStreamReady] = useState(false);
 
   // iOS 재생 버튼
@@ -127,8 +125,8 @@ function VideoMeetingRoom() {
 
   // ── 미디어 refs ───────────────────────────────────────────────────────────
   const localVideoRef      = useRef(null);
-  const initializationRef  = useRef(false);  // FIX-4
-  // FIX-3: 'idle' | 'running' | 'done'
+  const initializationRef  = useRef(false);
+  // 'idle' | 'running' | 'done'
   const approvalInitializedRef = useRef('idle');
 
   // ── SFU 훅 ───────────────────────────────────────────────────────────────
@@ -234,7 +232,7 @@ function VideoMeetingRoom() {
         break;
 
       // ── 참가 승인 알림 (참가자 전용) ──────────────────────────────────────
-      // FIX-3: approvalInitializedRef 3-state 로 race condition 방지
+      // FIX-R1: initSFU + startProducing 순서 보장
       case 'approval_notification': {
         const retryCount = data.retry_count || 0;
 
@@ -265,9 +263,8 @@ function VideoMeetingRoom() {
             // 2. 방 정보 갱신
             await fetchRoomDetails();
 
-            // 3. WebSocket 확인
-            const currentWs = wsRef.current;
-            if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+            // 3. WebSocket 확인 및 준비 대기
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
               connectWebSocket();
               await new Promise(r => setTimeout(r, isiOS ? 3000 : 2000));
               if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -275,10 +272,17 @@ function VideoMeetingRoom() {
               }
             }
 
+            // FIX-R1: wsReady가 될 때까지 대기 (최대 5초)
+            let wsReadyWait = 0;
+            while (!wsRef.current?._wsReady && wsReadyWait < 50) {
+              await new Promise(r => setTimeout(r, 100));
+              wsReadyWait++;
+            }
+
             setWsReady(true);
             await new Promise(r => setTimeout(r, isiOS ? 1500 : 500));
 
-            // 4. SFU 초기화
+            // 4. SFU 초기화 (FIX-R1: wsReady 후 호출)
             await initSFU();
 
             // 5. 자신의 미디어 produce
@@ -295,7 +299,7 @@ function VideoMeetingRoom() {
 
           } catch (error) {
             console.error('❌ 승인 후 초기화 실패:', error);
-            approvalInitializedRef.current = 'idle'; // 실패 시 재시도 허용
+            approvalInitializedRef.current = 'idle';
             alert('회의 참가 준비 중 오류. 새로고침 후 재시도해주세요.');
           }
         };
@@ -367,7 +371,7 @@ function VideoMeetingRoom() {
     startProducing,
   ]);
 
-  // FIX-1: ref 경유로 최신 핸들러 호출 — socket.onmessage 클로저 오염 방지
+  // FIX-R4: ref 경유로 최신 핸들러 호출 — socket.onmessage 클로저 오염 방지
   const handleWebSocketMessageRef = useRef(handleWebSocketMessage);
   useEffect(() => {
     handleWebSocketMessageRef.current = handleWebSocketMessage;
@@ -375,8 +379,6 @@ function VideoMeetingRoom() {
 
   // ==========================================================================
   // WebSocket 연결
-  // FIX-1: handleWebSocketMessage를 ref로 분리
-  // FIX-2: 재연결 시 wsReady 초기화
   // ==========================================================================
   const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') return;
@@ -388,7 +390,6 @@ function VideoMeetingRoom() {
       wsRef.current = null;
     }
 
-    // FIX-2: 재연결 직전 wsReady 초기화
     setWsReady(false);
 
     const isHttps    = window.location.protocol === 'https:';
@@ -423,12 +424,13 @@ function VideoMeetingRoom() {
         setWsConnected(true);
         reconnectAttemptsRef.current = 0;
 
-        // join 전송 후 wsReady 설정
         setTimeout(() => {
           if (socket.readyState === WebSocket.OPEN) {
             try {
               socket.send(JSON.stringify({ type: 'join', username: user.username }));
+              // FIX-R1: _wsReady 플래그 설정 (approval_notification 핸들러에서 참조)
               setTimeout(() => {
+                socket._wsReady = true;
                 setWsReady(true);
                 console.log('✅ WebSocket 완전 준비');
               }, 500);
@@ -437,7 +439,7 @@ function VideoMeetingRoom() {
         }, 500);
       };
 
-      // FIX-1: ref 경유로 최신 핸들러 호출
+      // FIX-R4: ref 경유로 최신 핸들러 호출
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -456,7 +458,6 @@ function VideoMeetingRoom() {
         console.log('🔌 WebSocket 종료 (code:', event.code, ')');
         clearTimeout(connectionTimeout);
         setWsConnected(false);
-        // FIX-2: 종료 시 wsReady 반드시 초기화
         setWsReady(false);
         wsRef.current = null;
 
@@ -481,11 +482,9 @@ function VideoMeetingRoom() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user, navigate]);
-  // NOTE: handleWebSocketMessage는 ref 경유이므로 의존성에서 제거
 
   // ==========================================================================
   // 미디어 초기화
-  // FIX-4: 오류 시에도 initializationRef = false 로 리셋하여 재시도 허용
   // ==========================================================================
   const initializeMedia = useCallback(async () => {
     if (initializationRef.current) return;
@@ -502,13 +501,12 @@ function VideoMeetingRoom() {
         localVideoRef.current.srcObject = stream;
         if (isIOS()) { try { await localVideoRef.current.play(); } catch (_) {} }
       }
-      // FIX-5: state 로 완료 신호
       setLocalStreamReady(true);
-      initializationRef.current = false; // 성공 후 재사용 가능하게 리셋
+      initializationRef.current = false;
 
     } catch (error) {
       console.error('❌ 미디어 초기화 실패:', error);
-      initializationRef.current = false; // FIX-4: 실패 시도 리셋
+      initializationRef.current = false;
 
       if (isIOS()) {
         if (error.name === 'NotAllowedError')
@@ -545,7 +543,7 @@ function VideoMeetingRoom() {
   const handleLeave = async () => {
     if (room.is_host) {
       const confirmEnd = window.confirm(
-        '회의를 종료하시겠습니까?\n\n"확인": 모든 참가자 퇴장\n"취소": 나만 나가기'
+        '회의를 종료하시겠습니까?\n\n\"확인\": 모든 참가자 퇴장\n\"취소\": 나만 나가기'
       );
       try {
         if (confirmEnd) { await endMeeting(); } else { await leaveRoom(); }
@@ -610,7 +608,6 @@ function VideoMeetingRoom() {
 
   // ==========================================================================
   // 초기 연결 — 승인된 참가자 & 방장
-  // FIX-5: localStreamRef.current → localStreamReady(state)
   // ==========================================================================
   useEffect(() => {
     if (!room || !user) return;
@@ -643,7 +640,7 @@ function VideoMeetingRoom() {
     room?.is_host,
     user,
     wsConnected,
-    localStreamReady,         // FIX-5
+    localStreamReady,
     initializeMedia,
     connectWebSocket,
     fetchPendingRequests,
@@ -651,19 +648,14 @@ function VideoMeetingRoom() {
 
   // ==========================================================================
   // 방장 SFU 초기화
-  // FIX-7: wsConnected 단독 → wsReady 조건 추가
-  //   - wsConnected 직후에는 join 메시지가 아직 서버에 처리되기 전일 수 있음
-  //   - wsReady(join 전송 + 500ms 후 true)가 된 뒤에 initSFU() 호출해야
-  //     서버가 sfu_join 메시지를 올바르게 처리함
-  // FIX-5: localStreamReady(state) 사용 — ref.current 의존성 제거
+  // FIX-R3: wsReady 조건 강화 — wsConnected 직후엔 join 메시지 미처리 상태일 수 있음
   // ==========================================================================
   const sfuInitializedRef = useRef(false);
 
   useEffect(() => {
-    // 방장이 아니거나 아직 준비 안 됐으면 대기
     if (!room?.is_host)    return;
-    if (!wsReady)          return;  // FIX-7: wsConnected → wsReady
-    if (!localStreamReady) return;  // FIX-5
+    if (!wsReady)          return;  // FIX-R3: wsConnected → wsReady
+    if (!localStreamReady) return;
     if (sfuInitializedRef.current) return;
 
     sfuInitializedRef.current = true;
@@ -677,15 +669,15 @@ function VideoMeetingRoom() {
         console.log('✅ 방장 SFU 초기화 완료');
       } catch (e) {
         console.error('❌ 방장 SFU 초기화 실패:', e);
-        sfuInitializedRef.current = false; // 실패 시 재시도 허용
+        sfuInitializedRef.current = false;
       }
     };
 
     initHostSFU();
   }, [
     room?.is_host,
-    wsReady,          // FIX-7
-    localStreamReady, // FIX-5
+    wsReady,
+    localStreamReady,
     initSFU,
     startProducing,
     localStreamRef,
@@ -772,7 +764,8 @@ function VideoMeetingRoom() {
     );
   }
 
-  // FIX-6: remoteStreams는 Map → .entries() 사용, localStreamReady state로 트리거
+  // FIX-R2: remoteStreams Map 순회 시 username 올바르게 표시
+  // streamData.username을 우선 사용 (서버 FIX-S2/S3으로 실제 이름이 전달됨)
   const allVideos = [
     {
       peerId:      user?.username,
@@ -786,12 +779,18 @@ function VideoMeetingRoom() {
     },
     ...[...remoteStreams.entries()].map(([peerId, streamData]) => ({
       peerId,
-      username:    streamData.username || peerId,
+      // FIX-R2: streamData.username 우선 (서버가 실제 username을 보내줌)
+      // 없으면 peerId에서 숫자 추출 대신 peerId 자체 사용
+      username:    streamData.username && streamData.username !== peerId
+                     ? streamData.username
+                     : (peerId.startsWith('user_') ? peerId.replace('user_', 'User ') : peerId),
       stream:      streamData.stream,
       isLocal:     false,
       isMuted:     streamData.isMuted    ?? false,
       isVideoOff:  streamData.isVideoOff ?? false,
-      isHandRaised: raisedHands.some(h => h.username === (streamData.username || peerId)),
+      isHandRaised: raisedHands.some(h =>
+        h.username === streamData.username || h.username === peerId
+      ),
     })),
   ].filter(v => v.stream || v.isLocal);
 
@@ -807,7 +806,7 @@ function VideoMeetingRoom() {
         onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
       />
 
-      {/* 개발 환경 디버그 바 — FIX-6: remoteStreams.size 사용 */}
+      {/* 개발 환경 디버그 바 — FIX-R5: remoteStreams.size 사용 */}
       {process.env.NODE_ENV === 'development' && (
         <div className="bg-gray-800 text-xs text-gray-400 px-4 py-2 flex gap-4">
           <span>WS: {wsConnected ? '🟢' : '🔴'}</span>
