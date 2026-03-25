@@ -2,24 +2,59 @@
 /**
  * useSFU — mediasoup-client 기반 SFU 훅
  *
- * [수정 내역 — BUG FIX]
- * FIX-C1: initSFU — recvTransport 생성 완료 후 new_producer 큐 처리
- *          기존에는 send/recv 두 transport가 모두 생성되고 나서야 큐를 처리했는데,
- *          send transport 생성 중 new_producer가 오면 recvTransport가 null이라 consume 불가
- *          → recvTransport 생성 직후 바로 큐 처리
- * FIX-C2: consumeProducer — waitForMessage 필터 방어 코드 강화
- *          d.producerId가 undefined이면 어떤 producerId와도 일치하지 않아 timeout
- *          → producerId OR producer_id 양쪽 모두 확인
- * FIX-C3: initSFU — sfu_transport_created 응답에 direction 없을 때 대비
- *          서버가 direction을 안 보내도 send를 먼저, recv를 나중에 요청하므로
- *          순서 기반 fallback 추가
- * FIX-C4: new_producer 이벤트에서 username이 없을 때 DB peerId로 조회하지 않고
- *          peerId 자체를 username으로 사용 (서버 FIX-S3으로 해결되지만 방어 코드 유지)
+ * ★ DIAGNOSTIC BUILD ★
+ * 각 단계마다 [SFU-Dxx] 태그 로그 추가.
+ * 브라우저 콘솔에서 "SFU-D" 로 필터하면 진단 로그만 확인 가능.
+ *
+ * 진단 체크포인트 목록:
+ *  D01  wsSend — 실제 전송 여부 + WS 상태
+ *  D02  dispatchSFUMessage — 수신 메시지 라우팅
+ *  D03  waitForMessage — 등록/해소/타임아웃
+ *  D10  getLocalMedia — 트랙 종류/수
+ *  D20  initSFU 진입
+ *  D21  sfu_get_rtp_capabilities 전송 → 응답
+ *  D22  Device.load
+ *  D23  sfu_join 전송 → existingProducers 목록
+ *  D24  getIceServers 결과
+ *  D25  sendTransport 생성 → connect/produce 이벤트
+ *  D26  recvTransport 생성 → connect 이벤트
+ *  D27  earlyQueued 큐 처리
+ *  D28  existingProducers 처리 (★중복 감지)
+ *  D29  lateQueued 처리
+ *  D2Z  initSFU 완료/실패
+ *  D30  consumeProducer 진입
+ *  D31  sfu_consume 전송 → sfu_consumed 응답
+ *  D32  transport.consume() 호출 → 결과
+ *  D33  consumer track 정보
+ *  D34  setRemoteStreams 업데이트
+ *  D35  sfu_resume_consumer → sfu_consumer_resumed
+ *  D36  consumeProducer 완료
+ *  D3E  consumeProducer 오류 + 재시도
+ *  D40  startProducing — audio/video track
+ *  D41  sendTransport.produce 완료
+ *  D50  handleSFUMessage 수신
+ *  D51  new_producer 처리 경로
+ *  D60  removeRemoteStream
  */
+
 import { useRef, useState, useCallback } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
 
+// ── 진단 로거 ────────────────────────────────────────────────
+const D = (tag, ...args) => {
+  const ts = new Date().toISOString().slice(11, 23); // HH:mm:ss.ms
+  console.log(`%c[SFU-${tag}] ${ts}`, 'color:#00bcd4;font-weight:bold', ...args);
+};
+const DE = (tag, ...args) => {
+  const ts = new Date().toISOString().slice(11, 23);
+  console.error(`%c[SFU-${tag}] ${ts}`, 'color:#f44336;font-weight:bold', ...args);
+};
+const DW = (tag, ...args) => {
+  const ts = new Date().toISOString().slice(11, 23);
+  console.warn(`%c[SFU-${tag}] ${ts}`, 'color:#ff9800;font-weight:bold', ...args);
+};
 
+// ── ICE 서버 ─────────────────────────────────────────────────
 async function generateTurnCredentials(secret) {
   const ttl = 24 * 3600;
   const username = Math.floor(Date.now() / 1000) + ttl;
@@ -44,31 +79,41 @@ async function getIceServers() {
   return servers;
 }
 
+// ── 훅 본체 ──────────────────────────────────────────────────
 export function useSFU({ wsRef, roomId }) {
   const pendingProducersRef = useRef([]);
-  const deviceRef        = useRef(null);
-  const sendTransportRef = useRef(null);
-  const recvTransportRef = useRef(null);
-  const producersRef     = useRef(new Map()); // kind → producer
-  const consumersRef     = useRef(new Map()); // consumerId → consumer
-  const localStreamRef   = useRef(null);
+  const deviceRef           = useRef(null);
+  const sendTransportRef    = useRef(null);
+  const recvTransportRef    = useRef(null);
+  const producersRef        = useRef(new Map()); // kind → producer
+  const consumersRef        = useRef(new Map()); // consumerId → consumer
+  const localStreamRef      = useRef(null);
+
+  // ★ 중복 consume 방지: 처리 중이거나 완료된 producerId 추적
+  const consumingProducerIds = useRef(new Set());
 
   // 메시지 큐: key = messageType, value = Array<{resolve, reject, timer, filter}>
   const pendingRef = useRef(new Map());
 
-  const [remoteStreams, setRemoteStreams]       = useState(new Map());
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [remoteStreams, setRemoteStreams]        = useState(new Map());
+  const [connectionStatus, setConnectionStatus]  = useState('disconnected');
 
-  // ── WebSocket 전송 헬퍼 ─────────────────────────────────────
+  // ── [D01] WebSocket 전송 헬퍼 ──────────────────────────────
   const wsSend = useCallback((msg) => {
     const ws = wsRef.current;
+    const state = ws ? ['CONNECTING','OPEN','CLOSING','CLOSED'][ws.readyState] : 'NO_WS';
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg));
+      D('01', `TX → type="${msg.type}"`, msg);
+    } else {
+      DE('01', `TX FAILED — ws=${state} type="${msg.type}"`);
     }
   }, [wsRef]);
 
-  // ── 메시지 큐 투입 ───────────────────────────────────────────
+  // ── [D02] 메시지 큐 투입 ────────────────────────────────────
   const dispatchSFUMessage = useCallback((data) => {
+    D('02', `RX type="${data.type}"`, data);
+
     if (data.type === 'sfu_error') {
       const targetType = `sfu_${data.request}`;
       const waiters = pendingRef.current.get(targetType);
@@ -78,28 +123,38 @@ export function useSFU({ wsRef, roomId }) {
           const { reject, timer } = waiters.splice(idx, 1)[0];
           if (waiters.length === 0) pendingRef.current.delete(targetType);
           clearTimeout(timer);
+          DE('02', `sfu_error → rejecting waiter for "${targetType}"`, data);
           reject(new Error(data.message || `SFU error: ${data.request}`));
           return true;
         }
       }
+      DW('02', `sfu_error received but no waiter matched for "${targetType}"`);
       return false;
     }
 
     const waiters = pendingRef.current.get(data.type);
-    if (!waiters?.length) return false;
+    if (!waiters?.length) {
+      DW('02', `No waiter for type="${data.type}" — message dropped`);
+      return false;
+    }
 
     const idx = waiters.findIndex(w => !w.filter || w.filter(data));
-    if (idx === -1) return false;
+    if (idx === -1) {
+      DW('02', `No matching filter for type="${data.type}" — ${waiters.length} waiter(s) exist but none matched`, data);
+      return false;
+    }
 
     const { resolve, timer } = waiters.splice(idx, 1)[0];
     if (waiters.length === 0) pendingRef.current.delete(data.type);
     clearTimeout(timer);
+    D('02', `Resolved waiter for type="${data.type}"`);
     resolve(data);
     return true;
   }, []);
 
-  // ── 큐 대기 Promise ─────────────────────────────────────────
+  // ── [D03] 큐 대기 Promise ────────────────────────────────────
   const waitForMessage = useCallback((type, timeoutMs = 10000, filter = null) => {
+    D('03', `WAIT registered — type="${type}" timeout=${timeoutMs}ms`);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         const waiters = pendingRef.current.get(type);
@@ -108,6 +163,10 @@ export function useSFU({ wsRef, roomId }) {
           if (idx !== -1) waiters.splice(idx, 1);
           if (waiters.length === 0) pendingRef.current.delete(type);
         }
+        // 현재 pendingRef 전체 상태 출력 (타임아웃 시점)
+        const remaining = {};
+        pendingRef.current.forEach((v, k) => { remaining[k] = v.length; });
+        DE('03', `TIMEOUT — type="${type}" after ${timeoutMs}ms. Remaining waiters:`, remaining);
         reject(new Error(`Timeout waiting for ${type}`));
       }, timeoutMs);
 
@@ -116,19 +175,30 @@ export function useSFU({ wsRef, roomId }) {
     });
   }, []);
 
-  // ── 미디어 초기화 ───────────────────────────────────────────
+  // ── [D10] 미디어 초기화 ─────────────────────────────────────
   const getLocalMedia = useCallback(async ({ video = true, audio = true } = {}) => {
+    D('10', `getUserMedia — video=${video} audio=${audio}`);
     const stream = await navigator.mediaDevices.getUserMedia({ video, audio });
+    const vt = stream.getVideoTracks();
+    const at = stream.getAudioTracks();
+    D('10', `Local media OK — videoTracks=${vt.length} audioTracks=${at.length}`,
+      vt.map(t => `${t.label} enabled=${t.enabled}`),
+      at.map(t => `${t.label} enabled=${t.enabled}`)
+    );
     localStreamRef.current = stream;
     return stream;
   }, []);
 
-  // ── 원격 스트림 제거 ────────────────────────────────────────
+  // ── [D60] 원격 스트림 제거 ──────────────────────────────────
   const removeRemoteStream = useCallback((peerId, kind) => {
+    D('60', `removeRemoteStream peerId="${peerId}" kind="${kind || 'ALL'}"`);
     setRemoteStreams((prev) => {
       const next     = new Map(prev);
       const existing = next.get(peerId);
-      if (!existing) return prev;
+      if (!existing) {
+        DW('60', `removeRemoteStream: peerId="${peerId}" not found in remoteStreams`);
+        return prev;
+      }
 
       if (kind) {
         const consumerId = existing[`${kind}ConsumerId`];
@@ -136,14 +206,17 @@ export function useSFU({ wsRef, roomId }) {
           const consumer = consumersRef.current.get(consumerId);
           try { consumer?.close(); } catch (_) {}
           consumersRef.current.delete(consumerId);
+          consumingProducerIds.current.delete(consumerId);
         }
         delete existing[`${kind}ConsumerId`];
         const hasAudio = !!existing.audioConsumerId;
         const hasVideo = !!existing.videoConsumerId;
         if (!hasAudio && !hasVideo) {
           next.delete(peerId);
+          D('60', `Removed all streams for peerId="${peerId}"`);
         } else {
           next.set(peerId, { ...existing });
+          D('60', `Removed ${kind} stream for peerId="${peerId}", remaining: audio=${hasAudio} video=${hasVideo}`);
         }
       } else {
         if (existing.audioConsumerId) {
@@ -155,115 +228,178 @@ export function useSFU({ wsRef, roomId }) {
           consumersRef.current.delete(existing.videoConsumerId);
         }
         next.delete(peerId);
+        D('60', `Removed ALL streams for peerId="${peerId}"`);
       }
       return next;
     });
   }, []);
 
-  // ── consumeProducer ─────────────────────────────────────────
+  // ── [D30~D3E] consumeProducer ────────────────────────────────
   const consumeProducer = useCallback(async (peerId, producerId, kind, username) => {
+    D('30', `consumeProducer ENTER — peerId="${peerId}" producerId="${producerId}" kind="${kind}" username="${username}"`);
+
     const device    = deviceRef.current;
     const transport = recvTransportRef.current;
+
     if (!device || !transport) {
-      console.warn('consumeProducer: device or recvTransport not ready, queuing...');
-      // FIX-C1: recvTransport 미준비 시 큐에 적재
+      DW('30', `device=${!!device} recvTransport=${!!transport} — QUEUING producerId="${producerId}"`);
       pendingProducersRef.current.push({ peerId, producerId, kind, username });
+      D('30', `Queue size now: ${pendingProducersRef.current.length}`);
       return;
     }
 
+    // ★ [D28] 중복 consume 방지
+    if (consumingProducerIds.current.has(producerId)) {
+      DW('30', `★ DUPLICATE SKIP — producerId="${producerId}" already consuming/consumed`);
+      return;
+    }
+    consumingProducerIds.current.add(producerId);
+    D('30', `Marked producerId="${producerId}" as consuming. Total tracked: ${consumingProducerIds.current.size}`);
+
     try {
-      wsSend({
+      // [D31] sfu_consume 전송
+      const consumePayload = {
         type:            'sfu_consume',
         producerPeerId:  peerId,
         producerId,
         transportId:     transport.id,
         rtpCapabilities: device.rtpCapabilities,
-      });
+      };
+      D('31', `TX sfu_consume — transportId="${transport.id}"`, consumePayload);
+      wsSend(consumePayload);
 
-      // FIX-C2: producerId 필터 — camelCase/snake_case 양쪽 대응
+      D('31', `Waiting for sfu_consumed (producerId="${producerId}") ...`);
       const consumerData = await waitForMessage(
         'sfu_consumed',
-        15000, // 타임아웃 10초→15초로 증가
+        15000,
         (d) => {
           const serverProdId = d.producerId || d.producer_id;
-          return serverProdId === producerId;
+          const matched = serverProdId === producerId;
+          if (!matched) {
+            DW('31', `sfu_consumed filter MISS — server="${serverProdId}" expected="${producerId}"`);
+          }
+          return matched;
         }
       );
+      D('31', `sfu_consumed received:`, consumerData);
 
-      const consumer = await transport.consume({
+      // [D32] transport.consume
+      const consumeArgs = {
         id:            consumerData.id,
         producerId:    consumerData.producerId || consumerData.producer_id || producerId,
         kind:          consumerData.kind || kind,
         rtpParameters: consumerData.rtpParameters || consumerData.rtp_parameters,
-      });
+      };
+      D('32', `transport.consume() — id="${consumeArgs.id}" kind="${consumeArgs.kind}"`);
+      const consumer = await transport.consume(consumeArgs);
+      D('32', `transport.consume() OK — consumerId="${consumer.id}"`);
+
+      // [D33] track 정보
+      const track = consumer.track;
+      D('33', `Consumer track — kind="${track.kind}" id="${track.id}" readyState="${track.readyState}" enabled=${track.enabled} muted=${track.muted}`);
 
       consumersRef.current.set(consumer.id, consumer);
 
+      // [D34] setRemoteStreams
+      D('34', `setRemoteStreams UPDATE — peerId="${peerId}" kind="${kind}"`);
       setRemoteStreams((prev) => {
         const next     = new Map(prev);
         const existing = next.get(peerId) || {};
         const stream   = existing.stream || new MediaStream();
-        stream.addTrack(consumer.track);
+
+        D('34', `Stream before addTrack — id="${stream.id}" tracks=${stream.getTracks().length}`);
+        stream.addTrack(track);
+        D('34', `Stream after addTrack  — tracks=${stream.getTracks().length}`, stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+
         next.set(peerId, {
           ...existing,
           stream,
-          // FIX-C4: username 항상 포함 (서버 FIX-S2/S3으로 전달되지만 방어 코드)
           username: username || existing.username || peerId,
           [`${kind}ConsumerId`]: consumer.id,
         });
+        D('34', `remoteStreams Map size after update: ${next.size}`);
         return next;
       });
 
+      // [D35] resume
+      D('35', `TX sfu_resume_consumer consumerId="${consumer.id}"`);
       wsSend({ type: 'sfu_resume_consumer', consumerId: consumer.id });
       await waitForMessage(
         'sfu_consumer_resumed',
         10000,
         (d) => d.consumerId === consumer.id
       );
+      D('35', `Consumer RESUMED — consumerId="${consumer.id}"`);
 
-      consumer.on('trackended',    () => removeRemoteStream(peerId, kind));
-      consumer.on('transportclose', () => removeRemoteStream(peerId, kind));
+      consumer.on('trackended',     () => { DW('33', `trackended — peerId="${peerId}" kind="${kind}"`); removeRemoteStream(peerId, kind); });
+      consumer.on('transportclose', () => { DW('33', `transportclose — peerId="${peerId}" kind="${kind}"`); removeRemoteStream(peerId, kind); });
 
-      console.log(`✅ Consumed ${kind} from ${username || peerId}`);
+      D('36', `✅ consumeProducer DONE — ${kind} from "${username || peerId}" producerId="${producerId}"`);
+
     } catch (e) {
-      console.error(`consumeProducer error (${kind} from ${peerId}):`, e);
+      // 실패 시 중복 방지 Set에서 제거 → 재시도 허용
+      consumingProducerIds.current.delete(producerId);
+      DE('3E', `consumeProducer FAILED — kind="${kind}" peerId="${peerId}" producerId="${producerId}"`, e.message);
+      DE('3E', `Stack:`, e.stack);
 
-      // 재시도: transport와 device가 여전히 살아있는지 확인 후 3초 후 1회 재시도
+      // 현재 transport/device 상태 덤프
+      const tp = recvTransportRef.current;
+      DE('3E', `recvTransport state — exists=${!!tp} connectionState="${tp?.connectionState}" closed=${tp?.closed}`);
+
       setTimeout(() => {
         if (deviceRef.current && recvTransportRef.current) {
-          console.log(`🔄 Retrying consumeProducer (${kind} from ${peerId})`);
+          DW('3E', `🔄 RETRY consumeProducer — ${kind} from "${peerId}" producerId="${producerId}"`);
           consumeProducer(peerId, producerId, kind, username);
+        } else {
+          DE('3E', `RETRY aborted — device=${!!deviceRef.current} recvTransport=${!!recvTransportRef.current}`);
         }
       }, 3000);
     }
   }, [wsSend, waitForMessage, removeRemoteStream]);
 
-  // ── SFU 초기화 ──────────────────────────────────────────────
+  // ── [D20~D2Z] SFU 초기화 ────────────────────────────────────
   const initSFU = useCallback(async () => {
+    D('20', `initSFU START — roomId="${roomId}"`);
     setConnectionStatus('connecting');
+
     try {
-      // 1. Router RTP Capabilities
+      // [D21] RTP Capabilities
+      D('21', 'TX sfu_get_rtp_capabilities');
       wsSend({ type: 'sfu_get_rtp_capabilities' });
       const { rtpCapabilities } = await waitForMessage('sfu_rtp_capabilities');
+      D('21', `rtpCapabilities received — codecs=${rtpCapabilities?.codecs?.length}`);
 
-      // 2. mediasoup Device 초기화
+      // [D22] Device.load
+      D('22', 'Device.load START');
       const device = new mediasoupClient.Device();
       await device.load({ routerRtpCapabilities: rtpCapabilities });
       deviceRef.current = device;
+      D('22', `Device.load OK — canProduce(video)=${device.canProduce('video')} canProduce(audio)=${device.canProduce('audio')}`);
 
-      // 3. SFU 방 참가
+      // [D23] sfu_join
+      D('23', 'TX sfu_join');
       wsSend({ type: 'sfu_join' });
       const { producers: existingProducers } = await waitForMessage('sfu_joined');
+      D('23', `sfu_joined — existingProducers count=${existingProducers?.length}`, existingProducers);
+      if (existingProducers?.length === 0) {
+        DW('23', 'existingProducers is EMPTY — 상대방이 아직 produce 안 했거나 join이 늦음');
+      }
 
+      // [D24] ICE Servers
       const iceServers = await getIceServers();
+      D('24', `ICE servers: ${iceServers.length} entries`, iceServers.map(s => s.urls));
 
-      // 4. Send Transport 생성
+      // [D25] Send Transport
+      D('25', 'TX sfu_create_transport direction=send');
       wsSend({ type: 'sfu_create_transport', direction: 'send' });
-      // FIX-C3: direction 필터 — 서버가 direction을 안 보낼 경우 첫 번째 응답 수락
       const sendParams = await waitForMessage(
         'sfu_transport_created', 10000,
-        (d) => !d.direction || d.direction === 'send'
+        (d) => {
+          D('25', `sfu_transport_created filter check — direction="${d.direction}"`);
+          return !d.direction || d.direction === 'send';
+        }
       );
+      D('25', `sendTransport params received — id="${sendParams.id}" iceCandidates=${sendParams.iceCandidates?.length}`);
 
       const sendTransport = device.createSendTransport({
         id:             sendParams.id,
@@ -274,33 +410,46 @@ export function useSFU({ wsRef, roomId }) {
       });
 
       sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+        D('25', `sendTransport "connect" event fired — transportId="${sendTransport.id}"`);
         wsSend({ type: 'sfu_connect_transport', transportId: sendTransport.id, dtlsParameters });
         waitForMessage('sfu_transport_connected', 10000,
           (d) => d.transportId === sendTransport.id
-        ).then(callback).catch(errback);
+        )
+          .then(() => { D('25', `sendTransport DTLS connected`); callback(); })
+          .catch((e) => { DE('25', `sendTransport DTLS connect FAILED`, e.message); errback(e); });
       });
 
       sendTransport.on('produce', ({ kind, rtpParameters, appData }, callback, errback) => {
+        D('25', `sendTransport "produce" event — kind="${kind}"`);
         wsSend({ type: 'sfu_produce', transportId: sendTransport.id, kind, rtpParameters, appData });
         waitForMessage('sfu_produced', 10000, (d) => d.kind === kind)
-          .then(({ id }) => callback({ id }))
-          .catch(errback);
+          .then(({ id }) => { D('25', `sfu_produced OK — kind="${kind}" id="${id}"`); callback({ id }); })
+          .catch((e) => { DE('25', `sfu_produce FAILED kind="${kind}"`, e.message); errback(e); });
       });
 
       sendTransport.on('connectionstatechange', (state) => {
-        console.log(`Send transport: ${state}`);
-        if (state === 'failed') setConnectionStatus('failed');
+        D('25', `sendTransport connectionstatechange → "${state}"`);
+        if (state === 'failed') {
+          DE('25', '★ sendTransport ICE FAILED — 미디어 송신 불가');
+          setConnectionStatus('failed');
+        }
+        if (state === 'connected') D('25', '★ sendTransport ICE CONNECTED ✅');
       });
 
       sendTransportRef.current = sendTransport;
+      D('25', `sendTransportRef set — id="${sendTransport.id}"`);
 
-      // 5. Recv Transport 생성
+      // [D26] Recv Transport
+      D('26', 'TX sfu_create_transport direction=recv');
       wsSend({ type: 'sfu_create_transport', direction: 'recv' });
-      // FIX-C3: direction 필터 — send와 구분
       const recvParams = await waitForMessage(
         'sfu_transport_created', 10000,
-        (d) => !d.direction || d.direction === 'recv'
+        (d) => {
+          D('26', `sfu_transport_created filter check — direction="${d.direction}"`);
+          return !d.direction || d.direction === 'recv';
+        }
       );
+      D('26', `recvTransport params received — id="${recvParams.id}" iceCandidates=${recvParams.iceCandidates?.length}`);
 
       const recvTransport = device.createRecvTransport({
         id:             recvParams.id,
@@ -311,64 +460,93 @@ export function useSFU({ wsRef, roomId }) {
       });
 
       recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
+        D('26', `recvTransport "connect" event fired — transportId="${recvTransport.id}"`);
         wsSend({ type: 'sfu_connect_transport', transportId: recvTransport.id, dtlsParameters });
         waitForMessage('sfu_transport_connected', 10000,
           (d) => d.transportId === recvTransport.id
-        ).then(callback).catch(errback);
+        )
+          .then(() => { D('26', `recvTransport DTLS connected ✅`); callback(); })
+          .catch((e) => { DE('26', `★ recvTransport DTLS connect FAILED — 상대방 영상 수신 불가`, e.message); errback(e); });
       });
 
       recvTransport.on('connectionstatechange', (state) => {
-        console.log(`Recv transport: ${state}`);
+        D('26', `recvTransport connectionstatechange → "${state}"`);
+        if (state === 'failed')  DE('26', '★ recvTransport ICE FAILED — 상대방 영상 수신 불가');
+        if (state === 'connected') D('26', '★ recvTransport ICE CONNECTED ✅');
       });
 
       recvTransportRef.current = recvTransport;
+      D('26', `recvTransportRef set — id="${recvTransport.id}"`);
 
-      // FIX-C1: recvTransport 생성 완료 직후 큐 먼저 처리 (기존 producers consume 전에)
-      // 이렇게 해야 recvTransport 생성 중에 도착한 new_producer를 놓치지 않음
+      // [D27] earlyQueued 처리
       const earlyQueued = [...pendingProducersRef.current];
       pendingProducersRef.current = [];
-      console.log(`📦 Early queued producers: ${earlyQueued.length}`);
+      D('27', `earlyQueued count=${earlyQueued.length}`, earlyQueued.map(p => `${p.kind}:${p.producerId}`));
+
       for (const prod of earlyQueued) {
+        D('27', `Processing earlyQueued — ${prod.kind} peerId="${prod.peerId}" producerId="${prod.producerId}"`);
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
-      // 6. 이미 방에 있는 producers consume
-      console.log(`📦 Existing producers: ${existingProducers.length}`);
-      for (const prod of existingProducers) {
-        await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
+      // [D28] existingProducers 처리 + 중복 경고
+      D('28', `Processing existingProducers count=${existingProducers?.length}`);
+      for (const prod of (existingProducers || [])) {
+        const pid = prod.peerId || prod.peer_id;
+        const prodId = prod.producerId || prod.producer_id;
+
+        // ★ 중복 감지: earlyQueued에서 이미 처리됐는지 확인
+        if (consumingProducerIds.current.has(prodId)) {
+          DW('28', `★ DUPLICATE DETECTED — producerId="${prodId}" already in earlyQueued. SKIP.`);
+          continue;
+        }
+
+        D('28', `Processing existingProducer — kind="${prod.kind}" peerId="${pid}" producerId="${prodId}"`);
+        await consumeProducer(pid, prodId, prod.kind, prod.username);
       }
 
-      // 큐에 쌓인 new_producer 처리 (initSFU 완료 후 도착한 것)
+      // [D29] lateQueued 처리
       const lateQueued = [...pendingProducersRef.current];
       pendingProducersRef.current = [];
+      D('29', `lateQueued count=${lateQueued.length}`, lateQueued.map(p => `${p.kind}:${p.producerId}`));
+
       for (const prod of lateQueued) {
+        D('29', `Processing lateQueued — ${prod.kind} peerId="${prod.peerId}" producerId="${prod.producerId}"`);
         await consumeProducer(prod.peerId, prod.producerId, prod.kind, prod.username);
       }
 
       setConnectionStatus('connected');
-      console.log('✅ SFU initialized');
+      D('2Z', `✅ initSFU COMPLETE — remoteStreams=${remoteStreams.size} consumers=${consumersRef.current.size}`);
+
     } catch (e) {
       setConnectionStatus('failed');
-      console.error('SFU init error:', e);
+      DE('2Z', `★ initSFU FAILED`, e.message);
+      DE('2Z', `Stack:`, e.stack);
       throw e;
     }
-  }, [wsSend, waitForMessage, consumeProducer]);
+  }, [wsSend, waitForMessage, consumeProducer, remoteStreams.size, roomId]);
 
-  // ── 로컬 미디어 송신 시작 ───────────────────────────────────
+  // ── [D40~D41] 로컬 미디어 송신 시작 ─────────────────────────
   const startProducing = useCallback(async (stream) => {
     const transport = sendTransportRef.current;
+    D('40', `startProducing — sendTransport exists=${!!transport}`);
     if (!transport) throw new Error('Send transport not ready');
 
     const audioTrack = stream.getAudioTracks()[0];
     const videoTrack = stream.getVideoTracks()[0];
+    D('40', `Tracks — audioTrack=${audioTrack ? `"${audioTrack.label}" enabled=${audioTrack.enabled}` : 'NONE'}`);
+    D('40', `Tracks — videoTrack=${videoTrack ? `"${videoTrack.label}" enabled=${videoTrack.enabled}` : 'NONE'}`);
 
     if (audioTrack) {
+      D('41', 'transport.produce audio START');
       const audioProducer = await transport.produce({ track: audioTrack });
       producersRef.current.set('audio', audioProducer);
-      console.log('✅ Audio producing');
+      D('41', `audio producer OK — id="${audioProducer.id}" paused=${audioProducer.paused}`);
+    } else {
+      DW('41', 'No audioTrack — audio will NOT be produced');
     }
 
     if (videoTrack) {
+      D('41', 'transport.produce video START');
       const videoProducer = await transport.produce({
         track: videoTrack,
         encodings: [
@@ -379,11 +557,13 @@ export function useSFU({ wsRef, roomId }) {
         codecOptions: { videoGoogleStartBitrate: 500 },
       });
       producersRef.current.set('video', videoProducer);
-      console.log('✅ Video producing');
+      D('41', `video producer OK — id="${videoProducer.id}" paused=${videoProducer.paused}`);
+    } else {
+      DW('41', 'No videoTrack — video will NOT be produced');
     }
   }, []);
 
-  // ── Mute / Unmute ──────────────────────────────────────────
+  // ── Mute / Unmute ───────────────────────────────────────────
   const muteAudio = useCallback(() => {
     const producer = producersRef.current.get('audio');
     if (!producer) return;
@@ -412,32 +592,40 @@ export function useSFU({ wsRef, roomId }) {
     wsSend({ type: 'sfu_producer_resume', producerId: producer.id, kind: 'video' });
   }, [wsSend]);
 
-  // ── 이벤트 기반 SFU 메시지 처리 ─────────────────────────────
+  // ── [D50~D51] 이벤트 기반 SFU 메시지 처리 ────────────────────
   const handleSFUMessage = useCallback(async (data) => {
+    D('50', `handleSFUMessage type="${data.type}"`, data);
+
     switch (data.type) {
       case 'peer_joined':
-        console.log(`Peer joined: ${data.username} (${data.peerId})`);
+        D('50', `peer_joined — username="${data.username}" peerId="${data.peerId}"`);
+        D('50', `(peer_joined 자체는 consume을 트리거하지 않음 — new_producer 이벤트 대기)`);
         break;
 
       case 'new_producer':
+        D('51', `new_producer — peerId="${data.peerId}" producerId="${data.producerId}" kind="${data.kind}" username="${data.username}"`);
+        D('51', `device=${!!deviceRef.current} recvTransport=${!!recvTransportRef.current}`);
         if (deviceRef.current && recvTransportRef.current) {
+          D('51', `→ consumeProducer 즉시 호출`);
           await consumeProducer(data.peerId, data.producerId, data.kind, data.username);
         } else {
-          // FIX-C1: recvTransport 미준비 시 큐에 적재
+          DW('51', `→ QUEUED (recvTransport 미준비) — queue size will be: ${pendingProducersRef.current.length + 1}`);
           pendingProducersRef.current.push(data);
-          console.warn('new_producer queued — recvTransport not ready yet:', data);
         }
         break;
 
       case 'track_state': {
+        D('50', `track_state — peerId="${data.peerId}" kind="${data.kind}" enabled=${data.enabled}`);
         setRemoteStreams((prev) => {
           const directKey = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
           const key = directKey && prev.has(directKey)
             ? directKey
             : [...prev.entries()].find(([, v]) => v.username === data.username)?.[0];
 
-          if (!key) return prev;
-
+          if (!key) {
+            DW('50', `track_state: no matching remoteStream for peerId="${data.peerId}" username="${data.username}"`);
+            return prev;
+          }
           const next     = new Map(prev);
           const existing = next.get(key);
           next.set(key, {
@@ -451,6 +639,7 @@ export function useSFU({ wsRef, roomId }) {
       }
 
       case 'user_left': {
+        D('50', `user_left — username="${data.username}" peerId="${data.peerId}"`);
         const directPeerId = data.peerId || (data.user_id ? `user_${data.user_id}` : null);
 
         setRemoteStreams((prev) => {
@@ -459,12 +648,11 @@ export function useSFU({ wsRef, roomId }) {
             : [...prev.entries()].find(([, v]) => v.username === data.username)?.[0];
 
           if (!key) {
-            console.warn('user_left: no matching stream for', data);
+            DW('50', `user_left: no matching stream for`, data);
             return prev;
           }
 
           const existing = prev.get(key);
-
           const cleanConsumer = (consumerId) => {
             if (!consumerId) return;
             try { consumersRef.current.get(consumerId)?.close(); } catch (_) {}
@@ -475,19 +663,21 @@ export function useSFU({ wsRef, roomId }) {
 
           const next = new Map(prev);
           next.delete(key);
-          console.log(`Peer left: ${data.username} (${key})`);
+          D('50', `user_left: removed stream for "${key}" — remaining remoteStreams: ${next.size}`);
           return next;
         });
         break;
       }
 
       default:
+        DW('50', `handleSFUMessage: unhandled type="${data.type}"`);
         break;
     }
   }, [consumeProducer]);
 
-  // ── 정리 ──────────────────────────────────────────────────
+  // ── 정리 ────────────────────────────────────────────────────
   const cleanup = useCallback(() => {
+    D('20', 'cleanup called');
     pendingRef.current.forEach((waiters) => {
       waiters.forEach(({ reject, timer }) => {
         clearTimeout(timer);
@@ -503,12 +693,14 @@ export function useSFU({ wsRef, roomId }) {
     recvTransportRef.current?.close();
     producersRef.current.clear();
     consumersRef.current.clear();
+    consumingProducerIds.current.clear();
     sendTransportRef.current = null;
     recvTransportRef.current = null;
     deviceRef.current = null;
     pendingProducersRef.current = [];
     setRemoteStreams(new Map());
     setConnectionStatus('disconnected');
+    D('20', 'cleanup done');
   }, []);
 
   return {
@@ -526,7 +718,7 @@ export function useSFU({ wsRef, roomId }) {
     unmuteVideo,
     handleSFUMessage,
     dispatchSFUMessage,
-    producersRef,  // useScreenShare에서 사용
+    producersRef,
     cleanup,
   };
 }
