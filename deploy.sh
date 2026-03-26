@@ -189,7 +189,7 @@ echo ""
 # fi
 
 # mediasoup 내용 변경때만 빌드 
-# docker build -t webboard-mediasoup:latest ./mediasoup
+docker build -t webboard-mediasoup:latest ./mediasoup
 
 echo "✅ mediasoup build complete"
 echo ""
