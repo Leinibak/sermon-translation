@@ -430,20 +430,16 @@ class VideoMeetingConsumer(AsyncWebsocketConsumer):
         participant_user_id = event.get('participant_user_id')
         try:
             if int(participant_user_id) == int(self.user_id):
-                for i in range(3):
-                    await self.send(text_data=json.dumps({
-                        'type':                  'approval_notification',
-                        'approved':              True,
-                        'message':               event['message'],
-                        'room_id':               str(event['room_id']),
-                        'host_username':         event.get('host_username'),
-                        'participant_username':  event.get('participant_username'),
-                        'participant_user_id':   participant_user_id,
-                        'should_initialize':     True,
-                        'retry_count':           i,
-                    }))
-                    if i < 2:
-                        await asyncio.sleep(0.5)
+                await self.send(text_data=json.dumps({
+                    'type':                 'approval_notification',
+                    'approved':             True,
+                    'message':              event['message'],
+                    'room_id':              str(event['room_id']),
+                    'host_username':        event.get('host_username'),
+                    'participant_username': event.get('participant_username'),
+                    'participant_user_id':  participant_user_id,
+                    'should_initialize':    True,
+                }))
         except (ValueError, TypeError) as e:
             logger.error(f"approval_notification error: {e}")
 

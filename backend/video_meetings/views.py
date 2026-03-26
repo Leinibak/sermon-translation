@@ -403,21 +403,12 @@ class VideoRoomViewSet(viewsets.ModelViewSet):
             }
             
             # 첫 번째 전송
-            logger.info(f"📡 승인 알림 전송 (1차)")
+            logger.info(f"📡 승인 알림 전송")
             async_to_sync(channel_layer.group_send)(
                 room_group_name,
                 notification_data
             )
-            
-            # 재전송
-            time.sleep(1.0)
-            
-            logger.info(f"📡 승인 알림 전송 (2차)")
-            async_to_sync(channel_layer.group_send)(
-                room_group_name,
-                notification_data
-            )
-            
+
             logger.info(f"✅ 승인 알림 전송 완료")
             
         except Exception as e:
