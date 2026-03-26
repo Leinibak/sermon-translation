@@ -189,9 +189,10 @@ services:
 
   # ── mediasoup SFU ─────────────────────────────────────────────
   mediasoup:
-    build:
-      context: ./mediasoup
-      dockerfile: Dockerfile
+    image: webboard-mediasoup:latest
+    # build:
+    #   context: ./mediasoup
+    #   dockerfile: Dockerfile
     container_name: webboard_mediasoup
     environment:
       - NODE_ENV=production

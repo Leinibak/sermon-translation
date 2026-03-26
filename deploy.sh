@@ -181,12 +181,16 @@ echo "⚠️  This may take a few minutes..."
 echo ""
 
 
-# mediasoup는 캐시 사용 (C++ 컴파일 포함, 변경 거의 없음)
-# echo "📦 Building mediasoup (cache enabled)..."
-if ! docker compose -f $COMPOSE_FILE build mediasoup; then
-    echo "❌ mediasoup build failed!"
-    exit 1
-fi
+# # mediasoup는 캐시 사용 (C++ 컴파일 포함, 변경 거의 없음)     이 방식은 사용하지 않는걸로
+# # echo "📦 Building mediasoup (cache enabled)..."
+# if ! docker compose -f $COMPOSE_FILE build mediasoup; then
+#     echo "❌ mediasoup build failed!"
+#     exit 1
+# fi
+
+# mediasoup 내용 변경때만 빌드 
+# docker build -t webboard-mediasoup:latest ./mediasoup
+
 echo "✅ mediasoup build complete"
 echo ""
 
