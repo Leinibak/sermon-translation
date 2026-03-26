@@ -2,7 +2,7 @@
 // frontend/src/App.jsx (수정)
 // ============================================
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from "./components/Navbar";
@@ -35,6 +35,38 @@ function PrivateRoute({ children }) {
   }
 
   return isAuthenticated ? children : <Navigate to="/login" />;
+}
+
+
+// ── 레이아웃 래퍼 ──────────────────────────────────────────────
+// 화상회의 룸에서는:
+//  - pt-8 제거 (Navbar가 fixed이므로 padding 불필요 → VideoMeetingRoom이 전체 화면 차지)
+//  - Footer 숨김 (영상 회의 중 하단 공간 낭비 방지)
+function AppLayout({ children }) {
+  const location = useLocation();
+  const isVideoRoom = /^\/video-meetings\/[^/]+/.test(location.pathname);
+ 
+  if (isVideoRoom) {
+    // 화상회의 룸: Navbar는 fixed로 올라가 있으므로 padding 없이 full-screen
+    return (
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-grow">
+          {children}
+        </main>
+        {/* Footer 숨김 */}
+      </div>
+    );
+  }
+ 
+  // 일반 페이지: 기존 구조 유지 (pt-8은 sticky Navbar 높이 보정)
+  return (
+    <div className="pt-8 min-h-screen flex flex-col justify-between">
+      <main className="flex-grow">
+        {children}
+      </main>
+      <Footer />
+    </div>
+  );
 }
 
 function AppContent() {
@@ -132,71 +164,51 @@ function App() {
       <AuthProvider>
         <ScrollToTop />
         <Navbar />
-        <div className="pt-8 min-h-screen flex flex-col justify-between">
-          <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              
-              {/* Sermons 라우팅 */}
-              <Route path="/sermons" element={<SermonList />} />
-              <Route path="/sermons/:id" element={<SermonDetail />} />
-              <Route path="/sermons/upload" element={
-                <PrivateRoute>
-                  <SermonUpload />
-                </PrivateRoute>
-              } />
-              <Route path="/sermons/edit/:id" element={
-                <PrivateRoute>
-                  <SermonUpload />
-                </PrivateRoute>
-              } />
-              
-              {/* ✅ Pastoral Letters 라우팅 */}
-              <Route path="/pastoral-letters" element={
-                <PrivateRoute>
-                  <PastoralLetterList />
-                </PrivateRoute>
-              } />
-              <Route path="/pastoral-letters/:id" element={
-                <PrivateRoute>
-                  <PastoralLetterDetail />
-                </PrivateRoute>
-              } />
-              
-              {/* Blog 라우팅 */}
-              <Route path="/blog" element={<PostList />} />
-              <Route path="/post/:id" element={<PostDetail />} />
-              <Route path="/edit/:id" element={
-                <PrivateRoute>
-                  <PostForm />
-                </PrivateRoute>
-              } />
-              <Route path="/create" element={
-                <PrivateRoute>
-                  <PostForm />
-                </PrivateRoute>
-              } />
-
-
-              {/* Video Meetings 라우팅 */}
-              <Route path="/video-meetings" element={
-                <PrivateRoute>
-                  <VideoMeetingList />
-                </PrivateRoute>
-              } />
-              <Route path="/video-meetings/:id" element={
-                <PrivateRoute>
-                  <VideoMeetingRoom />
-                </PrivateRoute>
-              } />
-
-              {/* Auth 라우팅 */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-            </Routes> 
-          </main>
-          <Footer />
-        </div>
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+ 
+            {/* Sermons */}
+            <Route path="/sermons" element={<SermonList />} />
+            <Route path="/sermons/:id" element={<SermonDetail />} />
+            <Route path="/sermons/upload" element={
+              <PrivateRoute><SermonUpload /></PrivateRoute>
+            } />
+            <Route path="/sermons/edit/:id" element={
+              <PrivateRoute><SermonUpload /></PrivateRoute>
+            } />
+ 
+            {/* Pastoral Letters */}
+            <Route path="/pastoral-letters" element={
+              <PrivateRoute><PastoralLetterList /></PrivateRoute>
+            } />
+            <Route path="/pastoral-letters/:id" element={
+              <PrivateRoute><PastoralLetterDetail /></PrivateRoute>
+            } />
+ 
+            {/* Blog */}
+            <Route path="/blog" element={<PostList />} />
+            <Route path="/post/:id" element={<PostDetail />} />
+            <Route path="/edit/:id" element={
+              <PrivateRoute><PostForm /></PrivateRoute>
+            } />
+            <Route path="/create" element={
+              <PrivateRoute><PostForm /></PrivateRoute>
+            } />
+ 
+            {/* Video Meetings */}
+            <Route path="/video-meetings" element={
+              <PrivateRoute><VideoMeetingList /></PrivateRoute>
+            } />
+            <Route path="/video-meetings/:id" element={
+              <PrivateRoute><VideoMeetingRoom /></PrivateRoute>
+            } />
+ 
+            {/* Auth */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </AppLayout>
       </AuthProvider>
     </BrowserRouter>
   );

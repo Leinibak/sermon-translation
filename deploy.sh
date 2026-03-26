@@ -180,18 +180,16 @@ echo "🔨 Building Docker images..."
 echo "⚠️  This may take a few minutes..."
 echo ""
 
-
-# # mediasoup는 캐시 사용 (C++ 컴파일 포함, 변경 거의 없음)     이 방식은 사용하지 않는걸로
-# # echo "📦 Building mediasoup (cache enabled)..."
-# if ! docker compose -f $COMPOSE_FILE build mediasoup; then
-#     echo "❌ mediasoup build failed!"
-#     exit 1
-# fi
-
-# mediasoup 내용 변경때만 빌드 
-docker build -t webboard-mediasoup:latest ./mediasoup
-
 echo "✅ mediasoup build complete"
+# mediasoup 이미지가 없을 때만 빌드
+if docker image inspect webboard-mediasoup:latest > /dev/null 2>&1; then
+    echo "✅ mediasoup image already exists — skipping build"
+else
+    echo "📦 Building mediasoup (first time or forced)..."
+    docker build -t webboard-mediasoup:latest ./mediasoup
+    echo "✅ mediasoup build complete"
+fi
+
 echo ""
 
 # backend, frontend는 매번 새로 빌드
