@@ -826,7 +826,7 @@ function VideoMeetingRoom() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
 
       <RoomHeader
         title={room.title}
@@ -861,20 +861,21 @@ function VideoMeetingRoom() {
         />
       )}
 
-      <VideoGrid
-        videos={allVideos}
-        HandRaisedBadge={HandRaisedBadge}
-        mainSpeakerId={mainSpeakerId}
-        pinnedPeerId={pinnedPeerId}
-        volumeLevels={volumeLevels}
-        isSpeaking={isSpeaking}
-        onPin={pinPeer}
-        onUnpin={unpinPeer}
-      />
-      
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <VideoGrid
+          videos={allVideos}
+          HandRaisedBadge={HandRaisedBadge}
+          mainSpeakerId={mainSpeakerId}
+          pinnedPeerId={pinnedPeerId}
+          volumeLevels={volumeLevels}
+          isSpeaking={isSpeaking}
+          onPin={pinPeer}
+          onUnpin={unpinPeer}
+        />
+      </div>
       <IOSPlayButton show={showIOSPlayButton} onPlay={handleIOSPlay} />
 
-      <div className="bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3 flex justify-center items-center gap-2 md:gap-4">
+      <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3 flex justify-center items-center gap-2 md:gap-4">
         <ControlBar
           isMicOn={isMicOn}
           isVideoOn={isVideoOn}
