@@ -36,6 +36,7 @@ import { ChatPanel, ChatToggleButton } from './VideoMeeting/ChatPanel';
 import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel';
 import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 import { IOSPlayButton }        from './VideoMeeting/IOSPlayButton';
+import { useActiveSpeaker } from '../hooks/useActiveSpeaker';
 
 // ── 진단 로거 ─────────────────────────────────────────────────
 const RD = (tag, ...args) => {
@@ -148,6 +149,19 @@ function VideoMeetingRoom() {
     dispatchSFUMessage,
     cleanup: cleanupWebRTC,
   } = useSFU({ wsRef, roomId });
+
+  const {
+    mainSpeakerId,
+    pinnedPeerId,
+    volumeLevels,
+    isSpeaking,
+    pinPeer,
+    unpinPeer,
+  } = useActiveSpeaker({
+    localStreamRef,
+    remoteStreams,
+    isMicOn,
+  });
 
   // ── 채팅 메시지 추가 헬퍼 ────────────────────────────────────
   const addChatMessage = useCallback((message) => {
@@ -847,8 +861,17 @@ function VideoMeetingRoom() {
         />
       )}
 
-      <VideoGrid videos={allVideos} HandRaisedBadge={HandRaisedBadge} />
-
+      <VideoGrid
+        videos={allVideos}
+        HandRaisedBadge={HandRaisedBadge}
+        mainSpeakerId={mainSpeakerId}
+        pinnedPeerId={pinnedPeerId}
+        volumeLevels={volumeLevels}
+        isSpeaking={isSpeaking}
+        onPin={pinPeer}
+        onUnpin={unpinPeer}
+      />
+      
       <IOSPlayButton show={showIOSPlayButton} onPlay={handleIOSPlay} />
 
       <div className="bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3 flex justify-center items-center gap-2 md:gap-4">
