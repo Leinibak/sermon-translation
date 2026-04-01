@@ -1,16 +1,18 @@
 // frontend/src/components/VideoMeetingRoom.jsx
 //
-// ★ LAYOUT TOGGLE BUILD ★
+// ★ LAYOUT TOGGLE BUILD — v2 ★
 //
 // [변경 내역]
-// - Speaker View / Gallery View 전환 버튼 추가 (RoomHeader 하단 or ControlBar)
-// - ReactionsOverlay에 index prop 전달 → 이모티콘 겹침 방지
-// - VideoGrid에 layout prop 전달
-// - 모바일/PC 모두 레이아웃 버튼 표시
+// - Speaker / Gallery / Dynamic Gallery 3가지 뷰 선택 옵션 추가
+// - RoomHeader를 최소화 (방이름+참가자수+뷰선택+벨 한 줄)
+// - 진단 상태 바를 RoomHeader 내부에 통합 (별도 div 제거)
+// - PendingRequestsPanel 컴팩트화 + 자동소멸 결과 알림
+// - LayoutToggleButton 제거 (RoomHeader에 통합)
+// - 컨트롤 바에서 레이아웃 버튼 제거
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader, AlertCircle, LayoutGrid, Monitor } from 'lucide-react';
+import { Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useVideoMeetingAPI } from '../hooks/useVideoMeetingAPI';
 import { useSFU } from '../hooks/useSFU';
@@ -51,40 +53,6 @@ const isSafari = () => {
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua) && !/FxiOS/.test(ua) && !/EdgiOS/.test(ua);
 };
 
-// ══════════════════════════════════════════════════════════════
-// 레이아웃 전환 버튼 컴포넌트
-// ══════════════════════════════════════════════════════════════
-function LayoutToggleButton({ layout, onToggle, isMobile }) {
-  const isSpeaker = layout === 'speaker';
-  return (
-    <button
-      onClick={onToggle}
-      className={`
-        flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-        transition-all duration-200 touch-manipulation
-        ${isSpeaker
-          ? 'bg-blue-600 text-white hover:bg-blue-700'
-          : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-        }
-      `}
-      title={isSpeaker ? '갤러리 보기로 전환' : '발표자 보기로 전환'}
-      type="button"
-    >
-      {isSpeaker ? (
-        <>
-          <LayoutGrid className="w-3.5 h-3.5" />
-          {!isMobile && <span>갤러리 보기</span>}
-        </>
-      ) : (
-        <>
-          <Monitor className="w-3.5 h-3.5" />
-          {!isMobile && <span>발표자 보기</span>}
-        </>
-      )}
-    </button>
-  );
-}
-
 // ============================================================
 // VideoMeetingRoom
 // ============================================================
@@ -97,19 +65,11 @@ function VideoMeetingRoom() {
   const [showIOSPlayButton, setShowIOSPlayButton] = useState(false);
   const iosPlayTriggeredRef = useRef(false);
 
-  // ── 레이아웃 상태 ──────────────────────────────────────────
-  const [layout, setLayout] = useState('speaker'); // 'speaker' | 'gallery'
-  const [isMobileView, setIsMobileView] = useState(false);
+  // ── 레이아웃 상태: 'speaker' | 'gallery' | 'dynamic' ──────
+  const [layout, setLayout] = useState('speaker');
 
-  useEffect(() => {
-    const check = () => setIsMobileView(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-
-  const handleToggleLayout = useCallback(() => {
-    setLayout(prev => prev === 'speaker' ? 'gallery' : 'speaker');
+  const handleLayoutChange = useCallback((newLayout) => {
+    setLayout(newLayout);
   }, []);
 
   const {
@@ -247,11 +207,6 @@ function VideoMeetingRoom() {
         RD('02', `participants_list — count=${data.participants?.length}`);
         break;
 
-      // ── [R-D03] 참가 승인 알림 ──────────────────────────────
-      // FIX-3: 복잡한 직접 초기화 로직 제거.
-      // fetchRoomDetails()로 participant_status를 'approved'로 갱신하면
-      // FIX-2의 SFU 초기화 useEffect가 자동으로 트리거됨.
-      // FIX-4: WS가 이미 연결된 경우에도 wsReady를 확인하고 강제 세트.
       case 'approval_notification': {
         RD('03', `approval_notification 수신`, {
           room_id: data.room_id,
@@ -259,9 +214,8 @@ function VideoMeetingRoom() {
           approved: data.approved,
         });
 
-        // room_id / user_id 검증
         if (String(data.room_id) !== String(roomId)) {
-          RDW('03', `room_id 불일치 — 무시 (data="${data.room_id}" current="${roomId}")`);
+          RDW('03', `room_id 불일치 — 무시`);
           break;
         }
         if (String(data.participant_user_id) !== String(user?.id)) {
@@ -269,11 +223,9 @@ function VideoMeetingRoom() {
           break;
         }
 
-        RD('03', `[Step 1] fetchRoomDetails 호출 — participant_status 갱신`);
+        RD('03', `[Step 1] fetchRoomDetails 호출`);
         fetchRoomDetails().then(() => {
           RD('03', `[Step 1] fetchRoomDetails OK`);
-
-          // FIX-4: WS는 연결돼 있지만 wsReady가 false인 경우 강제 세트
           if (wsRef.current?.readyState === WebSocket.OPEN && wsRef.current?._wsReady) {
             RD('03', `[Step 2] WS 이미 준비됨 — wsReady 강제 세트`);
             setWsReady(true);
@@ -285,11 +237,11 @@ function VideoMeetingRoom() {
       }
 
       case 'user_joined':
-        RD('02', `user_joined: ${data.username} (SFU new_producer로 처리됨)`);
+        RD('02', `user_joined: ${data.username}`);
         break;
 
       case 'join_ready':
-        RD('02', `join_ready: ${data.from_username} (SFU 환경 미사용)`);
+        RD('02', `join_ready: ${data.from_username}`);
         break;
 
       case 'chat_message':
@@ -353,7 +305,7 @@ function VideoMeetingRoom() {
   }, [handleWebSocketMessage]);
 
   // ==========================================================
-  // [R-D02] WebSocket 연결
+  // WebSocket 연결
   // ==========================================================
   const connectWebSocket = useCallback(() => {
     if (!roomId || !user || roomId === 'undefined') return;
@@ -361,7 +313,7 @@ function VideoMeetingRoom() {
     if (wsRef.current) {
       const s = wsRef.current.readyState;
       if (s === WebSocket.OPEN || s === WebSocket.CONNECTING) {
-        RDW('02', `connectWebSocket 중복 호출 무시 — state=${['CONNECTING','OPEN','CLOSING','CLOSED'][s]}`);
+        RDW('02', `connectWebSocket 중복 호출 무시`);
         return;
       }
       try { wsRef.current.close(1000, 'Reconnecting'); } catch (_) {}
@@ -462,98 +414,138 @@ function VideoMeetingRoom() {
   }, [roomId, user, navigate]);
 
   // ==========================================================
-  // [R-D05] 미디어 초기화
+  // 미디어 초기화
   // ==========================================================
   const initializeMedia = useCallback(async () => {
     if (initializationRef.current) {
-      RDW('05', 'initializeMedia 중복 호출 무시');
+      RDW('05', '미디어 초기화 중복 호출 무시');
       return;
     }
     initializationRef.current = true;
-    RD('05', 'initializeMedia START');
 
     try {
-      if (isIOS() && !isSafari()) {
-        const ok = window.confirm('⚠️ iOS에서는 Safari 사용을 권장합니다.\n\n계속 진행하시겠습니까?');
-        if (!ok) throw new Error('사용자가 취소했습니다');
+      RD('05', '미디어 초기화 시작');
+
+      let constraints = { video: true, audio: true };
+
+      if (isIOS() || isSafari()) {
+        constraints = {
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
+          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
+        };
       }
 
-      const stream = await getLocalMedia();
-      RD('05', `미디어 획득 OK — videoTracks=${stream.getVideoTracks().length} audioTracks=${stream.getAudioTracks().length}`);
+      const stream = await getLocalMedia(constraints);
 
-      if (localVideoRef.current && stream) {
+      if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        if (isIOS()) { try { await localVideoRef.current.play(); } catch (_) {} }
+        try { await localVideoRef.current.play(); } catch (_) {}
       }
+
       setLocalStreamReady(true);
-      RD('05', 'initializeMedia DONE');
-      initializationRef.current = false;
-
+      RD('05', '✅ 미디어 초기화 완료');
     } catch (error) {
-      RDE('05', `initializeMedia FAILED: ${error.name} — ${error.message}`);
+      RDE('05', '미디어 초기화 실패:', error);
       initializationRef.current = false;
 
-      if (isIOS()) {
-        if (error.name === 'NotAllowedError')       alert('📱 iOS 권한 설정이 필요합니다.\n\n설정 > Safari > 카메라/마이크');
-        else if (error.name === 'NotReadableError') alert('📱 카메라/마이크 사용 중\n\n다른 앱 종료 후 재시도');
-        else if (error.message !== '사용자가 취소했습니다') alert('미디어 초기화 실패');
-      } else {
-        alert('카메라와 마이크 접근 권한이 필요합니다.');
+      if (error.name === 'NotAllowedError') {
+        alert('카메라/마이크 접근이 거부되었습니다.\n브라우저 설정에서 권한을 허용해주세요.');
+      } else if (error.name === 'NotFoundError') {
+        alert('카메라 또는 마이크를 찾을 수 없습니다.');
       }
-      if (error.message !== '사용자가 취소했습니다') throw error;
     }
   }, [getLocalMedia]);
 
-  // ── 마이크/비디오 토글 ─────────────────────────────────────
-  const handleToggleMic = useCallback(() => {
-    const next = !isMicOn;
-    setIsMicOn(next);
-    next ? unmuteAudio() : muteAudio();
+  // ==========================================================
+  // 미디어 토글
+  // ==========================================================
+  const handleToggleMic = useCallback(async () => {
+    if (isMicOn) {
+      await muteAudio();
+      setIsMicOn(false);
+    } else {
+      await unmuteAudio();
+      setIsMicOn(true);
+    }
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'track_state', kind: 'audio', enabled: !isMicOn }));
+    }
   }, [isMicOn, muteAudio, unmuteAudio]);
 
-  const handleToggleVideo = useCallback(() => {
-    const next = !isVideoOn;
-    setIsVideoOn(next);
-    next ? unmuteVideo() : muteVideo();
+  const handleToggleVideo = useCallback(async () => {
+    if (isVideoOn) {
+      await muteVideo();
+      setIsVideoOn(false);
+    } else {
+      await unmuteVideo();
+      setIsVideoOn(true);
+    }
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'track_state', kind: 'video', enabled: !isVideoOn }));
+    }
   }, [isVideoOn, muteVideo, unmuteVideo]);
 
-  // ── 회의 나가기 ────────────────────────────────────────────
-  const handleLeave = async () => {
-    if (room.is_host) {
-      const confirmEnd = window.confirm('회의를 종료하시겠습니까?\n\n"확인": 모든 참가자 퇴장\n"취소": 나만 나가기');
-      try { if (confirmEnd) { await endMeeting(); } else { await leaveRoom(); } } catch (_) {}
+  // ==========================================================
+  // 나가기
+  // ==========================================================
+  const handleLeave = useCallback(async () => {
+    if (room?.is_host) {
+      const choice = window.confirm(
+        '방장으로서 나가시겠습니까?\n\n확인: 회의 종료 (모든 참가자 퇴장)\n취소: 계속 진행'
+      );
+      if (choice) {
+        try { await endMeeting(); } catch (_) {}
+      } else {
+        try { await leaveRoom(); } catch (_) {}
+      }
     } else {
       try { await leaveRoom(); } catch (_) {}
     }
-    cleanupWebRTC();
-    if (wsRef.current) wsRef.current.close(1000, 'User leaving');
-    navigate('/video-meetings');
-  };
 
-  // ── 채팅/반응/손들기 ────────────────────────────────────────
-  const handleSendChatMessage = async (content) => {
+    cleanupWebRTC();
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'User left');
+      wsRef.current = null;
+    }
+    navigate('/video-meetings');
+  }, [room, leaveRoom, endMeeting, cleanupWebRTC, navigate]);
+
+  // ==========================================================
+  // 채팅 메시지 전송
+  // ==========================================================
+  const handleSendChatMessage = useCallback(async (content) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('WebSocket 연결 없음');
-    ws.send(JSON.stringify({ type: 'chat', content }));
-  };
+    ws.send(JSON.stringify({ type: 'chat_message', content }));
+  }, []);
 
-  const handleSendReaction = async (emoji) => {
+  // ==========================================================
+  // 반응 전송
+  // ==========================================================
+  const handleSendReaction = useCallback((emoji) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    try { ws.send(JSON.stringify({ type: 'reaction', reaction_type: emoji })); } catch (e) { RDE('02', '반응 전송 실패:', e); }
-  };
+    ws.send(JSON.stringify({ type: 'reaction', reaction_type: emoji }));
+  }, []);
 
-  const handleRaiseHand = async () => {
+  // ==========================================================
+  // 손들기
+  // ==========================================================
+  const handleRaiseHand = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    try { ws.send(JSON.stringify({ type: 'raise_hand' })); setIsHandRaised(true); } catch (e) { RDE('02', '손들기 실패:', e); }
-  };
+    ws.send(JSON.stringify({ type: 'raise_hand' }));
+    setIsHandRaised(true);
+  }, []);
 
-  const handleLowerHand = async () => {
+  const handleLowerHand = useCallback(() => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    try { ws.send(JSON.stringify({ type: 'lower_hand' })); setIsHandRaised(false); } catch (e) { RDE('02', '손내리기 실패:', e); }
-  };
+    ws.send(JSON.stringify({ type: 'lower_hand' }));
+    setIsHandRaised(false);
+  }, []);
 
   // ==========================================================
   // 마운트/언마운트
@@ -576,10 +568,7 @@ function VideoMeetingRoom() {
   }, [roomId, navigate, fetchRoomDetails, cleanupWebRTC]);
 
   // ==========================================================
-  // FIX-1: 초기 연결 — 승인된 참가자 & 방장
-  // 원래: isApproved && !wsConnected && !wsRef.current && !localStreamReady
-  // 수정: !localStreamReady 조건 제거 → 미디어 초기화와 WS 연결 분리
-  //       미디어가 이미 있어도 WS가 없으면 연결 시도
+  // 초기 연결
   // ==========================================================
   useEffect(() => {
     if (!room || !user) return;
@@ -587,24 +576,20 @@ function VideoMeetingRoom() {
     const isApproved = room.participant_status === 'approved' || room.is_host;
     RD('04', `초기 연결 useEffect — isApproved=${isApproved} wsConnected=${wsConnected} localStreamReady=${localStreamReady} is_host=${room.is_host}`);
 
-    // FIX-1: !localStreamReady 조건 제거
-    // 미디어 준비 여부와 관계없이, 승인됐고 WS가 없으면 초기화 진행
     if (isApproved && !wsConnected && !wsRef.current) {
       const initialize = async () => {
         try {
-          // 미디어가 없는 경우에만 초기화
           if (!localStreamReady) {
             RD('05', '미디어 초기화 시작 (초기 연결)');
             await initializeMedia();
             await new Promise(r => setTimeout(r, 300));
           } else {
-            RD('05', '미디어 이미 준비됨 — skip 미디어 초기화');
-            // 로컬 비디오 엘리먼트에 스트림 재연결 (혹시 누락된 경우)
+            RD('05', '미디어 이미 준비됨 — skip');
             if (localVideoRef.current && localStreamRef.current && !localVideoRef.current.srcObject) {
               localVideoRef.current.srcObject = localStreamRef.current;
             }
           }
-          RD('02', 'WebSocket 연결 시작 (초기 연결)');
+          RD('02', 'WebSocket 연결 시작');
           connectWebSocket();
         } catch (error) {
           RDE('04', '초기화 실패:', error);
@@ -631,49 +616,31 @@ function VideoMeetingRoom() {
   ]);
 
   // ==========================================================
-  // FIX-2: SFU 초기화 useEffect — 방장 + 승인된 참가자 공통
-  //
-  // 원래: room?.is_host 가 false면 무조건 skip (참가자 차단)
-  // 수정: is_host OR participant_status==='approved' 이면 진행
-  //       → 참가자가 wsReady=true + localStreamReady=true 가 되는 순간
-  //         자동으로 initSFU() → startProducing() 실행
-  //
-  // 이 useEffect가 트리거되는 두 가지 경로:
-  //   경로 A) WS approval_notification → fetchRoomDetails() → participant_status 갱신
-  //           → deps 변경 → 이 effect 재실행
-  //   경로 B) HTTP 폴링으로 participant_status='approved' 감지
-  //           → fetchRoomDetails() → deps 변경 → 이 effect 재실행
+  // SFU 초기화
   // ==========================================================
   const sfuInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!room || !user) return;
 
-    // FIX-2: 방장 OR 승인된 참가자
     const isApproved = room.is_host || room.participant_status === 'approved';
 
     RD('04', `SFU useEffect check — is_host=${room?.is_host} participant_status=${room?.participant_status} isApproved=${isApproved} wsReady=${wsReady} localStreamReady=${localStreamReady} sfuInitialized=${sfuInitializedRef.current}`);
 
     if (!isApproved)               { RDW('04', '미승인 — skip'); return; }
-    if (!wsReady)                  { RDW('04', 'wsReady=false — skip (아직 WS 준비 안됨)'); return; }
-    if (!localStreamReady)         { RDW('04', 'localStreamReady=false — skip (미디어 준비 안됨)'); return; }
+    if (!wsReady)                  { RDW('04', 'wsReady=false — skip'); return; }
+    if (!localStreamReady)         { RDW('04', 'localStreamReady=false — skip'); return; }
     if (sfuInitializedRef.current) { RDW('04', '이미 초기화됨 — skip'); return; }
 
     sfuInitializedRef.current = true;
 
     const initSFUForUser = async () => {
       try {
-        if (room.is_host) {
-          RD('04', '👑 방장 initSFU 시작');
-        } else {
-          RD('04', '👤 참가자 initSFU 시작');
-        }
-
+        RD('04', `${room.is_host ? '👑 방장' : '👤 참가자'} initSFU 시작`);
         await initSFU();
         RD('04', 'initSFU OK → startProducing 시작');
         await startProducing(localStreamRef.current);
-        RD('04', `✅ SFU 초기화 완료 (${room.is_host ? '방장' : '참가자'})`);
-
+        RD('04', `✅ SFU 초기화 완료`);
       } catch (e) {
         RDE('04', '❌ SFU 초기화 실패:', e.message);
         sfuInitializedRef.current = false;
@@ -683,7 +650,7 @@ function VideoMeetingRoom() {
     initSFUForUser();
   }, [
     room?.is_host,
-    room?.participant_status, // FIX-2: 참가자 status 변경 감지
+    room?.participant_status,
     user,
     wsReady,
     localStreamReady,
@@ -693,23 +660,20 @@ function VideoMeetingRoom() {
   ]);
 
   // ── 승인 대기 폴링 ─────────────────────────────────────────
-  // 폴링 간격을 3000ms → 1500ms로 단축하여 승인 감지 지연 최소화
   useEffect(() => {
     if (!room || !user) return;
     if (room.is_host || room.participant_status !== 'pending') return;
 
     let pollCount = 0;
-    const maxPolls = 120; // 1500ms × 120 = 3분
+    const maxPolls = 120;
 
     const pollInterval = setInterval(async () => {
       pollCount++;
       try {
         const updated = await fetchRoomDetails();
         if (updated?.participant_status === 'approved') {
-          RD('04', '✅ 폴링으로 승인 감지 — clearInterval');
+          RD('04', '✅ 폴링으로 승인 감지');
           clearInterval(pollInterval);
-          // fetchRoomDetails()가 room state를 업데이트하므로
-          // FIX-2 useEffect가 자동으로 트리거됨
         }
         if (updated?.participant_status === 'rejected') {
           clearInterval(pollInterval);
@@ -720,10 +684,10 @@ function VideoMeetingRoom() {
           clearInterval(pollInterval);
           const retry = window.confirm('승인 대기 시간 초과.\n\n계속 대기하시겠습니까?');
           if (!retry) navigate('/video-meetings');
-          else pollCount = 0; // 재시작
+          else pollCount = 0;
         }
       } catch (_) {}
-    }, 1500); // FIX: 3000ms → 1500ms
+    }, 1500);
 
     return () => clearInterval(pollInterval);
   }, [room?.participant_status, room?.is_host, user, fetchRoomDetails, navigate]);
@@ -731,7 +695,7 @@ function VideoMeetingRoom() {
   useEffect(() => { if (showChatPanel) setUnreadChatCount(0); }, [showChatPanel]);
 
   // ==========================================================
-  // [R-D01] allVideos 계산
+  // allVideos 계산
   // ==========================================================
   const allVideos = (() => {
     const local = {
@@ -759,25 +723,10 @@ function VideoMeetingRoom() {
 
     const all = [local, ...remote].filter(v => v.stream || v.isLocal);
 
-    // [R-D01] 진단 로그
-    RD('01', `allVideos 재계산 — total=${all.length} (local=1 remote=${remote.length})`,
-      all.map(v => ({
-        peerId:     v.peerId,
-        username:   v.username,
-        isLocal:    v.isLocal,
-        hasStream:  !!v.stream,
-        trackCount: v.stream?.getTracks().length ?? 0,
-        tracks:     v.stream?.getTracks().map(t => `${t.kind}:${t.readyState}`) ?? [],
-        isVideoOff: v.isVideoOff,
-        isMuted:    v.isMuted,
-      }))
-    );
+    RD('01', `allVideos 재계산 — total=${all.length}`);
 
     if (remote.length === 0 && remoteStreams.size === 0) {
-      RDW('01', `remoteStreams 비어있음 — 상대방 영상 없음. consumeProducer가 아직 성공하지 않았거나 실패함.`);
-    }
-    if (remote.some(v => !v.stream)) {
-      RDW('01', `stream=null인 remote 항목 존재 — filter에 의해 제외됨`);
+      RDW('01', `remoteStreams 비어있음`);
     }
 
     return all;
@@ -820,32 +769,35 @@ function VideoMeetingRoom() {
     );
   }
 
+  const isDev = process.env.NODE_ENV === 'development';
+
   return (
     <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
 
-      <div className="flex-shrink-0">
-        <RoomHeader
-          title={room.title}
-          participantCount={allVideos.length}
-          connectionStatus={connectionStatus}
-          isHost={room.is_host}
-          pendingCount={pendingRequests.length}
-          onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
-        />
-      </div>
+      {/* ── 통합 헤더 (방이름 + 참가자수 + 뷰선택 + 벨 + 진단바) ── */}
+      <RoomHeader
+        title={room.title}
+        participantCount={allVideos.length}
+        connectionStatus={connectionStatus}
+        isHost={room.is_host}
+        pendingCount={pendingRequests.length}
+        onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
+        layout={layout}
+        onLayoutChange={handleLayoutChange}
+        // 진단 상태 (개발 모드에서만 표시)
+        showDiag={isDev}
+        wsConnected={wsConnected}
+        wsReady={wsReady}
+        localStreamReady={localStreamReady}
+        sfuStatus={connectionStatus}
+        remoteCount={remoteStreams.size}
+        videoCardsCount={allVideos.length}
+        sfuInitialized={sfuInitializedRef.current}
+        isHostRole={room.is_host}
+        participantStatus={room.participant_status}
+      />
 
-      {/* 진단 상태 바 */}
-      <div className="flex-shrink-0 bg-gray-800 text-xs text-gray-300 px-4 py-1.5 flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-700">
-        <span>WS: <b className={wsConnected ? 'text-green-400' : 'text-red-400'}>{wsConnected ? '연결' : '끊김'}</b></span>
-        <span>Ready: <b className={wsReady ? 'text-green-400' : 'text-yellow-400'}>{wsReady ? '준비' : '대기'}</b></span>
-        <span>Media: <b className={localStreamReady ? 'text-green-400' : 'text-red-400'}>{localStreamReady ? 'OK' : '없음'}</b></span>
-        <span>SFU: <b className={connectionStatus === 'connected' ? 'text-green-400' : connectionStatus === 'failed' ? 'text-red-400' : 'text-yellow-400'}>{connectionStatus}</b></span>
-        <span>상대방: <b className={remoteStreams.size > 0 ? 'text-green-400' : 'text-red-400'}>{remoteStreams.size}명</b></span>
-        <span>VideoCards: <b className="text-white">{allVideos.length}</b></span>
-        <span>SFU Init: <b className="text-gray-400">{sfuInitializedRef.current ? '완료' : '대기'}</b></span>
-        <span>Role: <b className="text-blue-400">{room.is_host ? '방장' : `참가자(${room.participant_status})`}</b></span>
-      </div>
-
+      {/* ── 참가 대기 패널 (컴팩트) ── */}
       {room.is_host && showPendingPanel && (
         <div className="flex-shrink-0">
           <PendingRequestsPanel
@@ -857,7 +809,7 @@ function VideoMeetingRoom() {
         </div>
       )}
 
-      {/* 비디오 그리드 */}
+      {/* ── 비디오 그리드 (최대 공간 확보) ── */}
       <div className="flex-1 min-h-0">
         <VideoGrid
           videos={allVideos}
@@ -874,37 +826,22 @@ function VideoMeetingRoom() {
 
       <IOSPlayButton show={showIOSPlayButton} onPlay={handleIOSPlay} />
 
-      {/* 하단 컨트롤 바 */}
-      <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3">
-        <div className="flex justify-between items-center gap-2">
-          {/* 좌측: 레이아웃 전환 버튼 */}
-          <div className="flex items-center">
-            {allVideos.length >= 3 && (
-              <LayoutToggleButton
-                layout={layout}
-                onToggle={handleToggleLayout}
-                isMobile={isMobileView}
-              />
-            )}
-          </div>
+      {/* ── 하단 컨트롤 바 (최소 높이) ── */}
+      <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2">
+        <div className="flex justify-center items-center gap-2 md:gap-4">
+          <ControlBar
+            isMicOn={isMicOn}
+            isVideoOn={isVideoOn}
+            onToggleMic={handleToggleMic}
+            onToggleVideo={handleToggleVideo}
+            onLeave={handleLeave}
+          />
 
-          {/* 가운데: 미디어 컨트롤 */}
-          <div className="flex items-center gap-2 md:gap-4">
-            <ControlBar
-              isMicOn={isMicOn}
-              isVideoOn={isVideoOn}
-              onToggleMic={handleToggleMic}
-              onToggleVideo={handleToggleVideo}
-              onLeave={handleLeave}
-            />
-          </div>
+          <div className="h-6 w-px bg-gray-600" />
 
-          {/* 우측: 채팅/반응/손들기 */}
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <ChatToggleButton onClick={() => setShowChatPanel(!showChatPanel)} unreadCount={unreadChatCount} />
-            <ReactionsButton onSendReaction={handleSendReaction} />
-            <RaiseHandButton isHandRaised={isHandRaised} onRaise={handleRaiseHand} onLower={handleLowerHand} />
-          </div>
+          <ChatToggleButton onClick={() => setShowChatPanel(!showChatPanel)} unreadCount={unreadChatCount} />
+          <ReactionsButton onSendReaction={handleSendReaction} />
+          <RaiseHandButton isHandRaised={isHandRaised} onRaise={handleRaiseHand} onLower={handleLowerHand} />
         </div>
       </div>
 

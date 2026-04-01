@@ -1,20 +1,18 @@
 // frontend/src/components/VideoMeeting/VideoGrid.jsx
 //
-// ▣ Speaker View  — 활성 발언자(또는 고정 참가자)를 메인으로,
-//                   나머지 참가자는 우측(PC) / 하단(모바일) 스트립으로 표시.
-//                   Zoom Speaker View와 동일한 방식.
-//
-// ▣ Gallery View  — 모든 참가자를 균등 그리드로 표시.
-//                   Zoom Gallery View와 동일한 방식.
+// ▣ Speaker View       — 활성 발언자를 메인으로, 나머지는 우측(PC)/하단(모바일) 스트립
+// ▣ Gallery View       — 모든 참가자 균등 그리드 (Zoom Gallery View)
+// ▣ Dynamic Gallery    — 활성 발언자가 자동으로 확대 (Zoom Dynamic Gallery View)
+//                        발언자 셀이 2배 크기, 나머지는 균등 배분
 //
 // ▣ 반응형 동작
-//   - PC: Speaker = 우측 세로 스트립 | Gallery = N×M 그리드
-//   - 모바일 세로: Speaker = 하단 가로 스크롤 스트립 | Gallery = 2열 그리드
-//   - 모바일 가로: Speaker = 좌측 세로 스트립 | Gallery = 3열 그리드
+//   - PC: Speaker = 우측 세로 스트립 | Gallery/Dynamic = N×M 그리드
+//   - 모바일 세로: Speaker = 하단 가로 스크롤 | Gallery = 2열 | Dynamic = 2열 확대
+//   - 모바일 가로: Speaker = 좌측 세로 스트립 | Gallery = 3열 | Dynamic = 3열 확대
 //
 // Props:
 //   videos        — VideoMeetingRoom에서 전달되는 참가자 배열
-//   layout        — 'speaker' | 'gallery'
+//   layout        — 'speaker' | 'gallery' | 'dynamic'
 //   HandRaisedBadge, mainSpeakerId, pinnedPeerId,
 //   volumeLevels, isSpeaking, onPin, onUnpin
 
@@ -181,7 +179,7 @@ export function VideoGrid({
   }
 
   // ══════════════════════════════════════════════════════════
-  // 3인+: Gallery View
+  // 3인+: Gallery View — 균등 그리드
   // ══════════════════════════════════════════════════════════
   if (layout === 'gallery') {
     // 열 수 결정
@@ -218,7 +216,163 @@ export function VideoGrid({
   }
 
   // ══════════════════════════════════════════════════════════
-  // 3인+: Speaker View
+  // 3인+: Dynamic Gallery View
+  // Zoom Dynamic Gallery: 활성 발언자가 자동으로 강조(크게),
+  // 나머지는 하단 또는 우측 스트립으로 표시.
+  // PC: 발언자 메인 + 우측 썸네일 스트립 (Speaker View와 유사하지만
+  //     발언자가 자동 교체되고 썸네일이 더 크게 표시됨)
+  // 모바일: 발언자 메인 + 하단 스트립
+  // ══════════════════════════════════════════════════════════
+  if (layout === 'dynamic') {
+    const dynamicThumbW = isMobile ? 100 : 176;
+    const dynamicThumbH = isMobile ? 78  : 132;
+
+    // ── 모바일 가로: 좌측 세로 스트립 ──────────────────────────
+    if (isMobile && isLandscape) {
+      return (
+        <div ref={containerRef} className="w-full h-full bg-gray-900 flex overflow-hidden">
+          <div
+            className="flex flex-col gap-1.5 overflow-y-auto bg-gray-950 py-1.5 px-1 shrink-0 thumbnail-strip-scroll border-r border-gray-800"
+            style={{ width: `${dynamicThumbW + 8}px` }}
+          >
+            {videos.map(video => (
+              <DynamicThumbnailCard
+                key={video.peerId}
+                video={video}
+                isActive={video.peerId === (pinnedPeerId || mainSpeakerId)}
+                isPinned={pinnedPeerId === video.peerId}
+                isSpeaking={isSpeaking(video.peerId)}
+                volume={volumeLevels.get(video.peerId) ?? 0}
+                HandRaisedBadge={HandRaisedBadge}
+                width={dynamicThumbW}
+                height={dynamicThumbH}
+                onClick={() => handlePinToggle(video.peerId)}
+                {...evts(video.peerId)}
+              />
+            ))}
+          </div>
+          <div className="flex-1 min-w-0 relative overflow-hidden">
+            {mainVideo && (
+              <FullscreenCard
+                video={mainVideo}
+                HandRaisedBadge={HandRaisedBadge}
+                isSpeaking={isSpeaking(mainVideo.peerId)}
+                volume={volumeLevels.get(mainVideo.peerId) ?? 0}
+                isPinned={pinnedPeerId === mainVideo.peerId}
+                showSpeakerLabel
+                isDynamic
+                {...evts(mainVideo.peerId)}
+              />
+            )}
+          </div>
+          <ContextMenuOverlay menu={contextMenu} pinnedPeerId={pinnedPeerId} onPinToggle={handlePinToggle} onClose={() => setContextMenu(null)} />
+        </div>
+      );
+    }
+
+    // ── PC: 메인 + 우측 세로 스트립 (더 넓은 썸네일) ───────────
+    if (!isMobile) {
+      return (
+        <div ref={containerRef} className="w-full h-full bg-gray-900 flex overflow-hidden">
+          <div className="flex-1 min-w-0 relative overflow-hidden">
+            {mainVideo && (
+              <FullscreenCard
+                video={mainVideo}
+                HandRaisedBadge={HandRaisedBadge}
+                isSpeaking={isSpeaking(mainVideo.peerId)}
+                volume={volumeLevels.get(mainVideo.peerId) ?? 0}
+                isPinned={pinnedPeerId === mainVideo.peerId}
+                showSpeakerLabel
+                isDynamic
+                {...evts(mainVideo.peerId)}
+              />
+            )}
+            {/* Dynamic 표시기 */}
+            <div className="absolute top-2 left-2 flex items-center gap-1 bg-purple-900/70 backdrop-blur-sm rounded-full px-2 py-0.5 pointer-events-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+              <span className="text-purple-200 text-[10px] font-medium">자동 발언자 추적</span>
+            </div>
+            {pinnedPeerId && (
+              <div className="absolute top-2 left-36 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 pointer-events-none">
+                <Pin className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="text-xs text-yellow-300 font-medium">고정됨</span>
+              </div>
+            )}
+          </div>
+          {/* 우측 썸네일 스트립 */}
+          <div
+            className="flex flex-col gap-2 overflow-y-auto bg-gray-950 py-2 px-1.5 shrink-0 border-l border-gray-800 thumbnail-strip-scroll"
+            style={{ width: `${dynamicThumbW + 12}px` }}
+          >
+            {videos.map(video => (
+              <DynamicThumbnailCard
+                key={video.peerId}
+                video={video}
+                isActive={video.peerId === (pinnedPeerId || mainSpeakerId)}
+                isPinned={pinnedPeerId === video.peerId}
+                isSpeaking={isSpeaking(video.peerId)}
+                volume={volumeLevels.get(video.peerId) ?? 0}
+                HandRaisedBadge={HandRaisedBadge}
+                width={dynamicThumbW}
+                height={dynamicThumbH}
+                onClick={() => handlePinToggle(video.peerId)}
+                {...evts(video.peerId)}
+              />
+            ))}
+          </div>
+          <ContextMenuOverlay menu={contextMenu} pinnedPeerId={pinnedPeerId} onPinToggle={handlePinToggle} onClose={() => setContextMenu(null)} />
+        </div>
+      );
+    }
+
+    // ── 모바일 세로: 메인(위) + 하단 가로 스크롤 스트립 ──────────
+    return (
+      <div ref={containerRef} className="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          {mainVideo && (
+            <FullscreenCard
+              video={mainVideo}
+              HandRaisedBadge={HandRaisedBadge}
+              isSpeaking={isSpeaking(mainVideo.peerId)}
+              volume={volumeLevels.get(mainVideo.peerId) ?? 0}
+              isPinned={pinnedPeerId === mainVideo.peerId}
+              showSpeakerLabel
+              isDynamic
+              {...evts(mainVideo.peerId)}
+            />
+          )}
+          <div className="absolute top-1.5 left-2 flex items-center gap-1 bg-purple-900/70 backdrop-blur-sm rounded-full px-2 py-0.5 pointer-events-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            <span className="text-purple-200 text-[10px] font-medium">자동 추적</span>
+          </div>
+        </div>
+        <div
+          className="bg-gray-950 border-t border-gray-800 flex items-center gap-1.5 px-1.5 overflow-x-auto shrink-0 thumbnail-strip-scroll"
+          style={{ height: `${dynamicThumbH + 12}px` }}
+        >
+          {videos.map(video => (
+            <DynamicThumbnailCard
+              key={video.peerId}
+              video={video}
+              isActive={video.peerId === (pinnedPeerId || mainSpeakerId)}
+              isPinned={pinnedPeerId === video.peerId}
+              isSpeaking={isSpeaking(video.peerId)}
+              volume={volumeLevels.get(video.peerId) ?? 0}
+              HandRaisedBadge={HandRaisedBadge}
+              width={dynamicThumbW}
+              height={dynamicThumbH}
+              onClick={() => handlePinToggle(video.peerId)}
+              {...evts(video.peerId)}
+            />
+          ))}
+        </div>
+        <ContextMenuOverlay menu={contextMenu} pinnedPeerId={pinnedPeerId} onPinToggle={handlePinToggle} onClose={() => setContextMenu(null)} />
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // 3인+: Speaker View (기존 코드 유지)
   // ══════════════════════════════════════════════════════════
 
   // ── 모바일 가로: 좌측 세로 스트립 ──────────────────────────
@@ -265,12 +419,8 @@ export function VideoGrid({
     );
   }
 
-  // ── PC 기본 / 모바일 세로: Speaker View ─────────────────────
-  // PC: 우측 세로 스트립 (Zoom PC와 동일)
-  // 모바일 세로: 하단 가로 스크롤 스트립 (Zoom 모바일과 동일)
-
+  // ── PC 기본: 메인(왼쪽) + 우측 세로 스트립 ────────────────────
   if (!isMobile) {
-    // ── PC: 메인(왼쪽) + 우측 세로 스트립 ────────────────────
     return (
       <div ref={containerRef} className="w-full h-full bg-gray-900 flex overflow-hidden">
         {/* 메인 뷰 */}
@@ -374,7 +524,8 @@ export function VideoGrid({
 // ══════════════════════════════════════════════════════════════
 function FullscreenCard({
   video, HandRaisedBadge, isSpeaking, volume, isPinned,
-  showSpeakerLabel = false, onContextMenu, onTouchStart, onTouchEnd,
+  showSpeakerLabel = false, isDynamic = false,
+  onContextMenu, onTouchStart, onTouchEnd,
 }) {
   return (
     <div
@@ -547,6 +698,82 @@ function ThumbnailCard({
       )}
       {isSpeaking && (
         <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-green-400 rounded-lg" />
+      )}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 py-1">
+        <div className="flex items-center gap-1">
+          {video.isMuted
+            ? <MicOff className="w-2.5 h-2.5 text-red-400 shrink-0" />
+            : isSpeaking
+              ? <Volume2 className="w-2.5 h-2.5 text-green-400 shrink-0" />
+              : <Mic className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+          }
+          <span className="text-white text-[10px] font-medium truncate">
+            {video.username}
+          </span>
+          {isPinned && <Pin className="w-2 h-2 text-yellow-400 shrink-0" />}
+        </div>
+      </div>
+      {video.isHandRaised && HandRaisedBadge && (
+        <div className="absolute top-1 right-1 scale-75">
+          <HandRaisedBadge />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// DynamicThumbnailCard — Dynamic Gallery View 스트립 카드
+// Speaker View의 ThumbnailCard와 유사하지만 조금 더 크고
+// 활성 발언자 표시가 더 강조됨
+// ══════════════════════════════════════════════════════════════
+function DynamicThumbnailCard({
+  video, isActive, isPinned, isSpeaking, volume, HandRaisedBadge,
+  width, height, onClick, onContextMenu, onTouchStart, onTouchEnd,
+}) {
+  return (
+    <div
+      className={`
+        relative rounded-lg overflow-hidden cursor-pointer shrink-0
+        transition-all duration-300
+        ${isActive
+          ? 'ring-2 ring-purple-400 shadow-lg shadow-purple-500/30 scale-[1.02]'
+          : isSpeaking
+          ? 'ring-2 ring-green-400'
+          : 'ring-1 ring-gray-700 hover:ring-gray-500'
+        }
+      `}
+      style={{ width: `${width}px`, height: `${height}px` }}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <VideoElement
+        ref={video.ref}
+        stream={video.stream}
+        isLocal={video.isLocal}
+        isVideoOff={video.isVideoOff}
+      />
+      {video.isVideoOff && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+          <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
+            <span className="text-white text-sm font-bold">
+              {video.username?.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        </div>
+      )}
+      {isSpeaking && (
+        <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-green-400 rounded-lg speaking-ring" />
+      )}
+      {/* 활성 발언자 표시 */}
+      {isActive && (
+        <div className="absolute top-1 left-1 flex items-center gap-0.5 bg-purple-700/80 rounded-full px-1.5 py-0.5">
+          <span className="w-1 h-1 rounded-full bg-purple-300 animate-pulse" />
+          <span className="text-purple-100 text-[9px] font-medium">발언중</span>
+        </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 py-1">
         <div className="flex items-center gap-1">
