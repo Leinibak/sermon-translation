@@ -26,6 +26,8 @@ import { ReactionsButton, ReactionsOverlay } from './VideoMeeting/ReactionsPanel
 import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton';
 import { IOSPlayButton }        from './VideoMeeting/IOSPlayButton';
 import { useActiveSpeaker } from '../hooks/useActiveSpeaker';
+import { useBackgroundProcessor } from '../hooks/useBackgroundProcessor';
+import { BackgroundSelector }   from './VideoMeeting/BackgroundSelector'; 
 
 // ── 진단 로거 ─────────────────────────────────────────────────
 const RD  = (tag, ...args) => { const ts = new Date().toISOString().slice(11,23); console.log(`%c[R-D${tag}] ${ts}`,'color:#8bc34a;font-weight:bold',...args); };
@@ -111,13 +113,27 @@ function VideoMeetingRoom() {
   const localVideoRef     = useRef(null);
   const initializationRef = useRef(false);
 
+const {
+  localStreamRef, remoteStreams, connectionStatus,
+  getLocalMedia, initSFU, startProducing,
+  muteAudio, unmuteAudio, muteVideo, unmuteVideo,
+  handleSFUMessage, dispatchSFUMessage,
+  producersRef,
+  cleanup: cleanupWebRTC,
+} = useSFU({ wsRef, roomId });
+ 
+  // ── 배경 효과 훅 ──────────────────────────────────────────
   const {
-    localStreamRef, remoteStreams, connectionStatus,
-    getLocalMedia, initSFU, startProducing,
-    muteAudio, unmuteAudio, muteVideo, unmuteVideo,
-    handleSFUMessage, dispatchSFUMessage,
-    cleanup: cleanupWebRTC,
-  } = useSFU({ wsRef, roomId });
+    backgroundMode,
+    backgroundImage,
+    setBackground,
+    setBackgroundImage,
+    cleanup: cleanupBackground,
+  } = useBackgroundProcessor({ localStreamRef, producersRef });
+  
+  // 배경 선택 패널 표시 상태
+  const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
+  
 
   const {
     mainSpeakerId, pinnedPeerId, volumeLevels,
@@ -503,7 +519,7 @@ function VideoMeetingRoom() {
     } else {
       try { await leaveRoom(); } catch (_) {}
     }
-
+    await cleanupBackground(); 
     cleanupWebRTC();
     if (wsRef.current) {
       wsRef.current.close(1000, 'User left');
@@ -558,6 +574,7 @@ function VideoMeetingRoom() {
     fetchRoomDetails().catch(() => {});
 
     return () => {
+      cleanupBackground();
       cleanupWebRTC();
       if (wsRef.current) {
         wsRef.current.close(1000, 'Component unmounting');
@@ -836,13 +853,33 @@ function VideoMeetingRoom() {
       {/* ── 하단 컨트롤 바 (최소 높이) ── */}
       <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2">
         <div className="flex justify-center items-center gap-2 md:gap-4">
-          <ControlBar
-            isMicOn={isMicOn}
-            isVideoOn={isVideoOn}
-            onToggleMic={handleToggleMic}
-            onToggleVideo={handleToggleVideo}
-            onLeave={handleLeave}
-          />
+          <div className="relative">
+            <ControlBar
+              isMicOn={isMicOn}
+              isVideoOn={isVideoOn}
+              onToggleMic={handleToggleMic}
+              onToggleVideo={handleToggleVideo}
+              onLeave={handleLeave}
+              backgroundMode={backgroundMode}
+              onToggleBackground={() => setShowBackgroundPanel(prev => !prev)}
+            />
+          
+            {/* 배경 선택 패널 */}
+            <BackgroundSelector
+              isOpen={showBackgroundPanel}
+              backgroundMode={backgroundMode}
+              backgroundImage={backgroundImage}
+              onSetBackground={async (mode) => {
+                await setBackground(mode);
+                if (mode === 'none') setShowBackgroundPanel(false);
+              }}
+              onSetBackgroundImage={async (dataUrl) => {
+                await setBackgroundImage(dataUrl);
+                setShowBackgroundPanel(false);
+              }}
+              onClose={() => setShowBackgroundPanel(false)}
+            />
+          </div>
 
           <div className="h-6 w-px bg-gray-600" />
 
