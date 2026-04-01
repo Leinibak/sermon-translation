@@ -828,17 +828,19 @@ function VideoMeetingRoom() {
   return (
     <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
 
-      <RoomHeader
-        title={room.title}
-        participantCount={allVideos.length}
-        connectionStatus={connectionStatus}
-        isHost={room.is_host}
-        pendingCount={pendingRequests.length}
-        onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
-      />
+      <div className="flex-shrink-0">
+        <RoomHeader
+          title={room.title}
+          participantCount={allVideos.length}
+          connectionStatus={connectionStatus}
+          isHost={room.is_host}
+          pendingCount={pendingRequests.length}
+          onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
+        />
+      </div>
 
       {/* 진단 상태 바 */}
-      <div className="bg-gray-800 text-xs text-gray-300 px-4 py-1.5 flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-700">
+      <div className="flex-shrink-0 bg-gray-800 text-xs text-gray-300 px-4 py-1.5 flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-700">
         <span>WS: <b className={wsConnected ? 'text-green-400' : 'text-red-400'}>{wsConnected ? '연결' : '끊김'}</b></span>
         <span>Ready: <b className={wsReady ? 'text-green-400' : 'text-yellow-400'}>{wsReady ? '준비' : '대기'}</b></span>
         <span>Media: <b className={localStreamReady ? 'text-green-400' : 'text-red-400'}>{localStreamReady ? 'OK' : '없음'}</b></span>
@@ -853,15 +855,17 @@ function VideoMeetingRoom() {
       </div>
 
       {room.is_host && showPendingPanel && (
-        <PendingRequestsPanel
-          requests={pendingRequests}
-          onApprove={approveParticipant}
-          onReject={rejectParticipant}
-          onClose={() => setShowPendingPanel(false)}
-        />
+        <div className="flex-shrink-0">
+          <PendingRequestsPanel
+            requests={pendingRequests}
+            onApprove={approveParticipant}
+            onReject={rejectParticipant}
+            onClose={() => setShowPendingPanel(false)}
+          />
+        </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0">
         <VideoGrid
           videos={allVideos}
           HandRaisedBadge={HandRaisedBadge}
@@ -873,6 +877,7 @@ function VideoMeetingRoom() {
           onUnpin={unpinPeer}
         />
       </div>
+
       <IOSPlayButton show={showIOSPlayButton} onPlay={handleIOSPlay} />
 
       <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2 md:py-3 flex justify-center items-center gap-2 md:gap-4">
