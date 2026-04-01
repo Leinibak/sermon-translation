@@ -1,8 +1,35 @@
 /* frontend/src/styles/videoMeeting.css */
 
 /* ============================================================================
-   반응 애니메이션
+   반응 애니메이션 — Zoom 스타일 (수직 상승, 좌우 흔들림 없음)
    ============================================================================ */
+ 
+@keyframes reaction-float-up {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(-20px) scale(1.15);
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(-60px) scale(1.0);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-160px) scale(0.95);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-220px) scale(0.85);
+    opacity: 0;
+  }
+}
+ 
+.reaction-float-up {
+  animation: reaction-float-up 3.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
 
 @keyframes float-up {
   0% {
@@ -28,150 +55,99 @@
 /* ============================================================================
    팝오버 스케일 애니메이션
    ============================================================================ */
-
+ 
 @keyframes scale-in {
-  0% {
-    transform: scale(0.8) translateY(10px);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-  }
+  0%   { transform: scale(0.8) translateY(10px); opacity: 0; }
+  100% { transform: scale(1)   translateY(0);    opacity: 1; }
 }
-
+ 
 .animate-scale-in {
-  animation: scale-in 0.2s ease-out;
+  animation: scale-in 0.18s ease-out;
 }
 
 
 /* ============================================================================
    터치 최적화
    ============================================================================ */
-
+ 
 .touch-manipulation {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-
+ 
 /* ============================================================================
-   손들기 애니메이션 (바운스)
+   손들기 애니메이션
    ============================================================================ */
-
+ 
 @keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
 }
-
+ 
 .animate-bounce {
   animation: bounce 1s ease-in-out infinite;
 }
 
-/* ============================================================================
-   펄스 효과 (연결 상태 표시)
-   ============================================================================ */
 
+
+/* ============================================================================
+   펄스 / 스핀 / 페이드 / 슬라이드
+   ============================================================================ */
+ 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
 }
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* ============================================================================
-   페이드 인 효과
-   ============================================================================ */
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-in;
-}
-
-/* ============================================================================
-   슬라이드 업 효과
-   ============================================================================ */
-
-@keyframes slide-up {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out;
-}
-
-/* ============================================================================
-   스피너 (로딩)
-   ============================================================================ */
-
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+ 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
+.animate-spin { animation: spin 1s linear infinite; }
+ 
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-in; }
+ 
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
 
 /* ============================================================================
-   비디오 카드 호버 효과
+   비디오 카드 호버
    ============================================================================ */
-
-.video-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+ 
+.video-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.video-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+ 
+@media (prefers-color-scheme: dark) {
+  .video-card { background-color: rgba(31,41,55,0.9); }
+  .video-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
 }
+ 
 
-.video-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* ============================================================================
-   채팅 메시지 애니메이션
+/*  ============================================================================
+   채팅 메시지 / 알림 배지
    ============================================================================ */
-
+ 
 @keyframes slide-in-right {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
-
-.chat-message-enter {
-  animation: slide-in-right 0.3s ease-out;
+.chat-message-enter { animation: slide-in-right 0.3s ease-out; }
+ 
+@keyframes notification-pop {
+  0%   { transform: scale(0); }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
+.notification-badge { animation: notification-pop 0.3s ease-out; }
 
 /* ============================================================================
    알림 배지 애니메이션
@@ -194,32 +170,29 @@
 }
 
 /* ============================================================================
-   웨이브 효과 (마이크 활성 표시)
+   마이크 웨이브
    ============================================================================ */
-
+ 
 @keyframes wave {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.1); }
 }
-
-.mic-active {
-  animation: wave 0.5s ease-in-out infinite;
-}
+.mic-active { animation: wave 0.5s ease-in-out infinite; }
+ 
 
 /* ============================================================================
-   반응형 그리드 조정
+   반응형 그리드 (모바일)
    ============================================================================ */
-
+ 
 @media (max-width: 768px) {
-  .animate-float-up {
-    animation: float-up 2.5s ease-out forwards;
+  .reaction-float-up { animation-duration: 3s; }
+  .animate-float-up  { animation: float-up 2.5s ease-out forwards; }
+ 
+  button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
-
 
 /* ============================================================================
    슬라이드 업 효과 (모바일 채팅창용)
@@ -277,54 +250,48 @@
    팝오버 z-index 계층 구조
    ============================================================================ */
 
-/* 기본 컨텐츠: z-10 */
-/* 비디오 그리드: z-20 */
-/* 반응 오버레이: z-30 */
-/* 팝오버 배경: z-40 */
-/* 팝오버: z-50 */
-/* 모달: z-60 */
 /* ============================================================================
-   videoMeeting.css — Active Speaker View 추가분
-   기존 파일 하단에 append
+   발언자 테두리 점멸
    ============================================================================ */
-
-/* ── 발언자 테두리 점멸 ─────────────────────────────────────── */
+ 
 @keyframes speaking-ring-pulse {
-  0%, 100% { opacity: 1;   box-shadow: inset 0 0 0 3px rgba(74, 222, 128, 0.9); }
-  50%       { opacity: 0.7; box-shadow: inset 0 0 0 3px rgba(74, 222, 128, 0.4); }
+  0%, 100% { opacity: 1;   box-shadow: inset 0 0 0 3px rgba(74,222,128,0.9); }
+  50%       { opacity: 0.7; box-shadow: inset 0 0 0 3px rgba(74,222,128,0.4); }
 }
-
-.speaking-ring {
-  animation: speaking-ring-pulse 1.2s ease-in-out infinite;
-}
-
+.speaking-ring { animation: speaking-ring-pulse 1.2s ease-in-out infinite; }
+ 
 @media (prefers-reduced-motion: reduce) {
   .speaking-ring { animation: none; }
+  .reaction-float-up { animation: none; }
 }
+ 
 
-/* ── 볼륨 바 애니메이션 ─────────────────────────────────────── */
+/* ============================================================================
+   볼륨 바 애니메이션
+   ============================================================================ */
+ 
 @keyframes speaking-bar-bounce {
   0%, 100% { transform: scaleY(0.4); }
   50%       { transform: scaleY(1.0); }
 }
-
 .speaking-bar {
   transform-origin: bottom;
   animation: speaking-bar-bounce 0.6s ease-in-out infinite;
 }
-
 @media (prefers-reduced-motion: reduce) {
   .speaking-bar { animation: none; transform: scaleY(0.7); }
 }
 
-/* ── 썸네일 스트립 스크롤바 숨김 (모바일) ─────────────────────── */
-.thumbnail-strip-scroll::-webkit-scrollbar {
-  display: none;
-}
+/* ============================================================================
+   썸네일 스트립 스크롤바 숨김
+   ============================================================================ */
+ 
+.thumbnail-strip-scroll::-webkit-scrollbar { display: none; }
 .thumbnail-strip-scroll {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 
 /* ── 썸네일 카드 active 상태 전환 ──────────────────────────────── */
 @keyframes thumbnail-active-in {
@@ -332,39 +299,88 @@
   to   { box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.8); }
 }
 
-/* ── PiP 드래그 가능 힌트 ──────────────────────────────────────── */
-.pip-card {
-  cursor: move;
-  user-select: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.pip-card:active {
-  transform: scale(0.97);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-}
+/* ============================================================================
+   PiP 카드
+   ============================================================================ */
+ 
+.pip-card { cursor: move; user-select: none; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.pip-card:active { transform: scale(0.97); box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+ 
 
-/* ── 고정 배지 ─────────────────────────────────────────────────── */
+/* ============================================================================
+   고정 배지 (핀)
+   ============================================================================ */
+ 
 .pin-badge {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 
-/* ── 컨텍스트 메뉴 진입 애니메이션 ─────────────────────────────── */
+/* ============================================================================
+   컨텍스트 메뉴
+   ============================================================================ */
+ 
 @keyframes context-menu-in {
   from { opacity: 0; transform: scale(0.92) translateY(-4px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
 
-/* ── 모바일 세로 썸네일 스트립 ─────────────────────────────────── */
+/* ============================================================================
+   썸네일 스트립 높이 (반응형)
+   ============================================================================ */
+ 
 @media (max-width: 767px) and (orientation: portrait) {
   .thumbnail-strip-h { height: 88px; }
 }
-
 @media (min-width: 768px) {
   .thumbnail-strip-h { height: 112px; }
 }
-
-/* ── 모바일 landscape 좌측 스트립 ──────────────────────────────── */
 @media (max-width: 767px) and (orientation: landscape) {
   .thumbnail-strip-v { width: 110px; }
 }
+
+/* ============================================================================
+   Gallery View 그리드 — 카드 진입 애니메이션
+   ============================================================================ */
+ 
+@keyframes gallery-card-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+ 
+.gallery-card-enter {
+  animation: gallery-card-in 0.25s ease-out;
+}
+
+
+/* ============================================================================
+   레이아웃 전환 버튼 툴팁 보조
+   ============================================================================ */
+ 
+.layout-btn-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.layout-btn-wrap:hover .layout-btn-tooltip { opacity: 1; }
+ 
+
+/* ============================================================================
+   z-index 계층 구조
+   기본 컨텐츠:   z-10
+   비디오 그리드: z-20
+   반응 오버레이: z-30
+   팝오버 배경:   z-40
+   팝오버:        z-50
+   모달:          z-60
+   ============================================================================ */

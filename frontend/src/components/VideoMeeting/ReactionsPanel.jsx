@@ -1,29 +1,43 @@
-// frontend/src/components/VideoMeeting/ReactionsPanel.jsx (수정 버전)
+// frontend/src/components/VideoMeeting/ReactionsPanel.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Smile } from 'lucide-react';
 
+// ── 이모티콘 목록 확장 (기존 6개 → 20개) ───────────────────────
 const REACTION_EMOJIS = [
   { emoji: '👍', label: '좋아요' },
   { emoji: '👏', label: '박수' },
   { emoji: '❤️', label: '하트' },
   { emoji: '😂', label: '웃음' },
   { emoji: '🎉', label: '축하' },
-  { emoji: '🤔', label: '생각중' }
+  { emoji: '🤔', label: '생각중' },
+  { emoji: '😮', label: '놀람' },
+  { emoji: '😢', label: '슬픔' },
+  { emoji: '🔥', label: '불꽃' },
+  { emoji: '👋', label: '손흔들기' },
+  { emoji: '💯', label: '100점' },
+  { emoji: '🙏', label: '감사' },
+  { emoji: '😍', label: '사랑' },
+  { emoji: '🤣', label: '빵터짐' },
+  { emoji: '👀', label: '주목' },
+  { emoji: '💪', label: '파이팅' },
+  { emoji: '✅', label: '확인' },
+  { emoji: '❌', label: '반대' },
+  { emoji: '⭐', label: '별' },
+  { emoji: '🎵', label: '음악' },
 ];
 
 /**
- * 반응 선택 패널 (팝오버) - 개선 버전
+ * 반응 선택 패널 (팝오버)
  */
 export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef }) {
   const popoverRef = useRef(null);
 
-  // 외부 클릭 감지
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (event) => {
       if (
-        popoverRef.current && 
+        popoverRef.current &&
         !popoverRef.current.contains(event.target) &&
         anchorRef.current &&
         !anchorRef.current.contains(event.target)
@@ -32,7 +46,6 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef 
       }
     };
 
-    // 약간의 지연 후 이벤트 리스너 등록 (버튼 클릭과 충돌 방지)
     setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
@@ -49,23 +62,21 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef 
   return (
     <>
       {/* 모바일용 배경 오버레이 */}
-      <div 
+      <div
         className="fixed inset-0 z-40 md:hidden"
         onClick={onClose}
       />
-      
+
       {/* 팝오버 */}
-      <div 
+      <div
         ref={popoverRef}
-        className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-3 z-50 animate-scale-in border-2 border-gray-200"
-        style={{
-          minWidth: '200px'
-        }}
+        className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 bg-gray-800 rounded-2xl shadow-2xl p-3 z-50 animate-scale-in border border-gray-600"
+        style={{ width: '264px' }}
       >
-        {/* 작은 화살표 (선택사항) */}
-        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white rotate-45 border-r-2 border-b-2 border-gray-200" />
-        
-        <div className="grid grid-cols-3 gap-2 relative z-10 bg-white rounded-lg">
+        {/* 화살표 */}
+        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gray-800 rotate-45 border-r border-b border-gray-600" />
+
+        <div className="grid grid-cols-5 gap-1.5 relative z-10">
           {REACTION_EMOJIS.map(({ emoji, label }) => (
             <button
               key={emoji}
@@ -75,7 +86,7 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef 
                 onSelectReaction(emoji);
                 onClose();
               }}
-              className="w-14 h-14 flex items-center justify-center text-3xl hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors touch-manipulation"
+              className="w-11 h-11 flex items-center justify-center text-2xl hover:bg-gray-700 active:bg-gray-600 rounded-xl transition-all duration-100 hover:scale-125 active:scale-110 touch-manipulation"
               title={label}
               type="button"
             >
@@ -89,7 +100,7 @@ export function ReactionsPopover({ isOpen, onClose, onSelectReaction, anchorRef 
 }
 
 /**
- * 반응 버튼 (ControlBar에 추가용) - 개선 버전
+ * 반응 버튼 (ControlBar에 추가용)
  */
 export function ReactionsButton({ onSendReaction }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -128,16 +139,18 @@ export function ReactionsButton({ onSendReaction }) {
 
 /**
  * 반응 애니메이션 오버레이
- * (화면 중앙에 떠오르는 이모지들)
+ * - 화면 우측 하단에서 올라오는 방식 (Zoom 스타일)
+ * - 좌우 흔들림 없이 부드럽게 수직 상승
  */
 export function ReactionsOverlay({ reactions }) {
   return (
-    <div className="fixed inset-0 pointer-events-none z-30">
+    <div className="fixed inset-0 pointer-events-none z-30 overflow-hidden">
       {reactions.map((reaction) => (
         <FloatingReaction
           key={reaction.id}
           emoji={reaction.emoji}
           username={reaction.username}
+          index={reaction.index ?? 0}
         />
       ))}
     </div>
@@ -145,28 +158,27 @@ export function ReactionsOverlay({ reactions }) {
 }
 
 /**
- * 개별 떠오르는 반응 애니메이션
+ * 개별 떠오르는 반응 — Zoom 스타일
+ * - 화면 우측 하단 고정 출발점
+ * - 순수 수직 상승 (X 이동 없음)
+ * - 각 반응은 index 기반 살짝 오프셋으로 겹침 방지
  */
-function FloatingReaction({ emoji, username }) {
-  // 랜덤 위치 생성
-  const randomX = Math.random() * 80 + 10; // 10% ~ 90%
-  const randomDelay = Math.random() * 0.3; // 0 ~ 0.3초 지연
+function FloatingReaction({ emoji, username, index }) {
+  // 우측에서 살짝 랜덤 offset (10px 이내) — 흔들리지 않도록 최소화
+  const offsetX = (index % 5) * 14; // 0, 14, 28, 42, 56 px
 
   return (
     <div
-      className="absolute animate-float-up pointer-events-none"
+      className="absolute reaction-float-up pointer-events-none flex flex-col items-center gap-1"
       style={{
-        left: `${randomX}%`,
-        bottom: '20%',
-        animationDelay: `${randomDelay}s`
+        right: `${24 + offsetX}px`,
+        bottom: '80px',
       }}
     >
-      <div className="flex flex-col items-center">
-        <span className="text-4xl md:text-5xl mb-2">{emoji}</span>
-        <span className="text-xs text-white bg-black bg-opacity-50 px-2 py-1 rounded whitespace-nowrap">
-          {username}
-        </span>
-      </div>
+      <span className="text-4xl md:text-5xl drop-shadow-lg leading-none">{emoji}</span>
+      <span className="text-[11px] text-white bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-full whitespace-nowrap font-medium">
+        {username}
+      </span>
     </div>
   );
 }
