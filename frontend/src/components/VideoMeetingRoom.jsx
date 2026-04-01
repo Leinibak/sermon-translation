@@ -772,42 +772,49 @@ function VideoMeetingRoom() {
   const isDev = process.env.NODE_ENV === 'development';
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
+    // ★ fixed + inset-0: 사이트 네비게이션 바를 완전히 덮음
+    <div className="fixed inset-0 bg-gray-900 flex flex-col" style={{ zIndex: 9000 }}>
 
-      {/* ── 통합 헤더 (방이름 + 참가자수 + 뷰선택 + 벨 + 진단바) ── */}
-      <RoomHeader
-        title={room.title}
-        participantCount={allVideos.length}
-        connectionStatus={connectionStatus}
-        isHost={room.is_host}
-        pendingCount={pendingRequests.length}
-        onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
-        layout={layout}
-        onLayoutChange={handleLayoutChange}
-        // 진단 상태 (개발 모드에서만 표시)
-        showDiag={isDev}
-        wsConnected={wsConnected}
-        wsReady={wsReady}
-        localStreamReady={localStreamReady}
-        sfuStatus={connectionStatus}
-        remoteCount={remoteStreams.size}
-        videoCardsCount={allVideos.length}
-        sfuInitialized={sfuInitializedRef.current}
-        isHostRole={room.is_host}
-        participantStatus={room.participant_status}
-      />
+      {/* ── 헤더 + 대기패널 래퍼 ── */}
+      <div className="flex-shrink-0 relative">
+        {/* 통합 헤더 (방이름 + 참가자수 + 뷰선택 + 벨 + 진단바) */}
+        <RoomHeader
+          title={room.title}
+          participantCount={allVideos.length}
+          connectionStatus={connectionStatus}
+          isHost={room.is_host}
+          pendingCount={pendingRequests.length}
+          onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+          // 진단 상태 (개발 모드에서만 표시)
+          showDiag={isDev}
+          wsConnected={wsConnected}
+          wsReady={wsReady}
+          localStreamReady={localStreamReady}
+          sfuStatus={connectionStatus}
+          remoteCount={remoteStreams.size}
+          videoCardsCount={allVideos.length}
+          sfuInitialized={sfuInitializedRef.current}
+          isHostRole={room.is_host}
+          participantStatus={room.participant_status}
+        />
 
-      {/* ── 참가 대기 패널 (컴팩트) ── */}
-      {room.is_host && showPendingPanel && (
-        <div className="flex-shrink-0">
-          <PendingRequestsPanel
-            requests={pendingRequests}
-            onApprove={approveParticipant}
-            onReject={rejectParticipant}
-            onClose={() => setShowPendingPanel(false)}
-          />
-        </div>
-      )}
+        {/* 참가 대기 패널: 헤더 바로 아래 absolute (비디오 영역 위에 float) */}
+        {room.is_host && showPendingPanel && (
+          <div
+            className="absolute left-0 right-0 shadow-2xl"
+            style={{ top: '100%', zIndex: 9100 }}
+          >
+            <PendingRequestsPanel
+              requests={pendingRequests}
+              onApprove={approveParticipant}
+              onReject={rejectParticipant}
+              onClose={() => setShowPendingPanel(false)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* ── 비디오 그리드 (최대 공간 확보) ── */}
       <div className="flex-1 min-h-0">
