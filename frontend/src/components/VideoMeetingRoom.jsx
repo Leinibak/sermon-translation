@@ -160,6 +160,7 @@ function VideoMeetingRoom() {
   } = useActiveSpeaker({
     localStreamRef,
     remoteStreams,
+    localPeerId: user?.username,
     isMicOn,
   });
 

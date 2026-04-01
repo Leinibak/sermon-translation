@@ -1,267 +1,323 @@
 // frontend/src/hooks/useActiveSpeaker.js
-/**
- * useActiveSpeaker
- *
- * Web Audio API 기반 Active Speaker 감지 훅.
- * 로컬/원격 오디오 스트림의 볼륨을 실시간 측정하여 현재 발언자를 결정한다.
- *
- * 반환값:
- *   activeSpeakerId  — 현재 발언자 peerId (null = 아무도 말 안 함)
- *   pinnedPeerId     — 수동 고정된 peerId (null = 고정 없음)
- *   volumeLevels     — Map<peerId, 0‥1> 볼륨 레벨 (UI 렌더링용)
- *   pinPeer(peerId)  — 특정 peer 고정
- *   unpinPeer()      — 고정 해제
- *   isSpeaking(pid)  — peerId가 현재 발언 중인지 boolean
- */
+//
+// [수정 내역]
+// FIX-1: 로컬 스트림 peerId → user.username 기반으로 정확히 매핑
+//        (remoteStreams의 key와 로컬 peerId가 일치하지 않는 문제 해결)
+// FIX-2: 음량 임계값 상향 (0.01 → 0.08) + 히스테리시스 적용
+//        → 잡음에 의한 깜박거림 방지
+// FIX-3: speaking 상태 변경에 debounce 적용 (켜질 때 즉시, 꺼질 때 1.5초 지연)
+//        → 말이 잠깐 끊겨도 테두리가 바로 사라지지 않음
+// FIX-4: mainSpeakerId smoothing — 주화자가 바뀌려면 연속 3회 이상 큰 소리여야 함
+//        → 주화자가 자주 바뀌는 깜박거림 방지
+// FIX-5: 로컬 스트림은 AudioContext analyser로 직접 분석
+//        원격 스트림도 각 peerId별로 analyser 생성하여 정확히 매핑
+//
+// [파라미터]
+//   localStreamRef  — useSFU의 localStreamRef
+//   remoteStreams    — useSFU의 remoteStreams (Map<peerId, {stream, username, ...}>)
+//   localPeerId      — 로컬 사용자의 peerId (user.username)
+//   isMicOn          — 마이크 상태 (꺼져 있으면 로컬 분석 skip)
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 
-// ── 상수 ──────────────────────────────────────────────────────
-const VOLUME_THRESHOLD_DB   = -50;   // dB: 이 값 이상이면 "말하는 중"으로 판단
-const SPEAKING_DEBOUNCE_MS  = 400;   // ms: 발언자 전환 최소 지속 시간
-const SILENCE_TIMEOUT_MS    = 2500;  // ms: 침묵 지속 후 activeSpeaker를 null로 초기화
-const MEASURE_INTERVAL_MS   = 80;    // ms: 볼륨 측정 주기
-const FFT_SIZE              = 512;   // AnalyserNode FFT 크기
-const LOCAL_PEER_ID         = '__local__'; // 로컬 스트림 식별자
+// ── 상수 ────────────────────────────────────────────────────
+const SPEAKING_THRESHOLD     = 0.08;   // 말하는 것으로 판단하는 최소 음량 (0~1)
+const SILENCE_THRESHOLD      = 0.04;   // 이 이하로 내려가야 침묵으로 판단 (히스테리시스)
+const SPEAKING_HOLD_MS       = 1500;   // 말이 끊겨도 speaking 유지 시간 (ms)
+const MAIN_SPEAKER_HOLD_MS   = 2000;   // 주화자 유지 최소 시간 (ms) — 너무 자주 바뀌지 않게
+const MAIN_SPEAKER_COUNT_REQ = 3;      // 주화자로 인정받으려면 연속 N회 최고 음량이어야 함
+const ANALYSIS_INTERVAL_MS   = 80;     // 음량 분석 주기 (ms) — 초당 ~12회
 
-// ── 헬퍼: AudioContext 생성 (Safari 크로스 브라우저) ────────────
-function createAudioContext() {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null;
-  try {
-    return new Ctx();
-  } catch {
-    return null;
-  }
-}
+export function useActiveSpeaker({ localStreamRef, remoteStreams, localPeerId, isMicOn }) {
+  const [mainSpeakerId, setMainSpeakerId]   = useState(null);
+  const [pinnedPeerId,  setPinnedPeerId]    = useState(null);
+  const [volumeLevels,  setVolumeLevels]    = useState(new Map());
 
-// ── 헬퍼: RMS → dB 변환 ─────────────────────────────────────
-function byteTimeDomainToDb(buffer) {
-  let sum = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    const val = (buffer[i] - 128) / 128; // -1 ~ 1
-    sum += val * val;
-  }
-  const rms = Math.sqrt(sum / buffer.length);
-  if (rms === 0) return -Infinity;
-  return 20 * Math.log10(rms);
-}
+  // ── 내부 상태 refs (렌더링 없이 관리) ──────────────────────
+  const analysersRef      = useRef(new Map()); // peerId → { analyser, source, ctx }
+  const speakingStateRef  = useRef(new Map()); // peerId → { isSpeaking, silenceTimer, rawVolume }
+  const mainSpeakerRef    = useRef({
+    currentId:    null,
+    candidateId:  null,
+    candidateCnt: 0,
+    lockedUntil:  0,       // 이 시각까지 mainSpeaker 고정
+  });
+  const intervalRef       = useRef(null);
+  const audioCtxRef       = useRef(null);
 
-// ── 헬퍼: dB → 0~1 정규화 (UI용) ───────────────────────────
-function dbToNormalized(db, minDb = -70, maxDb = -10) {
-  if (!isFinite(db)) return 0;
-  return Math.max(0, Math.min(1, (db - minDb) / (maxDb - minDb)));
-}
+  // ── AudioContext 가져오기 (싱글턴) ──────────────────────────
+  const getAudioCtx = useCallback(() => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  }, []);
 
-// ══════════════════════════════════════════════════════════════
-export function useActiveSpeaker({ localStreamRef, remoteStreams, isMicOn }) {
-  // ── State ──────────────────────────────────────────────────
-  const [activeSpeakerId, setActiveSpeakerId] = useState(null);
-  const [pinnedPeerId,    setPinnedPeerId]    = useState(null);
-  const [volumeLevels,    setVolumeLevels]    = useState(new Map());
-
-  // ── Refs (렌더 사이클과 무관한 내부 상태) ──────────────────
-  // Map<peerId, { ctx, analyser, source, buffer }>
-  const audioNodesRef        = useRef(new Map());
-  const intervalRef          = useRef(null);
-  const speakerCandidateRef  = useRef(null);   // { peerId, since }
-  const silenceTimerRef      = useRef(null);
-  const lastSpeakerRef       = useRef(null);   // 마지막으로 말한 peerId
-
-  // ── 오디오 노드 생성 ────────────────────────────────────────
-  const attachStream = useCallback((peerId, stream) => {
+  // ── analyser 등록 ────────────────────────────────────────────
+  const registerAnalyser = useCallback((peerId, stream) => {
+    if (analysersRef.current.has(peerId)) return; // 이미 등록됨
     if (!stream) return;
-    if (audioNodesRef.current.has(peerId)) return;
 
-    // 오디오 트랙이 없으면 skip
     const audioTracks = stream.getAudioTracks();
     if (audioTracks.length === 0) return;
 
-    const ctx = createAudioContext();
-    if (!ctx) return;
-
-    // iOS/Safari: suspended 상태면 resume 시도
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
     try {
+      const ctx      = getAudioCtx();
+      const source   = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = FFT_SIZE;
-      analyser.smoothingTimeConstant = 0.5;
-
-      const source = ctx.createMediaStreamSource(stream);
+      analyser.fftSize            = 256;
+      analyser.smoothingTimeConstant = 0.6;  // 0=빠름, 1=느림 — 부드럽게
       source.connect(analyser);
-      // 스피커로 연결하지 않음 (로컬 에코 방지, 원격은 별도 <video>에서 재생)
 
-      const buffer = new Uint8Array(analyser.frequencyBinCount);
+      analysersRef.current.set(peerId, { analyser, source, ctx });
 
-      audioNodesRef.current.set(peerId, { ctx, analyser, source, buffer });
-    } catch (err) {
-      console.warn(`[useActiveSpeaker] attachStream failed for ${peerId}:`, err);
-      try { ctx.close(); } catch {}
+      // speaking 상태 초기화
+      if (!speakingStateRef.current.has(peerId)) {
+        speakingStateRef.current.set(peerId, {
+          isSpeaking:  false,
+          silenceTimer: null,
+          rawVolume:    0,
+        });
+      }
+    } catch (e) {
+      console.warn(`[ActiveSpeaker] analyser 등록 실패 peerId="${peerId}":`, e.message);
     }
-  }, []);
+  }, [getAudioCtx]);
 
-  // ── 오디오 노드 해제 ────────────────────────────────────────
-  const detachStream = useCallback((peerId) => {
-    const node = audioNodesRef.current.get(peerId);
-    if (!node) return;
+  // ── analyser 해제 ────────────────────────────────────────────
+  const unregisterAnalyser = useCallback((peerId) => {
+    const entry = analysersRef.current.get(peerId);
+    if (!entry) return;
     try {
-      node.source.disconnect();
-      node.ctx.close();
-    } catch {}
-    audioNodesRef.current.delete(peerId);
+      entry.source.disconnect();
+    } catch (_) {}
+    analysersRef.current.delete(peerId);
+
+    const state = speakingStateRef.current.get(peerId);
+    if (state?.silenceTimer) clearTimeout(state.silenceTimer);
+    speakingStateRef.current.delete(peerId);
   }, []);
 
-  // ── remoteStreams 변경 감지 → 노드 생성/해제 ───────────────
-  useEffect(() => {
-    const currentPeerIds = new Set(audioNodesRef.current.keys());
-    const newPeerIds     = new Set(remoteStreams.keys());
-    newPeerIds.add(LOCAL_PEER_ID); // 로컬도 포함
+  // ── RMS 음량 계산 ─────────────────────────────────────────────
+  const getRmsVolume = useCallback((analyser) => {
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      sum += (data[i] / 255) ** 2;
+    }
+    return Math.sqrt(sum / data.length);
+  }, []);
 
-    // 새로 추가된 피어
-    for (const [peerId, streamData] of remoteStreams) {
-      if (streamData.stream && !currentPeerIds.has(peerId)) {
-        attachStream(peerId, streamData.stream);
+  // ── speaking 상태 업데이트 (히스테리시스 + debounce) ─────────
+  const updateSpeakingState = useCallback((peerId, volume) => {
+    const state = speakingStateRef.current.get(peerId);
+    if (!state) return;
+
+    state.rawVolume = volume;
+
+    if (volume >= SPEAKING_THRESHOLD) {
+      // 말하기 시작: 즉시 반영
+      if (!state.isSpeaking) {
+        state.isSpeaking = true;
+      }
+      // silence 타이머 리셋
+      if (state.silenceTimer) {
+        clearTimeout(state.silenceTimer);
+        state.silenceTimer = null;
+      }
+    } else if (volume < SILENCE_THRESHOLD && state.isSpeaking) {
+      // 침묵 감지: SPEAKING_HOLD_MS 후에 끔
+      if (!state.silenceTimer) {
+        state.silenceTimer = setTimeout(() => {
+          const s = speakingStateRef.current.get(peerId);
+          if (s) {
+            s.isSpeaking = false;
+            s.silenceTimer = null;
+          }
+        }, SPEAKING_HOLD_MS);
+      }
+    }
+  }, []);
+
+  // ── 주화자 결정 ───────────────────────────────────────────────
+  const updateMainSpeaker = useCallback((volumeMap) => {
+    const now = Date.now();
+    const ms  = mainSpeakerRef.current;
+
+    // 현재 주화자 고정 시간이 남아 있으면 변경 불가
+    if (now < ms.lockedUntil && ms.currentId) {
+      // 단, 현재 주화자가 완전히 침묵 상태이면 고정 해제
+      const curState = speakingStateRef.current.get(ms.currentId);
+      if (curState?.isSpeaking) return; // 아직 말 중 → 고정 유지
+    }
+
+    // 가장 큰 음량의 peerId 찾기 (speaking 중인 것만)
+    let maxVol   = SPEAKING_THRESHOLD;
+    let maxPeerId = null;
+
+    for (const [peerId, state] of speakingStateRef.current) {
+      if (state.isSpeaking && state.rawVolume > maxVol) {
+        maxVol   = state.rawVolume;
+        maxPeerId = peerId;
       }
     }
 
-    // 로컬 스트림 attach (마이크가 켜져 있을 때만)
-    if (localStreamRef.current && !currentPeerIds.has(LOCAL_PEER_ID)) {
-      attachStream(LOCAL_PEER_ID, localStreamRef.current);
+    if (!maxPeerId) {
+      // 아무도 말하지 않음 → 현재 주화자 유지 (고정 시간 무관)
+      return;
     }
 
-    // 퇴장한 피어 cleanup
-    for (const peerId of currentPeerIds) {
-      if (peerId === LOCAL_PEER_ID) continue;
-      if (!newPeerIds.has(peerId)) {
-        detachStream(peerId);
-        // 퇴장한 피어가 activeSpeaker였다면 초기화
-        setActiveSpeakerId(prev => prev === peerId ? null : prev);
-        setPinnedPeerId(prev => prev === peerId ? null : prev);
-      }
+    if (maxPeerId === ms.currentId) {
+      // 현재 주화자가 계속 말하는 중 → 유지
+      ms.candidateCnt = 0;
+      return;
     }
-  }, [remoteStreams, localStreamRef, attachStream, detachStream]);
 
-  // ── 볼륨 측정 루프 ──────────────────────────────────────────
-  useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    // 새 후보 평가
+    if (maxPeerId === ms.candidateId) {
+      ms.candidateCnt += 1;
+    } else {
+      ms.candidateId  = maxPeerId;
+      ms.candidateCnt = 1;
+    }
+
+    // MAIN_SPEAKER_COUNT_REQ 회 연속으로 최고 음량이어야 주화자 변경
+    if (ms.candidateCnt >= MAIN_SPEAKER_COUNT_REQ) {
+      ms.currentId    = maxPeerId;
+      ms.candidateId  = null;
+      ms.candidateCnt = 0;
+      ms.lockedUntil  = now + MAIN_SPEAKER_HOLD_MS;
+      setMainSpeakerId(maxPeerId);
+    }
+  }, []);
+
+  // ── 분석 루프 ─────────────────────────────────────────────────
+  const startAnalysisLoop = useCallback(() => {
+    if (intervalRef.current) return;
 
     intervalRef.current = setInterval(() => {
-      const nodes    = audioNodesRef.current;
-      const newLevels = new Map();
-      let loudestDb  = VOLUME_THRESHOLD_DB;
-      let loudestId  = null;
+      const newVolumes = new Map();
 
-      for (const [peerId, node] of nodes) {
-        // 로컬: 마이크 꺼져 있으면 0
-        if (peerId === LOCAL_PEER_ID && !isMicOn) {
-          newLevels.set(peerId, 0);
+      for (const [peerId, { analyser }] of analysersRef.current) {
+        // 로컬 피어: 마이크 꺼져 있으면 0
+        if (peerId === localPeerId && !isMicOn) {
+          newVolumes.set(peerId, 0);
+          updateSpeakingState(peerId, 0);
           continue;
         }
 
-        // 원격: isMuted 상태면 0
-        if (peerId !== LOCAL_PEER_ID) {
-          const streamData = remoteStreams.get(peerId);
-          if (streamData?.isMuted) {
-            newLevels.set(peerId, 0);
-            continue;
-          }
-        }
-
-        try {
-          node.analyser.getByteTimeDomainData(node.buffer);
-          const db         = byteTimeDomainToDb(node.buffer);
-          const normalized = dbToNormalized(db);
-          newLevels.set(peerId, normalized);
-
-          if (db > loudestDb) {
-            loudestDb = db;
-            loudestId = peerId;
-          }
-        } catch {
-          newLevels.set(peerId, 0);
-        }
+        const vol = getRmsVolume(analyser);
+        newVolumes.set(peerId, vol);
+        updateSpeakingState(peerId, vol);
       }
 
-      setVolumeLevels(newLevels);
+      updateMainSpeaker(newVolumes);
 
-      // ── Active Speaker 결정 로직 ──────────────────────────
-      if (loudestId) {
-        // 침묵 타이머 리셋
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
+      // speaking 상태를 volumeLevels에 반영
+      setVolumeLevels(new Map(newVolumes));
+    }, ANALYSIS_INTERVAL_MS);
+  }, [localPeerId, isMicOn, getRmsVolume, updateSpeakingState, updateMainSpeaker]);
 
-        const candidate = speakerCandidateRef.current;
+  const stopAnalysisLoop = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
-        if (!candidate || candidate.peerId !== loudestId) {
-          // 새 후보
-          speakerCandidateRef.current = { peerId: loudestId, since: Date.now() };
-        } else {
-          // 후보가 debounce 시간 이상 지속되면 activeSpeaker로 승격
-          const elapsed = Date.now() - candidate.since;
-          if (elapsed >= SPEAKING_DEBOUNCE_MS) {
-            lastSpeakerRef.current = loudestId;
-            setActiveSpeakerId(loudestId);
-          }
-        }
-      } else {
-        // 아무도 말 안 함 → 침묵 타이머 시작
-        speakerCandidateRef.current = null;
-        if (!silenceTimerRef.current) {
-          silenceTimerRef.current = setTimeout(() => {
-            setActiveSpeakerId(null);
-            silenceTimerRef.current = null;
-          }, SILENCE_TIMEOUT_MS);
-        }
-      }
-    }, MEASURE_INTERVAL_MS);
+  // ── 로컬 스트림 등록/해제 ─────────────────────────────────────
+  useEffect(() => {
+    if (!localPeerId || !localStreamRef.current) return;
+    registerAnalyser(localPeerId, localStreamRef.current);
+    startAnalysisLoop();
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      // cleanup은 unmount 시 전체 정리에서 처리
     };
-  }, [remoteStreams, isMicOn]);
+  }, [localPeerId, localStreamRef, registerAnalyser, startAnalysisLoop]);
 
-  // ── 전체 cleanup ────────────────────────────────────────────
+  // ── 원격 스트림 변경 감지 ────────────────────────────────────
+  useEffect(() => {
+    if (!remoteStreams) return;
+
+    const currentPeerIds = new Set([...remoteStreams.keys()]);
+
+    // 새로 추가된 피어 → analyser 등록
+    for (const [peerId, streamData] of remoteStreams) {
+      if (!analysersRef.current.has(peerId) && streamData.stream) {
+        registerAnalyser(peerId, streamData.stream);
+      }
+    }
+
+    // 제거된 피어 → analyser 해제
+    for (const peerId of analysersRef.current.keys()) {
+      if (peerId === localPeerId) continue; // 로컬은 건드리지 않음
+      if (!currentPeerIds.has(peerId)) {
+        unregisterAnalyser(peerId);
+
+        // 제거된 피어가 주화자였으면 초기화
+        if (mainSpeakerRef.current.currentId === peerId) {
+          mainSpeakerRef.current.currentId   = null;
+          mainSpeakerRef.current.lockedUntil = 0;
+          setMainSpeakerId(null);
+        }
+      }
+    }
+
+    // 분석 루프 시작 (이미 시작됐으면 무시)
+    startAnalysisLoop();
+  }, [remoteStreams, localPeerId, registerAnalyser, unregisterAnalyser, startAnalysisLoop]);
+
+  // ── unmount 정리 ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (intervalRef.current)   clearInterval(intervalRef.current);
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      for (const peerId of audioNodesRef.current.keys()) {
-        detachStream(peerId);
+      stopAnalysisLoop();
+      for (const peerId of [...analysersRef.current.keys()]) {
+        unregisterAnalyser(peerId);
+      }
+      for (const [, state] of speakingStateRef.current) {
+        if (state.silenceTimer) clearTimeout(state.silenceTimer);
+      }
+      speakingStateRef.current.clear();
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
       }
     };
-  }, [detachStream]);
+  }, [stopAnalysisLoop, unregisterAnalyser]);
 
-  // ── 공개 API ────────────────────────────────────────────────
+  // ── 핀 고정/해제 ─────────────────────────────────────────────
   const pinPeer = useCallback((peerId) => {
     setPinnedPeerId(peerId);
+    // 핀 고정 시 mainSpeaker도 해당 피어로 고정
+    mainSpeakerRef.current.currentId   = peerId;
+    mainSpeakerRef.current.lockedUntil = Date.now() + 999999999; // 영구 고정
+    setMainSpeakerId(peerId);
   }, []);
 
   const unpinPeer = useCallback(() => {
     setPinnedPeerId(null);
+    mainSpeakerRef.current.lockedUntil = 0;
   }, []);
 
+  // ── isSpeaking 함수 ────────────────────────────────────────
   const isSpeaking = useCallback((peerId) => {
-    if (!peerId) return false;
-    const level = volumeLevels.get(peerId) ?? 0;
-    return level > 0.08; // 정규화 레벨 임계값
-  }, [volumeLevels]);
+    return speakingStateRef.current.get(peerId)?.isSpeaking ?? false;
+  }, []);
 
-  // ── 실제 표시할 메인 발표자 (pin > active > last > null) ───
-  const mainSpeakerId = pinnedPeerId ?? activeSpeakerId ?? lastSpeakerRef.current ?? null;
+  // ── 핀 고정 중이면 mainSpeakerId를 pinnedPeerId로 override ──
+  const effectiveMainSpeakerId = pinnedPeerId ?? mainSpeakerId;
 
   return {
-    activeSpeakerId,
-    mainSpeakerId,
+    mainSpeakerId:  effectiveMainSpeakerId,
     pinnedPeerId,
     volumeLevels,
+    isSpeaking,
     pinPeer,
     unpinPeer,
-    isSpeaking,
-    LOCAL_PEER_ID,
   };
 }
