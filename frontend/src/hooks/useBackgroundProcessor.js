@@ -185,6 +185,12 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   //   null로 설정 시 rawStream 트랙이 ended 상태로 전환될 수 있음.
   //   래퍼를 사용하면 rawStream 원본은 항상 독립적으로 live 유지됨.
   const ensureInfrastructure = useCallback(async (rawStream) => {
+    // ✅ [추가] rawStream 트랙이 모두 ended면 getLocalMedia 재호출
+    const liveTracks = rawStream.getVideoTracks().filter(t => t.readyState === 'live');
+    if (liveTracks.length === 0) {
+        BPW('01', '⚠ rawStream 모든 트랙 ended — ensureInfrastructure 중단');
+        return false; // 호출자에서 체크 필요
+    }
     // video: 이미 있으면 재사용
     if (!videoElRef.current) {
       BP('01', '내부 video 엘리먼트 생성');
@@ -299,6 +305,19 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     setBackgroundMode(mode);
 
     if (mode === 'none') {
+        // ✅ ensureInfrastructure 실패(트랙 ended) → getUserMedia 재시도
+        const ok = await ensureInfrastructure(rawStream);
+        if (!ok) {
+        BPW('04', '트랙 ended — getLocalMedia 재호출 후 재시도');
+        try {
+            const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            localStreamRef.current = newStream;
+            await ensureInfrastructure(newStream);
+        } catch (e) {
+            BPE('04', '미디어 재획득 실패:', e.message);
+            return;
+        }
+        }
       // ── 배경 OFF ─────────────────────────────────────────
       stopLoop();
 

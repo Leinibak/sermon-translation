@@ -521,12 +521,18 @@ const {
     }
     await cleanupBackground(); 
     cleanupWebRTC();
+    // ✅ 트랙 최종 정리
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+    
     if (wsRef.current) {
       wsRef.current.close(1000, 'User left');
       wsRef.current = null;
     }
     navigate('/video-meetings');
-  }, [room, leaveRoom, endMeeting, cleanupWebRTC, navigate]);
+  }, [room, leaveRoom, endMeeting, cleanupWebRTC, localStreamRef, navigate]);
 
   // ==========================================================
   // 채팅 메시지 전송
@@ -576,6 +582,12 @@ const {
     return () => {
       cleanupBackground();
       cleanupWebRTC();
+      // ✅ 카메라/마이크 트랙을 여기서 최종 정리
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+      }
+      
       if (wsRef.current) {
         wsRef.current.close(1000, 'Component unmounting');
         wsRef.current = null;
