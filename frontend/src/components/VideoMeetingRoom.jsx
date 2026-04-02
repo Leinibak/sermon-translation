@@ -129,7 +129,7 @@ const {
     setBackground,
     setBackgroundImage,
     cleanup: cleanupBackground,
-  } = useBackgroundProcessor({ localStreamRef, producersRef });
+  } = useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef });
   
   // 배경 선택 패널 표시 상태
   const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
