@@ -10,7 +10,7 @@
 // - LayoutToggleButton 제거 (RoomHeader에 통합)
 // - 컨트롤 바에서 레이아웃 버튼 제거
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -713,41 +713,40 @@ const {
 
   // ==========================================================
   // allVideos 계산
-  // ==========================================================
-  const allVideos = (() => {
-    const local = {
-      peerId:      user?.username,
-      username:    `${user?.username} (나)`,
-      stream:      localStreamReady ? localStreamRef.current : null,
-      isLocal:     true,
-      isMuted:     !isMicOn,
-      isVideoOff:  !isVideoOn,
-      ref:         localVideoRef,
-      isHandRaised,
-    };
+  // ===========================
+   const allVideos = useMemo(() => {
+     const local = {
+       peerId:      user?.username,
+       username:    `${user?.username} (나)`,
+       stream:      localStreamReady ? localStreamRef.current : null,
+       isLocal:     true,
+       isMuted:     !isMicOn,
+       isVideoOff:  !isVideoOn,
+       ref:         localVideoRef,
+       isHandRaised,
+     };
+     const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
+//       peerId,
+//       username: streamData.username && streamData.username !== peerId
+//         ? streamData.username
+//         : (peerId.startsWith('user_') ? peerId.replace('user_', 'User ') : peerId),
+//       stream:      streamData.stream,
+//       isLocal:     false,
+//       isMuted:     streamData.isMuted    ?? false,
+//       isVideoOff:  streamData.isVideoOff ?? false,
+//       isHandRaised: raisedHands.some(h => h.username === streamData.username || h.username === peerId),
+     }));
+     const all = [local, ...remote].filter(v => v.stream || v.isLocal);
 
-    const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
-      peerId,
-      username: streamData.username && streamData.username !== peerId
-        ? streamData.username
-        : (peerId.startsWith('user_') ? peerId.replace('user_', 'User ') : peerId),
-      stream:      streamData.stream,
-      isLocal:     false,
-      isMuted:     streamData.isMuted    ?? false,
-      isVideoOff:  streamData.isVideoOff ?? false,
-      isHandRaised: raisedHands.some(h => h.username === streamData.username || h.username === peerId),
-    }));
-
-    const all = [local, ...remote].filter(v => v.stream || v.isLocal);
-
-    RD('01', `allVideos 재계산 — total=${all.length}`);
-
-    if (remote.length === 0 && remoteStreams.size === 0) {
-      RDW('01', `remoteStreams 비어있음`);
-    }
-
-    return all;
-  })();
+     if (process.env.NODE_ENV === 'development') {
+       RD('01', `allVideos 재계산 — total=${all.length}`);
+       if (remote.length === 0 && remoteStreams.size === 0) {
+         RDW('01', `remoteStreams 비어있음`);
+       }
+     }
+     return all;
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [user?.username, localStreamReady, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
 
   // ==========================================================
   // 렌더링

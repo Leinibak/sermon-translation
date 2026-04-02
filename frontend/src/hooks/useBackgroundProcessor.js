@@ -9,12 +9,18 @@
 //   'blur'  — 배경만 가우시안 블러 처리, 인물은 선명하게
 //   'image' — 배경을 커스텀 이미지로 교체
 //
-// ✅ 버그 수정 (v2):
-//   - cleanup() 시 segRef.current를 null로 초기화
-//     → 다음 세션에서 startProcessingLoop가 새 MediaPipe 인스턴스로 루프를 시작
-//     → 이전 onResults 콜백이 새 canvas에 영향을 주지 않음
+// ✅ 버그 수정 (v3):
+//   - [핵심] cachedSegmentation(모듈 싱글턴)과 segRef(세션별 인스턴스)를
+//     완전히 분리. cleanup 시 cachedSegmentation도 null로 초기화하여
+//     재진입 시 새 인스턴스가 생성되도록 함.
+//     → 이전 세션의 onResults 콜백이 새 세션 canvas에 영향을 주지 않음
+//   - [핵심] mode='none' 복귀 시 originalTrackRef를 null로 초기화하여
+//     다음 활성화 시 원본 트랙을 올바르게 다시 저장하도록 수정
+//   - [핵심] outputStreamRef 트랙 정리(stop) 추가 — 이전 captureStream
+//     트랙이 살아있어 새 세션에서 black frame 발생하는 문제 해결
+//   - [핵심] startProcessingLoop에서 videoElRef를 항상 초기화하여
+//     이전 세션의 video 엘리먼트가 재사용되지 않도록 수정
 //   - localVideoRef prop 추가: 배경 효과 시 로컬 미리보기도 업데이트
-//   - cleanup() 후 재진입 시 모든 ref가 깨끗하게 초기화된 상태에서 재시작
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 
@@ -26,19 +32,17 @@ const BP  = (tag, ...a) => console.log(`%c[BG-${tag}]`, 'color:#9c27b0;font-weig
 const BPW = (tag, ...a) => console.warn(`%c[BG-${tag}]`, 'color:#ff9800;font-weight:bold', ...a);
 const BPE = (tag, ...a) => console.error(`%c[BG-${tag}]`, 'color:#f44336;font-weight:bold', ...a);
 
-// ── MediaPipe 로더 (싱글턴 — 모듈 단위로 한 번만 로드) ──────
-// 주의: 인스턴스 자체는 재사용하지 않고 매 세션마다 새로 생성.
-// (segRef.current가 cleanup 시 null로 리셋되므로 startProcessingLoop에서
-//  새 인스턴스를 만들어 이전 onResults 콜백이 남지 않도록 함)
+// ── MediaPipe 로더 ──────────────────────────────────────────
+// ✅ v3 수정: cachedSegmentation을 let으로 선언하여 cleanup에서 null로 초기화 가능하게 함.
+//    세션이 끝날 때마다 인스턴스를 폐기하고 다음 세션에서 새로 생성.
+//    이유: MediaPipe SelfieSegmentation 인스턴스는 onResults 콜백을 내부 상태로
+//    보유하므로, 이전 세션의 콜백이 새 canvas에 그리는 문제가 발생할 수 있음.
 let cachedSegmentation = null;
 let segLoadingPromise  = null;
 
 async function loadSelfieSegmentation() {
-  // 이미 로드된 인스턴스가 있으면 재사용 (module-level 캐시)
   if (cachedSegmentation) return cachedSegmentation;
-
-  // 로딩 중이면 같은 promise 공유
-  if (segLoadingPromise) return segLoadingPromise;
+  if (segLoadingPromise)  return segLoadingPromise;
 
   segLoadingPromise = (async () => {
     BP('LOAD', 'MediaPipe SelfieSegmentation 로드 시작...');
@@ -78,15 +82,14 @@ async function loadSelfieSegmentation() {
 // 훅 본체
 // ─────────────────────────────────────────────────────────────────
 export function useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef }) {
-  const [backgroundMode,  setBackgroundMode]       = useState('none');
-  const [backgroundImage, setBackgroundImageState]  = useState(null);
+  const [backgroundMode,  setBackgroundMode]      = useState('none');
+  const [backgroundImage, setBackgroundImageState] = useState(null);
 
   // ── 내부 refs ──────────────────────────────────────────────
   const canvasRef        = useRef(null);
   const outputStreamRef  = useRef(null);
   const rafRef           = useRef(null);
   const intervalRef      = useRef(null);
-  // ✅ segRef: cleanup 시 null로 리셋 → 다음 세션에서 새 인스턴스 생성
   const segRef           = useRef(null);
   const bgImageRef       = useRef(null);
   const modeRef          = useRef('none');
@@ -149,8 +152,13 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, []);
 
   // ── video 엘리먼트 생성 ──────────────────────────────────
-  const getVideoEl = useCallback(async (stream) => {
-    if (videoElRef.current) return videoElRef.current;
+  // ✅ v3 수정: 항상 새로 생성 (이전 세션 video 재사용 방지)
+  const createVideoEl = useCallback(async (stream) => {
+    // 이전 video 엘리먼트가 있으면 정리
+    if (videoElRef.current) {
+      videoElRef.current.srcObject = null;
+      videoElRef.current = null;
+    }
 
     const video = document.createElement('video');
     video.srcObject   = stream;
@@ -180,6 +188,12 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const startProcessingLoop = useCallback(async (rawStream) => {
     BP('01', '처리 루프 시작');
 
+    // ✅ v3 수정: 이전 outputStreamRef 트랙 정리 (black frame 방지)
+    if (outputStreamRef.current) {
+      outputStreamRef.current.getTracks().forEach(t => t.stop());
+      outputStreamRef.current = null;
+    }
+
     // 캔버스 준비 (항상 새로 생성)
     canvasRef.current = document.createElement('canvas');
     const canvas = canvasRef.current;
@@ -190,18 +204,18 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     canvas.height = height;
     BP('01', `캔버스: ${width}×${height}`);
 
-    const videoEl = await getVideoEl(rawStream);
+    // ✅ v3 수정: 항상 새 video 엘리먼트 생성
+    const videoEl = await createVideoEl(rawStream);
 
-    // ✅ captureStream도 항상 새로 생성 (이전 세션 스트림과 혼용 방지)
+    // captureStream 생성
     outputStreamRef.current = canvas.captureStream(CANVAS_FPS);
     BP('01', `captureStream 생성 — ${CANVAS_FPS}fps`);
 
-    // ✅ segRef가 null이면 새 MediaPipe 인스턴스 로드 (cleanup 후 재진입 시)
+    // ✅ v3 수정: segRef와 cachedSegmentation을 함께 관리
+    //    segRef가 null이면 (cleanup 후 재진입) 새 인스턴스 로드
     try {
       if (!segRef.current) {
         BP('01', 'MediaPipe 로드 시도...');
-        // 모듈 캐시(cachedSegmentation)를 사용하되,
-        // segRef에는 매 세션 처음 시작 시 할당하여 onResults를 새로 등록
         const seg = await loadSelfieSegmentation();
         segRef.current = seg;
         BP('01', '✅ MediaPipe 준비 완료');
@@ -217,7 +231,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     if (seg) {
       // ✅ onResults를 새로 등록 (이전 세션의 콜백을 완전히 교체)
       seg.onResults((results) => {
-        // activeRef 체크: 이 루프가 여전히 살아있을 때만 결과 저장
         if (activeRef.current) lastResults = results;
       });
 
@@ -274,7 +287,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     BP('01', '✅ 처리 루프 시작 완료');
     return outputStreamRef.current;
-  }, [getVideoEl, composeFrame]);
+  }, [createVideoEl, composeFrame]);
 
   // ── SFU producer 트랙 교체 ───────────────────────────────
   const replaceVideoProducerTrack = useCallback(async (newTrack) => {
@@ -332,11 +345,27 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         videoElRef.current.srcObject = null;
         videoElRef.current = null;
       }
-      outputStreamRef.current = null;
+
+      // ✅ v3 수정: outputStreamRef 트랙 정리
+      if (outputStreamRef.current) {
+        outputStreamRef.current.getTracks().forEach(t => t.stop());
+        outputStreamRef.current = null;
+      }
+
+      // ✅ v3 수정: originalTrackRef도 null로 초기화
+      //    다음 활성화 시 원본 트랙을 다시 올바르게 저장하기 위함
+      originalTrackRef.current = null;
+
+      // ✅ v3 수정: segRef + cachedSegmentation 초기화
+      //    다음 세션에서 완전히 새로운 MediaPipe 인스턴스 사용
+      segRef.current = null;
+      cachedSegmentation = null;
+      segLoadingPromise  = null;
+
       setBackgroundImageState(null);
 
     } else {
-      // 원본 비디오 트랙 저장 (최초 1회)
+      // 원본 비디오 트랙 저장 (최초 1회만 — originalTrackRef가 null일 때)
       const origTrack = rawStream.getVideoTracks()[0];
       if (origTrack && !originalTrackRef.current) {
         originalTrackRef.current = origTrack;
@@ -398,16 +427,21 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       videoElRef.current = null;
     }
 
+    // ✅ v3 수정: outputStreamRef 트랙 정리
+    if (outputStreamRef.current) {
+      outputStreamRef.current.getTracks().forEach(t => t.stop());
+      outputStreamRef.current = null;
+    }
+
     bgImageRef.current       = null;
-    outputStreamRef.current  = null;
     originalTrackRef.current = null;
     canvasRef.current        = null;
     modeRef.current          = 'none';
 
-    // ✅ 핵심 수정: segRef를 null로 초기화
-    // → 다음 세션에서 startProcessingLoop 호출 시
-    //   seg.onResults를 새로 등록하여 이전 콜백이 남지 않게 함
-    segRef.current = null;
+    // ✅ v3 수정: segRef + 모듈 레벨 캐시 모두 초기화
+    segRef.current     = null;
+    cachedSegmentation = null;
+    segLoadingPromise  = null;
 
     setBackgroundMode('none');
     setBackgroundImageState(null);
