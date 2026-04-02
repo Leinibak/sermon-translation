@@ -686,7 +686,7 @@ export function useSFU({ wsRef, roomId }) {
     });
     pendingRef.current.clear();
 
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    // localStreamRef.current?.getTracks().forEach((t) => t.stop());
     producersRef.current.forEach((p) => { try { p.close(); } catch (_) {} });
     consumersRef.current.forEach((c) => { try { c.close(); } catch (_) {} });
     sendTransportRef.current?.close();
