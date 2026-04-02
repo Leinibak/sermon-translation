@@ -1,53 +1,42 @@
 // frontend/src/components/VideoMeeting/BackgroundSelector.jsx
 //
-// 배경 선택 패널 컴포넌트
-// - 배경 없음 / 배경 블러 / 커스텀 이미지 업로드
-// - 타원형 마스크 방식 완전 제거
-// - MediaPipe SelfieSegmentation 기반 실제 인물 분리 안내
+// ✅ v2 수정:
+//   - SVG 프리셋에서 linearGradient id 중복 제거
+//     (오피스/거실/다크가 모두 id="g"를 사용해 브라우저 렌더링 오류)
+//   - 각 SVG마다 고유 id 부여 (id="g-office", "g-living" 등)
 
 import React, { useRef, useCallback } from 'react';
 import { Blend, ImageOff, ImagePlus, X } from 'lucide-react';
 
-// ── 기본 배경 이미지 프리셋 ──────────────────────────────────
-// 실제 서비스: /static/backgrounds/ 경로에 이미지를 넣거나 CDN URL 사용
+// ── 배경 이미지 프리셋 ──────────────────────────────────────
+// ✅ SVG id 충돌 수정: 각 SVG마다 고유 id 사용
 const PRESET_BACKGROUNDS = [
   {
     id: 'office',
     label: '오피스',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23e8f0fe"/><stop offset="1" stop-color="%23c5cae9"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><rect x="0" y="240" width="640" height="120" fill="%23d7ccc8"/><rect x="60" y="100" width="200" height="150" fill="%23b0bec5" rx="4"/><rect x="380" y="80" width="180" height="170" fill="%23b0bec5" rx="4"/><text x="320" y="340" text-anchor="middle" fill="%23795548" font-size="14" font-family="sans-serif">사무실</text></svg>',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g-office" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23e8f0fe"/><stop offset="1" stop-color="%23c5cae9"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g-office)"/><rect x="0" y="240" width="640" height="120" fill="%23d7ccc8"/><rect x="60" y="100" width="200" height="150" fill="%23b0bec5" rx="4"/><rect x="380" y="80" width="180" height="170" fill="%23b0bec5" rx="4"/><text x="320" y="340" text-anchor="middle" fill="%23795548" font-size="14" font-family="sans-serif">사무실</text></svg>',
     thumb: '#c5cae9',
   },
   {
     id: 'living',
     label: '거실',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%23fff9c4"/><stop offset="1" stop-color="%23fff176"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><rect x="0" y="270" width="640" height="90" fill="%23a1887f"/><rect x="100" y="180" width="440" height="100" fill="%23795548" rx="8"/><rect x="240" y="140" width="160" height="50" fill="%238d6e63" rx="4"/><text x="320" y="345" text-anchor="middle" fill="%23fff" font-size="14" font-family="sans-serif">거실</text></svg>',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g-living" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%23fff9c4"/><stop offset="1" stop-color="%23fff176"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g-living)"/><rect x="0" y="270" width="640" height="90" fill="%23a1887f"/><rect x="100" y="180" width="440" height="100" fill="%23795548" rx="8"/><rect x="240" y="140" width="160" height="50" fill="%238d6e63" rx="4"/><text x="320" y="345" text-anchor="middle" fill="%23fff" font-size="14" font-family="sans-serif">거실</text></svg>',
     thumb: '#fff176',
   },
   {
     id: 'nature',
     label: '자연',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%2387ceeb"/><stop offset="1" stop-color="%23e0f7fa"/></linearGradient></defs><rect width="640" height="360" fill="url(%23sky)"/><rect x="0" y="260" width="640" height="100" fill="%234caf50"/><circle cx="100" cy="200" r="60" fill="%2366bb6a"/><circle cx="200" cy="180" r="80" fill="%2381c784"/><circle cx="500" cy="210" r="55" fill="%2366bb6a"/><circle cx="600" cy="190" r="75" fill="%2381c784"/><text x="320" y="345" text-anchor="middle" fill="%23fff" font-size="14" font-family="sans-serif">자연</text></svg>',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%2387ceeb"/><stop offset="1" stop-color="%23e0f7fa"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g-sky)"/><rect x="0" y="260" width="640" height="100" fill="%234caf50"/><circle cx="100" cy="200" r="60" fill="%2366bb6a"/><circle cx="200" cy="180" r="80" fill="%2381c784"/><circle cx="500" cy="210" r="55" fill="%2366bb6a"/><circle cx="600" cy="190" r="75" fill="%2381c784"/><text x="320" y="345" text-anchor="middle" fill="%23fff" font-size="14" font-family="sans-serif">자연</text></svg>',
     thumb: '#87ceeb',
   },
   {
     id: 'dark',
     label: '다크',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23212121"/><stop offset="1" stop-color="%23424242"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><rect x="50" y="80" width="540" height="200" fill="%23303030" rx="8" opacity="0.5"/><text x="320" y="345" text-anchor="middle" fill="%23757575" font-size="14" font-family="sans-serif">다크</text></svg>',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g-dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23212121"/><stop offset="1" stop-color="%23424242"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g-dark)"/><rect x="50" y="80" width="540" height="200" fill="%23303030" rx="8" opacity="0.5"/><text x="320" y="345" text-anchor="middle" fill="%23757575" font-size="14" font-family="sans-serif">다크</text></svg>',
     thumb: '#424242',
   },
 ];
 
-/**
- * 배경 선택 패널 (팝오버)
- *
- * Props:
- *   isOpen              — 팝오버 열림 여부
- *   backgroundMode      — 현재 모드 ('none' | 'blur' | 'image')
- *   backgroundImage     — 현재 배경 이미지 data URL (없으면 null)
- *   onSetBackground     — (mode: string) => void
- *   onSetBackgroundImage — (dataUrl: string) => void
- *   onClose             — 닫기 콜백
- */
 export function BackgroundSelector({
   isOpen,
   backgroundMode,
@@ -66,16 +55,13 @@ export function BackgroundSelector({
       alert('이미지 파일만 업로드할 수 있습니다.');
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       alert('이미지 크기는 5MB 이하여야 합니다.');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      onSetBackgroundImage(ev.target.result);
-    };
+    reader.onload = (ev) => { onSetBackgroundImage(ev.target.result); };
     reader.readAsDataURL(file);
     e.target.value = '';
   }, [onSetBackgroundImage]);
@@ -85,15 +71,11 @@ export function BackgroundSelector({
   return (
     <>
       {/* 모바일 배경 오버레이 */}
-      <div
-        className="fixed inset-0 z-40 md:hidden"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 md:hidden" onClick={onClose} />
 
       {/* 패널 본체 */}
-      <div
-        className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in"
-      >
+      <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in">
+
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
           <span className="text-white font-semibold text-sm">배경 효과</span>
@@ -108,7 +90,7 @@ export function BackgroundSelector({
 
         <div className="p-4 space-y-4">
 
-          {/* ── 기본 옵션 ── */}
+          {/* ── 기본 옵션 (배경 없음 / 블러) ── */}
           <div className="grid grid-cols-2 gap-2">
 
             {/* 배경 없음 */}
@@ -172,10 +154,7 @@ export function BackgroundSelector({
                   `}
                   title={preset.label}
                 >
-                  <div
-                    className="w-full h-full"
-                    style={{ backgroundColor: preset.thumb }}
-                  />
+                  <div className="w-full h-full" style={{ backgroundColor: preset.thumb }} />
                   <img
                     src={preset.url}
                     alt={preset.label}
@@ -190,7 +169,7 @@ export function BackgroundSelector({
             </div>
           </div>
 
-          {/* ── 이미지 업로드 ── */}
+          {/* ── 이미지 직접 업로드 ── */}
           <div>
             <p className="text-xs text-gray-400 font-medium mb-2">직접 업로드</p>
             <button
@@ -233,7 +212,6 @@ export function BackgroundSelector({
             </div>
           )}
 
-          {/* 안내 문구 — 타원형 마스크 설명 제거 */}
           <p className="text-[11px] text-gray-500 leading-relaxed">
             💡 AI 인물 인식으로 배경을 처리합니다. 조명이 밝고 배경과 대비가 뚜렷할수록 효과가 좋습니다.
           </p>
@@ -243,9 +221,6 @@ export function BackgroundSelector({
   );
 }
 
-/**
- * 배경 버튼 (ControlBar에 추가)
- */
 export function BackgroundButton({ backgroundMode, onClick }) {
   const isActive = backgroundMode !== 'none';
 
@@ -266,7 +241,6 @@ export function BackgroundButton({ backgroundMode, onClick }) {
         <Blend className="w-5 h-5 md:w-6 md:h-6" />
       </button>
 
-      {/* 활성 표시 도트 */}
       {isActive && (
         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-400 rounded-full border-2 border-gray-800" />
       )}
