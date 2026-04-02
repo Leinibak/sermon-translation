@@ -2,19 +2,18 @@
 //
 // 배경 선택 패널 컴포넌트
 // - 배경 없음 / 배경 블러 / 커스텀 이미지 업로드
-// - 컨트롤 바의 배경 버튼 클릭 시 팝오버로 표시
+// - 타원형 마스크 방식 완전 제거
+// - MediaPipe SelfieSegmentation 기반 실제 인물 분리 안내
 
 import React, { useRef, useCallback } from 'react';
 import { Blend, ImageOff, ImagePlus, X } from 'lucide-react';
 
-// ── 기본 배경 이미지 프리셋 (URL 기반) ──────────────────────────
-// 실제 서비스에서는 /static/backgrounds/ 경로에 이미지를 넣거나
-// CDN URL을 사용하세요.
+// ── 기본 배경 이미지 프리셋 ──────────────────────────────────
+// 실제 서비스: /static/backgrounds/ 경로에 이미지를 넣거나 CDN URL 사용
 const PRESET_BACKGROUNDS = [
   {
     id: 'office',
     label: '오피스',
-    // 간단한 SVG data URL (실제 배포 시 실제 이미지로 교체)
     url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23e8f0fe"/><stop offset="1" stop-color="%23c5cae9"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><rect x="0" y="240" width="640" height="120" fill="%23d7ccc8"/><rect x="60" y="100" width="200" height="150" fill="%23b0bec5" rx="4"/><rect x="380" y="80" width="180" height="170" fill="%23b0bec5" rx="4"/><text x="320" y="340" text-anchor="middle" fill="%23795548" font-size="14" font-family="sans-serif">사무실</text></svg>',
     thumb: '#c5cae9',
   },
@@ -33,7 +32,7 @@ const PRESET_BACKGROUNDS = [
   {
     id: 'dark',
     label: '다크',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23212121"/><stop offset="1" stop-color="%23424242"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><circle cx="320" cy="180" r="120" fill="%23303030" opacity="0.5"/><text x="320" y="345" text-anchor="middle" fill="%23757575" font-size="14" font-family="sans-serif">다크</text></svg>',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%23212121"/><stop offset="1" stop-color="%23424242"/></linearGradient></defs><rect width="640" height="360" fill="url(%23g)"/><rect x="50" y="80" width="540" height="200" fill="%23303030" rx="8" opacity="0.5"/><text x="320" y="345" text-anchor="middle" fill="%23757575" font-size="14" font-family="sans-serif">다크</text></svg>',
     thumb: '#424242',
   },
 ];
@@ -42,12 +41,12 @@ const PRESET_BACKGROUNDS = [
  * 배경 선택 패널 (팝오버)
  *
  * Props:
- *   isOpen          — 팝오버 열림 여부
- *   backgroundMode  — 현재 모드 ('none' | 'blur' | 'image')
- *   backgroundImage — 현재 배경 이미지 data URL (없으면 null)
+ *   isOpen              — 팝오버 열림 여부
+ *   backgroundMode      — 현재 모드 ('none' | 'blur' | 'image')
+ *   backgroundImage     — 현재 배경 이미지 data URL (없으면 null)
  *   onSetBackground     — (mode: string) => void
  *   onSetBackgroundImage — (dataUrl: string) => void
- *   onClose         — 닫기 콜백
+ *   onClose             — 닫기 콜백
  */
 export function BackgroundSelector({
   isOpen,
@@ -59,7 +58,6 @@ export function BackgroundSelector({
 }) {
   const fileInputRef = useRef(null);
 
-  // 이미지 파일 업로드 처리
   const handleFileChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -79,8 +77,6 @@ export function BackgroundSelector({
       onSetBackgroundImage(ev.target.result);
     };
     reader.readAsDataURL(file);
-
-    // input 초기화 (같은 파일 재선택 가능하게)
     e.target.value = '';
   }, [onSetBackgroundImage]);
 
@@ -237,10 +233,9 @@ export function BackgroundSelector({
             </div>
           )}
 
-          {/* 안내 문구 */}
+          {/* 안내 문구 — 타원형 마스크 설명 제거 */}
           <p className="text-[11px] text-gray-500 leading-relaxed">
-            💡 배경 효과는 <strong className="text-gray-400">타원형 마스크</strong> 방식으로 적용됩니다.
-            카메라 정면 촬영 시 가장 자연스럽습니다.
+            💡 AI 인물 인식으로 배경을 처리합니다. 조명이 밝고 배경과 대비가 뚜렷할수록 효과가 좋습니다.
           </p>
         </div>
       </div>

@@ -5,15 +5,12 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# 1️⃣ 의존성 설치
+# 1️⃣ 의존성 설치 (@mediapipe/selfie_segmentation 포함)
 COPY package*.json ./
 RUN npm ci
 
 # 2️⃣ 소스 복사
 COPY . .
-
-# 4️⃣ Vite 빌드
-RUN npm run build -- --mode production
 
 # 3️⃣ 환경변수 (빌드 시점에 주입)
 ARG VITE_API_URL
@@ -21,15 +18,36 @@ ARG VITE_WS_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 
+# ✅ MediaPipe wasm/모델 파일을 public/mediapipe/ 로 복사
+#    - COPY . . 이후에 실행해야 소스의 public/ 폴더에 덮어쓰여지지 않음
+#    - Vite build.copyPublicDir:true 설정으로 dist/mediapipe/ 에 자동 포함
+#    - 파일명은 @mediapipe/selfie_segmentation 0.1.x 기준
+RUN mkdir -p public/mediapipe && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.js \
+       public/mediapipe/ && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.js \
+       public/mediapipe/ && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.wasm \
+       public/mediapipe/ && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_landscape.tflite \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.binarypb \
+       public/mediapipe/ 2>/dev/null || true && \
+    echo "✅ MediaPipe 파일 목록:" && \
+    ls -la public/mediapipe/
+
+# 4️⃣ Vite 빌드 (dist/mediapipe/ 포함됨)
+RUN npm run build -- --mode production
+
 # ================================================
 # Stage 2: Nginx – Serve static files
 # ================================================
 FROM nginx:stable-alpine
 
-# 1️⃣ 빌드 결과 복사
+# 1️⃣ 빌드 결과 복사 (dist/mediapipe/ 도 포함)
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# 2️⃣ ⭐ Nginx 설정 복사 (파일명 수정!)
+# 2️⃣ Nginx 설정 복사
 COPY nginx.prod.conf /etc/nginx/conf.d/default.conf
 
 # 3️⃣ 퍼미션 및 권한 조정
