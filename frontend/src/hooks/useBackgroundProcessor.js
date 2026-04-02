@@ -1,6 +1,6 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v4 ★
+// ★ 배경 처리 훅 v5 ★
 //
 // 방식: MediaPipe SelfieSegmentation → Canvas 합성 → captureStream()
 //
@@ -9,17 +9,16 @@
 //   'blur'  — 배경만 가우시안 블러 처리, 인물은 선명하게
 //   'image' — 배경을 커스텀 이미지로 교체
 //
-// ✅ v4 수정 사항:
-//   1. [track ended 수정] mode='none' 복귀 시 originalTrackRef 대신
-//      localStreamRef.current.getVideoTracks().find(t=>t.readyState==='live')
-//      에서 live 트랙을 직접 가져옴.
-//      이유: originalTrackRef에 저장된 트랙이 이미 ended 상태일 수 있기 때문.
-//   2. [배경이미지 인물 소실 수정] composeFrame의 segmentationMask 합성 방향
-//      수정. MediaPipe mask는 흰색=인물/검정=배경이므로 Step1(배경) →
-//      Step2(인물 마스크 추출) → Step3(인물 오버레이) 순서로 올바르게 처리.
-//   3. [재활성화 black frame 수정] outputStreamRef 트랙 stop 후 segRef +
-//      cachedSegmentation 완전 초기화 → 다음 세션에서 새 인스턴스 사용 보장.
-//   4. replaceVideoProducerTrack에서 track.readyState 사전 검증 추가.
+// ✅ v5 핵심 수정:
+//   [버그] createVideoEl에서 이전 video.srcObject = null 설정 시
+//          Chrome이 rawStream(getUserMedia 원본)의 트랙들을 ended시킴.
+//          → 이후 배경 전환이 모두 검은 화면으로 나타나는 근본 원인.
+//   [수정] createVideoEl에서 videoElRef 재사용 가능 시 srcObject만 교체.
+//          전 video를 null로 초기화하지 않고, srcObject를 새 스트림으로 덮어씀.
+//          srcObject 변경 시 이전 스트림의 트랙은 멈추지 않고 참조만 해제됨.
+//   [추가] rawStream을 안전하게 재활용하기 위한 별도 스트림(internalStream) 사용:
+//          rawStream 대신 rawStream.getTracks()를 복사한 새 MediaStream을
+//          video.srcObject에 연결 → 원본 트랙 ended 문제 완전 차단.
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 
@@ -32,7 +31,6 @@ const BPW = (tag, ...a) => console.warn(`%c[BG-${tag}]`, 'color:#ff9800;font-wei
 const BPE = (tag, ...a) => console.error(`%c[BG-${tag}]`, 'color:#f44336;font-weight:bold', ...a);
 
 // ── MediaPipe 로더 ──────────────────────────────────────────
-// ✅ v4: let으로 선언 → cleanup 시 null 재할당 가능
 let cachedSegmentation = null;
 let segLoadingPromise  = null;
 
@@ -95,24 +93,15 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const bgImageRef         = useRef(null);
   const modeRef            = useRef('none');
   const activeRef          = useRef(false);
-  // ✅ v4: 트랙 id만 기록 (복원 시 live 트랙은 localStreamRef에서 직접 가져옴)
-  const originalTrackIdRef = useRef(null);
   const videoElRef         = useRef(null);
+  // ✅ v5: 내부 video용 복사 스트림 — 원본 rawStream과 분리
+  const internalStreamRef  = useRef(null);
 
-  // ── 캔버스 합성 ──────────────────────────────────────────────
-  // ✅ v4 핵심 수정: MediaPipe segmentationMask 합성 순서 교정
-  //
-  //  MediaPipe SelfieSegmentation segmentationMask:
-  //    - 흰색(alpha≈1) = 인물(foreground)
-  //    - 검정(alpha≈0) = 배경(background)
-  //
-  //  올바른 합성 순서:
-  //   Step1) 배경 레이어 전체를 메인 캔버스에 그리기 (blur 영상 또는 이미지)
-  //   Step2) 임시 캔버스에 원본 영상 + mask(destination-in) → 인물 픽셀만 추출
-  //   Step3) 인물 레이어를 메인 캔버스(배경) 위에 올려 합성
-  //
-  //  ❌ 이전 v2/v3 버그: destination-in을 적용할 때 canvas/mask 순서가 반대여서
-  //     배경 이미지가 인물 위에 덮히거나 인물이 사라지는 현상 발생
+  // ── 캔버스 합성 ─────────────────────────────────────────────
+  //  MediaPipe segmentationMask: 흰색=인물, 검정=배경
+  //  Step1) 배경 레이어 (blur or 이미지)를 메인 캔버스에 그리기
+  //  Step2) 임시 캔버스에 원본 영상 → destination-in으로 인물 픽셀만 추출
+  //  Step3) 인물 레이어를 배경 위에 합성
   const composeFrame = useCallback((videoEl, results) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -139,7 +128,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     const mask = results.segmentationMask;
 
-    // ── Step 1: 배경 레이어 ────────────────────────────────
+    // Step 1: 배경 레이어
     ctx.save();
     if (mode === 'blur') {
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
@@ -157,34 +146,55 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
     ctx.restore();
 
-    // ── Step 2: 인물 레이어 추출 (임시 캔버스) ────────────
+    // Step 2: 인물 레이어 추출 (임시 캔버스)
     const tmp  = document.createElement('canvas');
     tmp.width  = w;
     tmp.height = h;
     const tCtx = tmp.getContext('2d');
 
-    // 원본 영상 그리기
     if (videoEl.readyState >= 2) tCtx.drawImage(videoEl, 0, 0, w, h);
 
-    // mask(흰=인물, 검=배경)를 destination-in으로 적용
-    // → 인물 영역(mask 흰 부분)만 남고 배경(mask 검정 부분)은 투명해짐
+    // mask 흰 부분(인물)만 남기기
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mask, 0, 0, w, h);
     tCtx.globalCompositeOperation = 'source-over';
 
-    // ── Step 3: 인물 레이어를 배경 위에 합성 ──────────────
+    // Step 3: 인물 레이어를 배경 위에 합성
     ctx.drawImage(tmp, 0, 0, w, h);
   }, []);
 
-  // ── video 엘리먼트 생성 (항상 새로 생성) ─────────────────────
-  const createVideoEl = useCallback(async (stream) => {
+  // ── ✅ v5 핵심: video 엘리먼트 생성 시 원본 스트림 분리 ─────
+  //
+  //  문제: video.srcObject = rawStream 후 srcObject = null 하면
+  //        Chrome이 rawStream의 getUserMedia 트랙을 ended시킴.
+  //
+  //  해결: rawStream의 트랙들을 그대로 사용하되,
+  //        새 MediaStream 래퍼(internalStream)를 만들어 video에 연결.
+  //        → internalStream이 null이 돼도 원본 트랙은 ended 안 됨.
+  const createVideoEl = useCallback(async (rawStream) => {
+    // ✅ 이전 video 정리: srcObject를 null로 하지 않고 detach만
     if (videoElRef.current) {
-      videoElRef.current.srcObject = null;
+      // srcObject = null 대신 srcObject에 빈 스트림을 할당하거나
+      // 그냥 pause()만 하여 원본 스트림 트랙 보호
+      try { videoElRef.current.pause(); } catch (_) {}
       videoElRef.current = null;
     }
 
+    // ✅ 이전 internalStream 정리 (원본 트랙은 stop 하지 않음)
+    if (internalStreamRef.current) {
+      internalStreamRef.current = null;
+    }
+
+    // ✅ 원본 트랙을 참조하는 새 MediaStream 래퍼 생성
+    //    - rawStream 자체가 아닌 새 MediaStream에 같은 트랙들을 추가
+    //    - video.srcObject = internalStream
+    //    - 나중에 internalStream = null 해도 rawStream 트랙은 live 유지
+    const tracks = rawStream.getTracks();
+    const internalStream = new MediaStream(tracks);
+    internalStreamRef.current = internalStream;
+
     const video = document.createElement('video');
-    video.srcObject   = stream;
+    video.srcObject   = internalStream;
     video.autoplay    = true;
     video.playsInline = true;
     video.muted       = true;
@@ -196,10 +206,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     });
 
     videoElRef.current = video;
+    BP('01', `video 엘리먼트 생성 완료 — internalStream="${internalStream.id}"`);
     return video;
   }, []);
 
-  // ── 처리 루프 중지 ────────────────────────────────────────────
+  // ── 처리 루프 중지 ────────────────────────────────────────
   const stopProcessingLoop = useCallback(() => {
     activeRef.current = false;
     if (rafRef.current)      { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
@@ -207,21 +218,23 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('02', '처리 루프 중지');
   }, []);
 
-  // ── outputStream 트랙 정리 ────────────────────────────────────
+  // ── outputStream 캔버스 트랙 정리 ────────────────────────
+  //  ✅ captureStream 트랙만 stop — 원본 카메라 트랙 불변
   const stopOutputStreamTracks = useCallback(() => {
     if (outputStreamRef.current) {
       outputStreamRef.current.getTracks().forEach(t => {
         try { t.stop(); } catch (_) {}
       });
       outputStreamRef.current = null;
-      BP('02', 'outputStream 트랙 stop 완료');
+      BP('02', 'outputStream(canvas) 트랙 stop 완료');
     }
   }, []);
 
-  // ── 처리 루프 시작 ────────────────────────────────────────────
+  // ── 처리 루프 시작 ────────────────────────────────────────
   const startProcessingLoop = useCallback(async (rawStream) => {
     BP('01', '처리 루프 시작');
 
+    // 이전 outputStream 트랙 정리
     stopOutputStreamTracks();
 
     canvasRef.current = document.createElement('canvas');
@@ -233,6 +246,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     canvas.height = height;
     BP('01', `캔버스: ${width}×${height}`);
 
+    // ✅ v5: createVideoEl로 안전한 내부 스트림 래퍼 사용
     const videoEl = await createVideoEl(rawStream);
 
     outputStreamRef.current = canvas.captureStream(CANVAS_FPS);
@@ -254,6 +268,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     let lastResults = null;
 
     if (seg) {
+      // ✅ onResults 항상 새로 등록 (이전 세션 콜백 교체)
       seg.onResults((results) => {
         if (activeRef.current) lastResults = results;
       });
@@ -278,7 +293,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       rafRef.current = requestAnimationFrame(loop);
 
     } else {
-      // Fallback: MediaPipe 없이 단순 처리
       BPW('01', 'Fallback 모드: 세그멘테이션 없이 처리');
       const ctx = canvas.getContext('2d');
 
@@ -312,15 +326,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     return outputStreamRef.current;
   }, [createVideoEl, composeFrame, stopOutputStreamTracks]);
 
-  // ── SFU producer 트랙 교체 ────────────────────────────────────
-  // ✅ v4: track.readyState 사전 검증 추가
+  // ── SFU producer 트랙 교체 ────────────────────────────────
   const replaceVideoProducerTrack = useCallback(async (newTrack) => {
     if (!newTrack) {
       BPW('03', 'replaceVideoProducerTrack: newTrack null — 생략');
       return;
     }
     if (newTrack.readyState === 'ended') {
-      BPW('03', `replaceVideoProducerTrack: track already ended (id="${newTrack.id.slice(0,8)}") — 생략`);
+      BPW('03', `replaceVideoProducerTrack: track ended (id="${newTrack.id.slice(0,8)}") — 생략`);
       return;
     }
     const producers = producersRef?.current;
@@ -335,7 +348,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
   }, [producersRef]);
 
-  // ── 로컬 비디오 미리보기 업데이트 ───────────────────────────
+  // ── 로컬 비디오 미리보기 업데이트 ───────────────────────
   const updateLocalVideoPreview = useCallback((stream) => {
     const videoEl = localVideoRef?.current;
     if (!videoEl) { BPW('06', 'localVideoRef 없음'); return; }
@@ -346,7 +359,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
   }, [localVideoRef]);
 
-  // ── 배경 모드 설정 ───────────────────────────────────────────
+  // ── 배경 모드 설정 ───────────────────────────────────────
   const setBackground = useCallback(async (mode) => {
     BP('04', `setBackground 호출 — mode="${mode}"`);
     modeRef.current = mode;
@@ -359,56 +372,55 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
 
     if (mode === 'none') {
-      // ── 배경 효과 OFF ──────────────────────────────────────
+      // ── 배경 효과 OFF ──────────────────────────────────
       stopProcessingLoop();
 
-      // ✅ v4 핵심: localStreamRef에서 live 상태의 트랙을 직접 가져옴
-      //    originalTrackRef에 저장된 트랙은 ended일 수 있으므로 사용 불가
+      // ✅ rawStream에서 live 트랙 직접 가져오기
       const liveVideoTrack = rawStream.getVideoTracks().find(t => t.readyState === 'live');
 
       if (liveVideoTrack) {
-        BP('04', `✅ live 원본 트랙 확인 — id="${liveVideoTrack.id.slice(0,8)}" readyState="${liveVideoTrack.readyState}"`);
-        updateLocalVideoPreview(rawStream);
+        BP('04', `live 원본 트랙 확인 — id="${liveVideoTrack.id.slice(0,8)}" readyState="${liveVideoTrack.readyState}"`);
+        // ✅ SFU 교체를 outputStream stop 전에 먼저 실행
         await replaceVideoProducerTrack(liveVideoTrack);
+        updateLocalVideoPreview(rawStream);
       } else {
         BPW('04', '⚠ live 트랙 없음. 트랙 상태:', rawStream.getVideoTracks().map(t => `${t.id.slice(0,8)}:${t.readyState}`).join(', '));
         updateLocalVideoPreview(rawStream);
       }
 
-      // video 엘리먼트 정리
+      // ✅ v5: video 엘리먼트 정리 — srcObject=null 아닌 pause()만 사용
       if (videoElRef.current) {
-        videoElRef.current.srcObject = null;
+        try { videoElRef.current.pause(); } catch (_) {}
         videoElRef.current = null;
       }
 
-      // outputStream 트랙 정리
+      // ✅ internalStream 참조 해제 (원본 트랙은 touched 없음)
+      internalStreamRef.current = null;
+
+      // outputStream(canvas captureStream) 트랙 stop
       stopOutputStreamTracks();
 
       // 다음 세션을 위한 초기화
-      originalTrackIdRef.current = null;
       segRef.current = null;
       resetSegmentationCache();
+      canvasRef.current = null;
 
       setBackgroundImageState(null);
 
     } else {
-      // ── 배경 효과 ON ───────────────────────────────────────
-      const origTrack = rawStream.getVideoTracks()[0];
-      if (origTrack && !originalTrackIdRef.current) {
-        originalTrackIdRef.current = origTrack.id;
-        BP('04', `원본 비디오 트랙 id 저장 — id="${origTrack.id.slice(0,8)}"`);
-      }
-
+      // ── 배경 효과 ON ───────────────────────────────────
       if (!activeRef.current) {
         const processedStream = await startProcessingLoop(rawStream);
         if (processedStream) {
-          updateLocalVideoPreview(processedStream);
+          // ✅ SFU 교체 먼저, 미리보기 업데이트 후
           const processedTrack = processedStream.getVideoTracks()[0];
           if (processedTrack) {
             await replaceVideoProducerTrack(processedTrack);
           }
+          updateLocalVideoPreview(processedStream);
         }
       } else {
+        // 이미 루프 동작 중 → modeRef만 변경 (자동 반영)
         if (outputStreamRef.current) {
           updateLocalVideoPreview(outputStreamRef.current);
         }
@@ -423,7 +435,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     updateLocalVideoPreview,
   ]);
 
-  // ── 배경 이미지 설정 ──────────────────────────────────────────
+  // ── 배경 이미지 설정 ─────────────────────────────────────
   const setBackgroundImage = useCallback(async (dataUrl) => {
     BP('05', 'setBackgroundImage 호출');
     setBackgroundImageState(dataUrl);
@@ -438,7 +450,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     await setBackground('image');
   }, [setBackground]);
 
-  // ── 정리 ────────────────────────────────────────────────────
+  // ── 정리 ────────────────────────────────────────────────
   const cleanup = useCallback(async () => {
     BP('99', 'cleanup 시작');
     stopProcessingLoop();
@@ -447,23 +459,24 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     if (rawStream) {
       const liveTrack = rawStream.getVideoTracks().find(t => t.readyState === 'live');
       if (liveTrack) {
-        updateLocalVideoPreview(rawStream);
         await replaceVideoProducerTrack(liveTrack).catch(() => {});
+        updateLocalVideoPreview(rawStream);
       }
     }
 
+    // ✅ v5: pause()만, srcObject=null 사용 안 함
     if (videoElRef.current) {
-      videoElRef.current.srcObject = null;
+      try { videoElRef.current.pause(); } catch (_) {}
       videoElRef.current = null;
     }
 
+    internalStreamRef.current = null;
     stopOutputStreamTracks();
 
-    bgImageRef.current         = null;
-    originalTrackIdRef.current = null;
-    canvasRef.current          = null;
-    modeRef.current            = 'none';
-    segRef.current             = null;
+    bgImageRef.current   = null;
+    canvasRef.current    = null;
+    modeRef.current      = 'none';
+    segRef.current       = null;
     resetSegmentationCache();
 
     setBackgroundMode('none');
