@@ -9,16 +9,11 @@
 //   'blur'  — 배경만 가우시안 블러 처리, 인물은 선명하게
 //   'image' — 배경을 커스텀 이미지로 교체
 //
-// ✅ 변경 사항 (기존 대비):
-//   - MEDIAPIPE_CDN(jsdelivr) 제거
-//   - npm 패키지(@mediapipe/selfie_segmentation) 사용
-//   - locateFile: /mediapipe/ 경로 (Dockerfile.prod에서 public/mediapipe/에 복사)
-//   - CDN 스크립트 태그 방식 제거 (불필요)
-//   - 나머지 로직 동일 유지
-//
-// 사용:
-//   const { backgroundMode, backgroundImage, setBackground, setBackgroundImage, cleanup }
-//     = useBackgroundProcessor({ localStreamRef, producersRef });
+// ✅ 버그 수정:
+//   - setBackground('blur'|'image') 호출 시 localVideoRef의 srcObject를
+//     캔버스 출력 스트림으로 교체 → 로컬 미리보기도 배경 효과 반영
+//   - setBackground('none') 호출 시 localVideoRef를 원본 스트림으로 복원
+//   - localVideoRefForPreview prop 추가 (VideoMeetingRoom에서 localVideoRef 전달)
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 
@@ -48,12 +43,9 @@ async function loadSelfieSegmentation() {
   BP('LOAD', 'MediaPipe SelfieSegmentation 로드 시작...');
 
   try {
-    // ✅ npm 패키지에서 import (CDN 아님)
     const { SelfieSegmentation } = await import('@mediapipe/selfie_segmentation');
 
     const seg = new SelfieSegmentation({
-      // ✅ Dockerfile.prod에서 복사한 public/mediapipe/ 경로에서 wasm/모델 로드
-      //    빌드 후 dist/mediapipe/ → nginx가 /mediapipe/ 로 서빙
       locateFile: (file) => `/mediapipe/${file}`,
     });
 
@@ -70,7 +62,6 @@ async function loadSelfieSegmentation() {
         clearTimeout(timeout);
         resolve();
       });
-      // 더미 캔버스로 초기화 트리거
       const dummy = document.createElement('canvas');
       dummy.width = 64; dummy.height = 64;
       seg.send({ image: dummy }).catch(() => {});
@@ -95,21 +86,22 @@ async function loadSelfieSegmentation() {
 }
 
 // ── 훅 본체 ──────────────────────────────────────────────────
-export function useBackgroundProcessor({ localStreamRef, producersRef }) {
+// ✅ localVideoRef 추가: 배경 효과 적용 시 로컬 미리보기도 업데이트
+export function useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef }) {
   const [backgroundMode,  setBackgroundMode]      = useState('none');
   const [backgroundImage, setBackgroundImageState] = useState(null);
 
   // ── 내부 refs ──────────────────────────────────────────────
-  const canvasRef        = useRef(null);   // 합성용 캔버스
-  const outputStreamRef  = useRef(null);   // captureStream() 결과
-  const rafRef           = useRef(null);   // requestAnimationFrame ID
-  const intervalRef      = useRef(null);   // setInterval ID (fallback)
-  const segRef           = useRef(null);   // SelfieSegmentation 인스턴스
-  const bgImageRef       = useRef(null);   // HTMLImageElement (배경 이미지)
-  const modeRef          = useRef('none'); // 현재 모드 (closure 없이 최신값 유지)
-  const activeRef        = useRef(false);  // 처리 루프 활성 여부
-  const originalTrackRef = useRef(null);   // 원본 카메라 비디오 트랙
-  const videoElRef       = useRef(null);   // 재사용 video 엘리먼트
+  const canvasRef        = useRef(null);
+  const outputStreamRef  = useRef(null);
+  const rafRef           = useRef(null);
+  const intervalRef      = useRef(null);
+  const segRef           = useRef(null);
+  const bgImageRef       = useRef(null);
+  const modeRef          = useRef('none');
+  const activeRef        = useRef(false);
+  const originalTrackRef = useRef(null);
+  const videoElRef       = useRef(null);
 
   // ── 캔버스 합성 함수 ─────────────────────────────────────
   const composeFrame = useCallback((videoEl, seg, results) => {
@@ -126,7 +118,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     }
 
     if (!results || !results.segmentationMask) {
-      // 세그멘테이션 결과 없음 → fallback
       if (mode === 'blur') {
         ctx.filter = `blur(${BLUR_AMOUNT}px)`;
         ctx.drawImage(videoEl, 0, 0, w, h);
@@ -145,7 +136,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
       ctx.drawImage(videoEl, 0, 0, w, h);
       ctx.filter = 'none';
     } else if (mode === 'image' && bgImageRef.current) {
-      // 배경 이미지: 비율 유지하며 중앙 크롭
       const img = bgImageRef.current;
       const s  = Math.max(w / img.width, h / img.height);
       const dw = img.width * s, dh = img.height * s;
@@ -162,12 +152,10 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     const tCtx = tempCanvas.getContext('2d');
 
     tCtx.drawImage(videoEl, 0, 0, w, h);
-    // destination-in: 마스크 흰색(인물) 부분만 남김
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mask, 0, 0, w, h);
     tCtx.globalCompositeOperation = 'source-over';
 
-    // 배경 위에 인물 합성
     ctx.drawImage(tempCanvas, 0, 0, w, h);
   }, []);
 
@@ -184,7 +172,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     await new Promise((resolve) => {
       video.onloadedmetadata = () => { video.play().catch(() => {}); resolve(); };
       video.onerror = resolve;
-      setTimeout(resolve, 3000); // 안전망
+      setTimeout(resolve, 3000);
     });
 
     videoElRef.current = video;
@@ -195,29 +183,24 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
   const startProcessingLoop = useCallback(async (rawStream) => {
     BP('01', '처리 루프 시작');
 
-    // 캔버스 준비
     if (!canvasRef.current) {
       canvasRef.current = document.createElement('canvas');
     }
     const canvas = canvasRef.current;
 
-    // 실제 카메라 해상도에 맞춤
     const vTrack = rawStream.getVideoTracks()[0];
     const { width = 640, height = 480 } = vTrack?.getSettings?.() || {};
     canvas.width  = width;
     canvas.height = height;
     BP('01', `캔버스: ${width}×${height}`);
 
-    // 비디오 엘리먼트 준비
     const videoEl = await getVideoEl(rawStream);
 
-    // captureStream 준비 (최초 1회)
     if (!outputStreamRef.current) {
       outputStreamRef.current = canvas.captureStream(CANVAS_FPS);
       BP('01', `captureStream 생성 — ${CANVAS_FPS}fps`);
     }
 
-    // MediaPipe 로드 시도
     try {
       if (!segRef.current) {
         BP('01', 'MediaPipe 로드 시도...');
@@ -234,7 +217,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     let lastResults = null;
 
     if (seg) {
-      // ── MediaPipe 세그멘테이션 루프 ──────────────────────
       seg.onResults((results) => { lastResults = results; });
 
       const loop = async () => {
@@ -255,7 +237,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
       rafRef.current = requestAnimationFrame(loop);
 
     } else {
-      // ── Fallback: MediaPipe 없이 단순 처리 ───────────────
       BPW('01', 'Fallback 모드: 세그멘테이션 없이 처리');
       const ctx = canvas.getContext('2d');
 
@@ -270,7 +251,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
           ctx.filter = `blur(${BLUR_AMOUNT}px)`;
           ctx.drawImage(videoEl, 0, 0, cw, ch);
           ctx.filter = 'none';
-          // 중앙 사각형 선명하게 복사 (AI 없는 fallback)
           const pw = Math.round(cw * 0.65), ph = ch;
           const px = (cw - pw) / 2;
           ctx.drawImage(videoEl, px, 0, pw, ph, px, 0, pw, ph);
@@ -279,7 +259,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
           const s  = Math.max(cw / img.width, ch / img.height);
           const dw = img.width * s, dh = img.height * s;
           ctx.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
-          // 중앙 사각형 인물 합성
           const pw = Math.round(cw * 0.65), ph = ch;
           const px = (cw - pw) / 2;
           ctx.drawImage(videoEl, px, 0, pw, ph, px, 0, pw, ph);
@@ -315,6 +294,20 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     }
   }, [producersRef]);
 
+  // ── ✅ 로컬 비디오 미리보기 업데이트 헬퍼 ───────────────
+  const updateLocalVideoPreview = useCallback((stream) => {
+    const videoEl = localVideoRef?.current;
+    if (!videoEl) {
+      BPW('06', 'localVideoRef 없음 — 미리보기 업데이트 생략');
+      return;
+    }
+    if (videoEl.srcObject !== stream) {
+      videoEl.srcObject = stream;
+      videoEl.play().catch(() => {});
+      BP('06', `로컬 비디오 미리보기 업데이트 — streamId="${stream?.id}"`);
+    }
+  }, [localVideoRef]);
+
   // ── 배경 모드 설정 ───────────────────────────────────────
   const setBackground = useCallback(async (mode) => {
     BP('04', `setBackground 호출 — mode="${mode}"`);
@@ -329,6 +322,9 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
 
     if (mode === 'none') {
       stopProcessingLoop();
+
+      // ✅ 로컬 비디오를 원본 스트림으로 복원
+      updateLocalVideoPreview(rawStream);
 
       // SFU producer를 원본 트랙으로 복원
       if (originalTrackRef.current) {
@@ -355,22 +351,29 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
       if (!activeRef.current) {
         const processedStream = await startProcessingLoop(rawStream);
         if (processedStream) {
+          // ✅ 로컬 비디오 미리보기를 처리된 캔버스 스트림으로 교체
+          updateLocalVideoPreview(processedStream);
+
           const processedVideoTrack = processedStream.getVideoTracks()[0];
           if (processedVideoTrack) {
             await replaceVideoProducerTrack(processedVideoTrack);
           }
         }
+      } else {
+        // 루프가 이미 동작 중 → modeRef만 변경됨(자동 반영)
+        // 하지만 미리보기는 이미 processedStream으로 연결된 상태여야 함
+        if (outputStreamRef.current) {
+          updateLocalVideoPreview(outputStreamRef.current);
+        }
       }
-      // 이미 루프가 동작 중이면 modeRef만 변경 → 자동 반영
     }
-  }, [localStreamRef, startProcessingLoop, stopProcessingLoop, replaceVideoProducerTrack]);
+  }, [localStreamRef, startProcessingLoop, stopProcessingLoop, replaceVideoProducerTrack, updateLocalVideoPreview]);
 
   // ── 배경 이미지 설정 ─────────────────────────────────────
   const setBackgroundImage = useCallback(async (dataUrl) => {
     BP('05', 'setBackgroundImage 호출');
     setBackgroundImageState(dataUrl);
 
-    // 이미지 로드 완료 후 모드 전환
     await new Promise((resolve) => {
       const img = new Image();
       img.onload  = () => { bgImageRef.current = img; BP('05', '✅ 배경 이미지 로드 완료'); resolve(); };
@@ -385,6 +388,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
   const cleanup = useCallback(async () => {
     BP('99', 'cleanup 시작');
     stopProcessingLoop();
+
+    // ✅ 정리 시 원본 스트림으로 복원
+    if (originalTrackRef.current && localStreamRef?.current) {
+      updateLocalVideoPreview(localStreamRef.current);
+    }
 
     if (originalTrackRef.current) {
       await replaceVideoProducerTrack(originalTrackRef.current).catch(() => {});
@@ -404,9 +412,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef }) {
     setBackgroundMode('none');
     setBackgroundImageState(null);
     BP('99', 'cleanup 완료');
-  }, [stopProcessingLoop, replaceVideoProducerTrack]);
+  }, [stopProcessingLoop, replaceVideoProducerTrack, localStreamRef, updateLocalVideoPreview]);
 
-  // 언마운트 시 정리
   useEffect(() => {
     return () => {
       activeRef.current = false;
