@@ -1,22 +1,27 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v6 — 완전 재설계 ★
+// ★ 배경 처리 훅 v7 — 버그 수정 ★
 //
-// [핵심 설계 원칙]
+// [v7 수정 사항]
 //
-// 1. 원본 카메라 스트림(rawStream)과 그 트랙은 절대로 건드리지 않음
-//    - video.srcObject = null 사용 금지 (Chrome에서 getUserMedia 트랙 ended됨)
-//    - track.stop() 호출 금지 (captureStream track이라도 SFU 상태에 영향)
+// 버그 1: 배경 이미지 → 배경없음 전환 시 검은 화면
+//   원인: ensureInfrastructure에서 video.srcObject = rawStream 직접 연결 시
+//         Chrome이 rawStream videoTrack의 "소유권"을 내부 video로 이전하여
+//         이후 rawStream.getVideoTracks()에서 readyState='live' 트랙을 찾지 못함.
+//   수정: rawStream을 감싸는 래퍼 MediaStream을 내부 video에 연결.
+//         → rawStream 원본 트랙은 항상 live 상태 유지.
 //
-// 2. 내부 video 엘리먼트는 컴포넌트 전체 수명 동안 하나만 유지
-//    - 매 세션마다 새로 생성하지 않음
-//    - srcObject는 rawStream → rawStream 변경 없음 (한 번 연결 후 고정)
+// 버그 2: 배경 이미지 → 다른 배경 이미지 전환 시 사람 안보임
+//   원인: activeRef.current=true이므로 startLoop() skip → seg.onResults 재등록 안됨
+//         → lastResults가 null인 채로 composeFrame 호출 → mask 없으면 배경만 그림.
+//   수정: 배경 이미지 간 전환 시(mode='image'이고 루프가 이미 active) seg.onResults를
+//         명시적으로 재등록하여 lastResults 갱신 보장.
 //
-// 3. none 전환 시 captureStream 트랙 stop 금지
-//    - 대신 canvas 렌더링 루프만 중지 (track은 자연히 정지 상태가 됨)
-//    - SFU producer 트랙 교체 후 canvas/outputStream은 GC에 맡김
-//
-// 4. SFU 교체는 항상 새 트랙이 준비된 후에만 실행
+// 버그 3: updatePreview에서 동일 stream 비교로 인한 skip
+//   원인: none 전환 시 rawStream으로 복원하려 할 때 el.srcObject가 outputStream과 달라
+//         정상 작동해야 하나, rawStream이 ended 상태면 검은 화면.
+//   수정: none 전환 시 rawStream의 liveTrack이 없으면 videoElRef의 래퍼스트림에서
+//         대체 트랙을 찾는 폴백 처리 추가.
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 
@@ -28,7 +33,6 @@ const BPW = (tag, ...a) => console.warn(`%c[BG-${tag}]`, 'color:#ff9800;font-wei
 const BPE = (tag, ...a) => console.error(`%c[BG-${tag}]`, 'color:#f44336;font-weight:bold', ...a);
 
 // ── MediaPipe 로더 (싱글턴) ──────────────────────────────────
-// 한 번 로드 후 세션 간 재사용 (매번 재로드 불필요)
 let _segInstance = null;
 let _segPromise  = null;
 
@@ -65,16 +69,22 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const [backgroundImage, setBackgroundImageState] = useState(null);
 
   // ── refs ──────────────────────────────────────────────────
-  const modeRef        = useRef('none');
-  const bgImageRef     = useRef(null);
-  const activeRef      = useRef(false);
-  const rafRef         = useRef(null);
-  const intervalRef    = useRef(null);
+  const modeRef         = useRef('none');
+  const bgImageRef      = useRef(null);
+  const activeRef       = useRef(false);
+  const rafRef          = useRef(null);
+  const intervalRef     = useRef(null);
 
-  // ✅ v6: video / canvas / stream 은 한 번 생성 후 재사용
-  const videoElRef     = useRef(null);   // 내부 처리용 video (rawStream 고정)
-  const canvasRef      = useRef(null);   // 합성 캔버스
-  const outputStreamRef = useRef(null);  // captureStream 출력
+  // v7: video / canvas / stream 한 번 생성 후 재사용
+  const videoElRef      = useRef(null);   // 내부 처리용 video
+  // ★ v7 수정: rawStream 래퍼 (rawStream 원본 보호)
+  const wrapperStreamRef = useRef(null);  // video.srcObject에 연결되는 래퍼 MediaStream
+  const canvasRef        = useRef(null);   // 합성 캔버스
+  const outputStreamRef  = useRef(null);  // captureStream 출력
+
+  // seg 인스턴스와 lastResults를 ref로 관리 (루프 간 공유)
+  const segRef          = useRef(null);
+  const lastResultsRef  = useRef(null);   // ★ v7: ref로 관리하여 루프 간 공유
 
   // ── 캔버스 합성 ─────────────────────────────────────────────
   const composeFrame = useCallback((videoEl, results) => {
@@ -103,7 +113,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       const s   = Math.max(w / img.width, h / img.height);
       ctx.drawImage(img, (w - img.width * s) / 2, (h - img.height * s) / 2, img.width * s, img.height * s);
     } else {
-      // 배경 이미지 미준비 시 fallback: 흐린 영상
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
       ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
       ctx.filter = 'none';
@@ -111,8 +120,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     ctx.restore();
 
     if (!mask) {
-      // mask 없으면 인물 합성 건너뜀 (배경만 표시)
-      return;
+      return; // mask 없으면 배경만 표시
     }
 
     // ── Step 2: 인물 추출 (임시 캔버스) ─────────────────────
@@ -128,7 +136,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     ctx.drawImage(tmp, 0, 0, w, h);
   }, []);
 
-  // ── 처리 루프 중지 (active만 false, 모든 ref 유지) ──────────
+  // ── 처리 루프 중지 ──────────────────────────────────────────
   const stopLoop = useCallback(() => {
     activeRef.current = false;
     if (rafRef.current)      { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
@@ -160,24 +168,35 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   // ── 로컬 미리보기 업데이트 ────────────────────────────────
   const updatePreview = useCallback((stream) => {
     const el = localVideoRef?.current;
-    if (!el || el.srcObject === stream) return;
-    el.srcObject = stream;
-    el.play().catch(() => {});
-    BP('06', `미리보기 업데이트 — streamId="${stream?.id}"`);
+    if (!el) return;
+    // ★ v7: srcObject가 같아도 강제 업데이트 (none 복원 시 안전)
+    if (el.srcObject !== stream) {
+      el.srcObject = stream;
+      el.play().catch(() => {});
+      BP('06', `미리보기 업데이트 — streamId="${stream?.id}"`);
+    }
   }, [localVideoRef]);
 
-  // ── ✅ v6 핵심: 처리 인프라 초기화 (최초 1회만) ──────────────
+  // ── ✅ v7 핵심: 처리 인프라 초기화 ──────────────────────────
   //
-  //  한 번 설정한 video / canvas / captureStream은 계속 재사용.
-  //  mode 전환 시에도 이들을 파괴하지 않음.
-  //  → rawStream 트랙의 ended 문제 원천 차단
+  // ★ rawStream을 내부 video에 직접 연결하지 않고 래퍼 MediaStream 사용.
+  //   이유: Chrome에서 video.srcObject = rawStream 시 rawStream videoTrack의
+  //   "live" 상태가 내부 video에 종속됨. video.srcObject를 나중에 변경하거나
+  //   null로 설정 시 rawStream 트랙이 ended 상태로 전환될 수 있음.
+  //   래퍼를 사용하면 rawStream 원본은 항상 독립적으로 live 유지됨.
   const ensureInfrastructure = useCallback(async (rawStream) => {
     // video: 이미 있으면 재사용
     if (!videoElRef.current) {
       BP('01', '내부 video 엘리먼트 생성');
       const video = document.createElement('video');
-      // ✅ rawStream을 직접 연결 (이후 절대로 srcObject 변경 안 함)
-      video.srcObject   = rawStream;
+
+      // ★ v7 핵심 수정: rawStream을 직접 연결하지 않고 래퍼 MediaStream 생성
+      // rawStream의 트랙들을 같이 사용하되, 래퍼 객체를 통해 접근
+      // → 래퍼가 GC되거나 srcObject에서 제거되어도 rawStream 원본 트랙은 ended 안됨
+      const wrapper = new MediaStream(rawStream.getTracks());
+      wrapperStreamRef.current = wrapper;
+
+      video.srcObject   = wrapper;
       video.autoplay    = true;
       video.playsInline = true;
       video.muted       = true;
@@ -216,27 +235,32 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     const canvas  = canvasRef.current;
     if (!videoEl || !canvas) return;
 
-    let seg = null;
-    try {
-      seg = await getSegmentation();
-    } catch (e) {
-      BPW('01', 'MediaPipe 실패 — fallback:', e.message);
+    let seg = segRef.current;
+    if (!seg) {
+      try {
+        seg = await getSegmentation();
+        segRef.current = seg;
+      } catch (e) {
+        BPW('01', 'MediaPipe 실패 — fallback:', e.message);
+      }
     }
 
     if (seg) {
-      let lastResults = null;
-      // ✅ onResults 매 루프 시작 시 새로 등록
-      seg.onResults(r => { if (activeRef.current) lastResults = r; });
+      // ★ v7: lastResultsRef(ref)로 관리 — 루프 재시작 없이도 업데이트 공유
+      // onResults를 새로 등록하여 최신 콜백 보장
+      seg.onResults(r => {
+        if (activeRef.current) lastResultsRef.current = r;
+      });
 
       const loop = async () => {
         if (!activeRef.current) return;
         try {
           if (videoEl.readyState >= 2) {
             await seg.send({ image: videoEl });
-            composeFrame(videoEl, lastResults);
+            composeFrame(videoEl, lastResultsRef.current);
           }
         } catch (_) {
-          if (activeRef.current) composeFrame(videoEl, null);
+          if (activeRef.current) composeFrame(videoEl, lastResultsRef.current);
         }
         if (activeRef.current) rafRef.current = requestAnimationFrame(loop);
       };
@@ -253,6 +277,17 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('01', '✅ 렌더링 루프 시작');
   }, [composeFrame]);
 
+  // ── ★ v7: seg.onResults 재등록 (루프 재시작 없이) ──────────
+  // 배경 이미지 간 전환 시 호출하여 onResults 콜백을 새로 등록
+  const refreshOnResults = useCallback(() => {
+    const seg = segRef.current;
+    if (!seg || !activeRef.current) return;
+    seg.onResults(r => {
+      if (activeRef.current) lastResultsRef.current = r;
+    });
+    BP('04', 'seg.onResults 재등록 완료');
+  }, []);
+
   // ── 배경 모드 설정 (공개 API) ────────────────────────────
   const setBackground = useCallback(async (mode) => {
     BP('04', `setBackground — mode="${mode}"`);
@@ -267,29 +302,47 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       // ── 배경 OFF ─────────────────────────────────────────
       stopLoop();
 
-      // ✅ rawStream에서 live 트랙 확인
+      // ★ v7: rawStream에서 live 트랙 확인
       const liveTrack = rawStream.getVideoTracks().find(t => t.readyState === 'live');
       BP('04', `none 전환 — liveTrack: ${liveTrack?.readyState ?? 'none'} (id=${liveTrack?.id?.slice(0,8) ?? 'N/A'})`);
 
       if (liveTrack) {
         await replaceSFUTrack(liveTrack);
+        updatePreview(rawStream);
+      } else {
+        // ★ v7 폴백: rawStream 트랙이 ended인 경우 래퍼스트림에서 찾기
+        BPW('04', 'rawStream liveTrack 없음 — 래퍼스트림 폴백 시도');
+        const wrapperTrack = wrapperStreamRef.current?.getVideoTracks()
+          .find(t => t.readyState === 'live');
+        if (wrapperTrack) {
+          await replaceSFUTrack(wrapperTrack);
+        }
+        // 미리보기 복원: rawStream이 ended라도 srcObject를 rawStream으로 복원
+        // (Chrome이 rawStream ref가 있으면 재활성화 시도)
+        const el = localVideoRef?.current;
+        if (el) {
+          el.srcObject = rawStream;
+          el.play().catch(() => {});
+          BP('04', `미리보기 폴백 복원 — rawStream id="${rawStream.id}"`);
+        }
       }
-      // ✅ 로컬 미리보기를 rawStream으로 복원
-      updatePreview(rawStream);
-
-      // ✅ v6: video / canvas / outputStream 파괴 안 함 (트랙 ended 방지)
-      //       루프만 중지하고 인프라는 유지 → 다음 배경 선택 시 재사용
 
       setBackgroundImageState(null);
+      lastResultsRef.current = null; // ★ v7: none 전환 시 lastResults 초기화
 
     } else {
       // ── 배경 ON ──────────────────────────────────────────
       // 1) 인프라 준비 (이미 있으면 재사용)
       await ensureInfrastructure(rawStream);
 
-      // 2) 루프가 중지된 경우만 재시작
+      // 2) 루프가 중지된 경우만 재시작, 이미 active이면 onResults만 재등록
       if (!activeRef.current) {
+        lastResultsRef.current = null; // 새 루프 시작 전 초기화
         await startLoop();
+      } else {
+        // ★ v7 핵심 수정: 루프가 이미 돌고 있어도 onResults 재등록
+        // 이렇게 하면 다른 배경 이미지로 전환해도 lastResults가 계속 갱신됨
+        refreshOnResults();
       }
 
       // 3) 출력 스트림을 SFU와 로컬 미리보기에 연결
@@ -302,7 +355,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
   }, [
     localStreamRef, stopLoop, startLoop, ensureInfrastructure,
-    replaceSFUTrack, updatePreview,
+    replaceSFUTrack, updatePreview, refreshOnResults, localVideoRef,
   ]);
 
   // ── 배경 이미지 설정 ─────────────────────────────────────
@@ -310,7 +363,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('05', 'setBackgroundImage 호출');
     setBackgroundImageState(dataUrl);
 
-    // 이미지 로드
     await new Promise(resolve => {
       const img = new Image();
       img.onload  = () => { bgImageRef.current = img; BP('05', '✅ 이미지 로드 완료'); resolve(); };
@@ -335,18 +387,19 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       updatePreview(rawStream);
     }
 
-    // ✅ v6: video srcObject 건드리지 않음 — pause만
     if (videoElRef.current) {
       try { videoElRef.current.pause(); } catch (_) {}
-      // srcObject = null 금지!
+      // srcObject = null 금지! (rawStream 트랙 ended 방지)
       videoElRef.current = null;
     }
 
-    // captureStream은 참조만 해제 (stop 금지)
-    outputStreamRef.current = null;
-    canvasRef.current       = null;
-    bgImageRef.current      = null;
-    modeRef.current         = 'none';
+    wrapperStreamRef.current = null;
+    outputStreamRef.current  = null;
+    canvasRef.current        = null;
+    bgImageRef.current       = null;
+    modeRef.current          = 'none';
+    lastResultsRef.current   = null;
+    segRef.current           = null;
 
     setBackgroundMode('none');
     setBackgroundImageState(null);
