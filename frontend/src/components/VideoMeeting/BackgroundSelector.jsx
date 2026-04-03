@@ -1,12 +1,12 @@
 // frontend/src/components/VideoMeeting/BackgroundSelector.jsx
 //
-// ✅ v2 수정:
-//   - SVG 프리셋에서 linearGradient id 중복 제거
-//     (오피스/거실/다크가 모두 id="g"를 사용해 브라우저 렌더링 오류)
-//   - 각 SVG마다 고유 id 부여 (id="g-office", "g-living" 등)
+// ✅ v3 수정:
+//   - 드래그로 창 이동 가능 (데스크톱 전용)
+//   - fixed 위치 + useState position으로 드래그 구현
+//   - 헤더 전체를 드래그 핸들로 사용
 
-import React, { useRef, useCallback } from 'react';
-import { Blend, ImageOff, ImagePlus, X } from 'lucide-react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { Blend, ImageOff, ImagePlus, X, GripVertical } from 'lucide-react';
 
 // ── 배경 이미지 프리셋 ──────────────────────────────────────
 // ✅ SVG id 충돌 수정: 각 SVG마다 고유 id 사용
@@ -46,11 +46,75 @@ export function BackgroundSelector({
   onClose,
 }) {
   const fileInputRef = useRef(null);
+  const panelRef = useRef(null);
 
+  // ── 드래그 상태 ──────────────────────────────────────────
+  const [position, setPosition] = useState(null); // null = 초기 위치 미설정
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 패널이 열릴 때 초기 위치를 화면 중앙 하단으로 설정
+  useEffect(() => {
+    if (isOpen && position === null) {
+      const panelW = 320;
+      const panelH = 480;
+      setPosition({
+        x: Math.round((window.innerWidth - panelW) / 2),
+        y: Math.round((window.innerHeight - panelH) / 2),
+      });
+    }
+    if (!isOpen) {
+      setPosition(null); // 닫으면 초기화 → 다음에 열릴 때 다시 중앙
+    }
+  }, [isOpen]);
+
+  // ── 드래그 핸들러 ─────────────────────────────────────────
+  const handleDragStart = (e) => {
+    if (isMobile) return;
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - (position?.x ?? 0),
+      y: e.clientY - (position?.y ?? 0),
+    });
+  };
+
+  const handleDragMove = useCallback((e) => {
+    if (!isDragging || isMobile) return;
+    const panelW = panelRef.current?.offsetWidth || 320;
+    const panelH = panelRef.current?.offsetHeight || 480;
+    const newX = Math.max(0, Math.min(window.innerWidth - panelW, e.clientX - dragStart.x));
+    const newY = Math.max(0, Math.min(window.innerHeight - panelH, e.clientY - dragStart.y));
+    setPosition({ x: newX, y: newY });
+  }, [isDragging, dragStart, isMobile]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+      };
+    }
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  // ── 파일 업로드 ──────────────────────────────────────────
   const handleFileChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       alert('이미지 파일만 업로드할 수 있습니다.');
       return;
@@ -59,28 +123,66 @@ export function BackgroundSelector({
       alert('이미지 크기는 5MB 이하여야 합니다.');
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (ev) => { onSetBackgroundImage(ev.target.result); };
     reader.readAsDataURL(file);
     e.target.value = '';
   }, [onSetBackgroundImage]);
 
-  if (!isOpen) return null;
+  if (!isOpen || position === null) return null;
 
+  // ── 모바일: 기존 팝오버 방식 유지 ────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        <div className="fixed inset-0 z-40 md:hidden" onClick={onClose} />
+        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in">
+          <MobileHeader onClose={onClose} />
+          <PanelBody
+            backgroundMode={backgroundMode}
+            backgroundImage={backgroundImage}
+            onSetBackground={onSetBackground}
+            onSetBackgroundImage={onSetBackgroundImage}
+            fileInputRef={fileInputRef}
+            handleFileChange={handleFileChange}
+            onClose={onClose}
+          />
+        </div>
+      </>
+    );
+  }
+
+  // ── 데스크톱: fixed + 드래그 ─────────────────────────────
   return (
     <>
-      {/* 모바일 배경 오버레이 */}
-      <div className="fixed inset-0 z-40 md:hidden" onClick={onClose} />
+      {/* 드래그 중 텍스트 선택 방지용 오버레이 */}
+      {isDragging && (
+        <div className="fixed inset-0 z-40 cursor-grabbing" />
+      )}
 
-      {/* 패널 본체 */}
-      <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in">
-
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <span className="text-white font-semibold text-sm">배경 효과</span>
+      <div
+        ref={panelRef}
+        className="fixed w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          cursor: isDragging ? 'grabbing' : 'default',
+          userSelect: 'none',
+        }}
+      >
+        {/* 헤더 (드래그 핸들) */}
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b border-gray-700 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleDragStart}
+          title="드래그하여 이동"
+        >
+          <div className="flex items-center gap-2">
+            <GripVertical className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            <span className="text-white font-semibold text-sm">배경 효과</span>
+          </div>
           <button
             onClick={onClose}
+            onMouseDown={(e) => e.stopPropagation()} // 닫기 버튼 클릭 시 드래그 시작 방지
             className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-gray-700"
             type="button"
           >
@@ -88,136 +190,175 @@ export function BackgroundSelector({
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
-
-          {/* ── 기본 옵션 (배경 없음 / 블러) ── */}
-          <div className="grid grid-cols-2 gap-2">
-
-            {/* 배경 없음 */}
-            <button
-              type="button"
-              onClick={() => onSetBackground('none')}
-              className={`
-                flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
-                ${backgroundMode === 'none'
-                  ? 'border-blue-500 bg-blue-900/30'
-                  : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
-                }
-              `}
-            >
-              <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center">
-                <ImageOff className="w-5 h-5 text-gray-300" />
-              </div>
-              <span className="text-xs text-gray-200 font-medium">배경 없음</span>
-              {backgroundMode === 'none' && (
-                <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
-              )}
-            </button>
-
-            {/* 배경 블러 */}
-            <button
-              type="button"
-              onClick={() => onSetBackground('blur')}
-              className={`
-                flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
-                ${backgroundMode === 'blur'
-                  ? 'border-blue-500 bg-blue-900/30'
-                  : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
-                }
-              `}
-            >
-              <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center overflow-hidden">
-                <Blend className="w-5 h-5 text-blue-300" />
-              </div>
-              <span className="text-xs text-gray-200 font-medium">배경 블러</span>
-              {backgroundMode === 'blur' && (
-                <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
-              )}
-            </button>
-          </div>
-
-          {/* ── 배경 이미지 프리셋 ── */}
-          <div>
-            <p className="text-xs text-gray-400 font-medium mb-2">배경 이미지</p>
-            <div className="grid grid-cols-4 gap-2">
-              {PRESET_BACKGROUNDS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => onSetBackgroundImage(preset.url)}
-                  className={`
-                    relative aspect-video rounded-lg overflow-hidden border-2 transition-all
-                    ${backgroundMode === 'image' && backgroundImage === preset.url
-                      ? 'border-blue-500 ring-2 ring-blue-500/50'
-                      : 'border-gray-600 hover:border-gray-400'
-                    }
-                  `}
-                  title={preset.label}
-                >
-                  <div className="w-full h-full" style={{ backgroundColor: preset.thumb }} />
-                  <img
-                    src={preset.url}
-                    alt={preset.label}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    draggable={false}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-black/60 text-[9px] text-white text-center py-0.5">
-                    {preset.label}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── 이미지 직접 업로드 ── */}
-          <div>
-            <p className="text-xs text-gray-400 font-medium mb-2">직접 업로드</p>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-xl text-gray-400 hover:text-gray-200 transition-all hover:bg-gray-700/50 text-sm"
-            >
-              <ImagePlus className="w-4 h-4" />
-              이미지 파일 선택 (최대 5MB)
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </div>
-
-          {/* 현재 커스텀 배경 미리보기 */}
-          {backgroundMode === 'image' && backgroundImage && (
-            <div className="flex items-center gap-3 bg-gray-700/50 rounded-xl p-2.5">
-              <img
-                src={backgroundImage}
-                alt="현재 배경"
-                className="w-14 h-9 object-cover rounded-lg border border-gray-600 flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-white font-medium">배경 적용 중</p>
-                <p className="text-[11px] text-gray-400 truncate">이미지 배경이 송출됩니다</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onSetBackground('none')}
-                className="text-gray-400 hover:text-red-400 transition flex-shrink-0"
-                title="배경 제거"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          <p className="text-[11px] text-gray-500 leading-relaxed">
-            💡 AI 인물 인식으로 배경을 처리합니다. 조명이 밝고 배경과 대비가 뚜렷할수록 효과가 좋습니다.
-          </p>
-        </div>
+        <PanelBody
+          backgroundMode={backgroundMode}
+          backgroundImage={backgroundImage}
+          onSetBackground={onSetBackground}
+          onSetBackgroundImage={onSetBackgroundImage}
+          fileInputRef={fileInputRef}
+          handleFileChange={handleFileChange}
+          onClose={onClose}
+        />
       </div>
     </>
+  );
+}
+
+// ── 모바일 헤더 (드래그 없음) ─────────────────────────────
+function MobileHeader({ onClose }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+      <span className="text-white font-semibold text-sm">배경 효과</span>
+      <button
+        onClick={onClose}
+        className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-gray-700"
+        type="button"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+// ── 패널 본체 (모바일/데스크톱 공용) ─────────────────────
+function PanelBody({
+  backgroundMode,
+  backgroundImage,
+  onSetBackground,
+  onSetBackgroundImage,
+  fileInputRef,
+  handleFileChange,
+  onClose,
+}) {
+  return (
+    <div className="p-4 space-y-4">
+
+      {/* ── 기본 옵션 (배경 없음 / 블러) ── */}
+      <div className="grid grid-cols-2 gap-2">
+
+        {/* 배경 없음 */}
+        <button
+          type="button"
+          onClick={() => onSetBackground('none')}
+          className={`
+            flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            ${backgroundMode === 'none'
+              ? 'border-blue-500 bg-blue-900/30'
+              : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
+            }
+          `}
+        >
+          <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center">
+            <ImageOff className="w-5 h-5 text-gray-300" />
+          </div>
+          <span className="text-xs text-gray-200 font-medium">배경 없음</span>
+          {backgroundMode === 'none' && (
+            <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
+          )}
+        </button>
+
+        {/* 배경 블러 */}
+        <button
+          type="button"
+          onClick={() => onSetBackground('blur')}
+          className={`
+            flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            ${backgroundMode === 'blur'
+              ? 'border-blue-500 bg-blue-900/30'
+              : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
+            }
+          `}
+        >
+          <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center overflow-hidden">
+            <Blend className="w-5 h-5 text-blue-300" />
+          </div>
+          <span className="text-xs text-gray-200 font-medium">배경 블러</span>
+          {backgroundMode === 'blur' && (
+            <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── 배경 이미지 프리셋 ── */}
+      <div>
+        <p className="text-xs text-gray-400 font-medium mb-2">배경 이미지</p>
+        <div className="grid grid-cols-4 gap-2">
+          {PRESET_BACKGROUNDS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => onSetBackgroundImage(preset.url)}
+              className={`
+                relative aspect-video rounded-lg overflow-hidden border-2 transition-all
+                ${backgroundMode === 'image' && backgroundImage === preset.url
+                  ? 'border-blue-500 ring-2 ring-blue-500/50'
+                  : 'border-gray-600 hover:border-gray-400'
+                }
+              `}
+              title={preset.label}
+            >
+              <div className="w-full h-full" style={{ backgroundColor: preset.thumb }} />
+              <img
+                src={preset.url}
+                alt={preset.label}
+                className="absolute inset-0 w-full h-full object-cover"
+                draggable={false}
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-black/60 text-[9px] text-white text-center py-0.5">
+                {preset.label}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 이미지 직접 업로드 ── */}
+      <div>
+        <p className="text-xs text-gray-400 font-medium mb-2">직접 업로드</p>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-xl text-gray-400 hover:text-gray-200 transition-all hover:bg-gray-700/50 text-sm"
+        >
+          <ImagePlus className="w-4 h-4" />
+          이미지 파일 선택 (최대 5MB)
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+
+      {/* 현재 커스텀 배경 미리보기 */}
+      {backgroundMode === 'image' && backgroundImage && (
+        <div className="flex items-center gap-3 bg-gray-700/50 rounded-xl p-2.5">
+          <img
+            src={backgroundImage}
+            alt="현재 배경"
+            className="w-14 h-9 object-cover rounded-lg border border-gray-600 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-white font-medium">배경 적용 중</p>
+            <p className="text-[11px] text-gray-400 truncate">이미지 배경이 송출됩니다</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSetBackground('none')}
+            className="text-gray-400 hover:text-red-400 transition flex-shrink-0"
+            title="배경 제거"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        💡 AI 인물 인식으로 배경을 처리합니다. 조명이 밝고 배경과 대비가 뚜렷할수록 효과가 좋습니다.
+      </p>
+    </div>
   );
 }
 
