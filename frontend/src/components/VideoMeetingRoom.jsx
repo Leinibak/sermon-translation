@@ -9,6 +9,10 @@
 // - PendingRequestsPanel 컴팩트화 + 자동소멸 결과 알림
 // - LayoutToggleButton 제거 (RoomHeader에 통합)
 // - 컨트롤 바에서 레이아웃 버튼 제거
+// ✅ [버그수정] 방장 나가기: window.confirm 제거 → ControlBar 팝오버 메뉴로 분리
+//   - handleLeave: 나만 나가기 전용
+//   - handleEndMeeting: 회의 종료(모든 퇴장) 전용
+//   - ControlBar에 isHost / onEndMeeting prop 추가 전달
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -27,7 +31,7 @@ import { RaiseHandButton, HandRaisedBadge } from './VideoMeeting/RaiseHandButton
 import { IOSPlayButton }        from './VideoMeeting/IOSPlayButton';
 import { useActiveSpeaker } from '../hooks/useActiveSpeaker';
 import { useBackgroundProcessor } from '../hooks/useBackgroundProcessor';
-import { BackgroundSelector }   from './VideoMeeting/BackgroundSelector'; 
+import { BackgroundSelector }   from './VideoMeeting/BackgroundSelector';
 
 // ── 진단 로거 ─────────────────────────────────────────────────
 const RD  = (tag, ...args) => { const ts = new Date().toISOString().slice(11,23); console.log(`%c[R-D${tag}] ${ts}`,'color:#8bc34a;font-weight:bold',...args); };
@@ -54,6 +58,27 @@ const isSafari = () => {
   const ua = navigator.userAgent || navigator.vendor || window.opera;
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua) && !/FxiOS/.test(ua) && !/EdgiOS/.test(ua);
 };
+
+// ── 공통 정리 헬퍼 ────────────────────────────────────────────
+async function doCleanupAndNavigate({
+  cleanupBackground,
+  cleanupWebRTC,
+  localStreamRef,
+  wsRef,
+  navigate,
+}) {
+  try { await cleanupBackground(); } catch (_) {}
+  cleanupWebRTC();
+  if (localStreamRef.current) {
+    localStreamRef.current.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+  }
+  if (wsRef.current) {
+    wsRef.current.close(1000, 'User left');
+    wsRef.current = null;
+  }
+  navigate('/video-meetings');
+}
 
 // ============================================================
 // VideoMeetingRoom
@@ -104,7 +129,7 @@ function VideoMeetingRoom() {
   const messagesEndRef  = useRef(null);
   const messageIdsRef   = useRef(new Set());
 
-  // ── reactions: id, emoji, username, index ─────────────────
+  // ── reactions ─────────────────────────────────────────────
   const [reactions,    setReactions]    = useState([]);
   const reactionIndexRef = useRef(0);
   const [isHandRaised, setIsHandRaised] = useState(false);
@@ -121,8 +146,8 @@ function VideoMeetingRoom() {
     producersRef,
     cleanup: cleanupWebRTC,
   } = useSFU({ wsRef, roomId });
- 
-  const processedStreamRef = useRef(null);  // outputStream 참조 보관
+
+  const processedStreamRef = useRef(null);  // eslint-disable-line no-unused-vars
 
   // ── 배경 효과 훅 ──────────────────────────────────────────
   const {
@@ -131,12 +156,11 @@ function VideoMeetingRoom() {
     setBackground,
     setBackgroundImage,
     cleanup: cleanupBackground,
-    outputStreamRef,   // ★ 추가로 노출해야 함
+    outputStreamRef,
   } = useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef });
-  
+
   // 배경 선택 패널 표시 상태
   const [showBackgroundPanel, setShowBackgroundPanel] = useState(false);
-  
 
   const {
     mainSpeakerId, pinnedPeerId, volumeLevels,
@@ -205,14 +229,12 @@ function VideoMeetingRoom() {
   const handleWebSocketMessage = useCallback((data) => {
     const type = data.type;
 
-    // SFU Promise 타입은 dispatchSFUMessage 큐로
     if (SFU_PROMISE_TYPES.has(type)) {
       RD('02', `→ dispatchSFUMessage (promise type) "${type}"`);
       dispatchSFUMessage(data);
       return;
     }
 
-    // SFU 이벤트 타입은 handleSFUMessage로
     if (SFU_EVENT_TYPES.has(type)) {
       RD('02', `→ handleSFUMessage (event type) "${type}"`);
       handleSFUMessage(data);
@@ -226,42 +248,11 @@ function VideoMeetingRoom() {
         RD('02', `participants_list — count=${data.participants?.length}`);
         break;
 
-      // case 'approval_notification': {
-      //   RD('03', `approval_notification 수신`, {
-      //     room_id: data.room_id,
-      //     participant_user_id: data.participant_user_id,
-      //     approved: data.approved,
-      //   });
-
-      //   if (String(data.room_id) !== String(roomId)) {
-      //     RDW('03', `room_id 불일치 — 무시`);
-      //     break;
-      //   }
-      //   if (String(data.participant_user_id) !== String(user?.id)) {
-      //     RDW('03', `participant_user_id 불일치 — 무시`);
-      //     break;
-      //   }
-
-      //   RD('03', `[Step 1] fetchRoomDetails 호출`);
-      //   fetchRoomDetails().then(() => {
-      //     RD('03', `[Step 1] fetchRoomDetails OK`);
-      //     if (wsRef.current?.readyState === WebSocket.OPEN && wsRef.current?._wsReady) {
-      //       RD('03', `[Step 2] WS 이미 준비됨 — wsReady 강제 세트`);
-      //       setWsReady(true);
-      //     }
-      //   }).catch(e => {
-      //     RDE('03', `fetchRoomDetails 실패:`, e.message);
-      //   });
-      //   break;
-      // }
-
       case 'approval_notification': {
         if (String(data.room_id) !== String(roomId)) break;
         if (String(data.participant_user_id) !== String(user?.id)) break;
 
         fetchRoomDetails().then(() => {
-          // sfuInitializedRef 리셋 없이 wsReady만 보장
-          // → SFU useEffect의 조건이 모두 충족되면 자동 실행
           setWsReady(prev => {
             if (!prev && wsRef.current?._wsReady) return true;
             return prev;
@@ -332,7 +323,6 @@ function VideoMeetingRoom() {
     navigate,
   ]);
 
-  // stale closure 방지 ref
   const handleWebSocketMessageRef = useRef(handleWebSocketMessage);
   useEffect(() => {
     handleWebSocketMessageRef.current = handleWebSocketMessage;
@@ -522,35 +512,20 @@ function VideoMeetingRoom() {
   }, [isVideoOn, muteVideo, unmuteVideo]);
 
   // ==========================================================
-  // 나가기
+  // ✅ [버그수정] 나가기 — window.confirm 제거, 두 함수로 분리
   // ==========================================================
+
+  // 나만 나가기 (방장 포함 — 회의는 유지됨)
   const handleLeave = useCallback(async () => {
-    if (room?.is_host) {
-      const choice = window.confirm(
-        '방장으로서 나가시겠습니까?\n\n확인: 회의 종료 (모든 참가자 퇴장)\n취소: 계속 진행'
-      );
-      if (choice) {
-        try { await endMeeting(); } catch (_) {}
-      } else {
-        try { await leaveRoom(); } catch (_) {}
-      }
-    } else {
-      try { await leaveRoom(); } catch (_) {}
-    }
-    await cleanupBackground(); 
-    cleanupWebRTC();
-    // ✅ 트랙 최종 정리
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-    }
-    
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User left');
-      wsRef.current = null;
-    }
-    navigate('/video-meetings');
-  }, [room, leaveRoom, endMeeting, cleanupWebRTC, localStreamRef, navigate]);
+    try { await leaveRoom(); } catch (_) {}
+    await doCleanupAndNavigate({ cleanupBackground, cleanupWebRTC, localStreamRef, wsRef, navigate });
+  }, [leaveRoom, cleanupBackground, cleanupWebRTC, localStreamRef, navigate]);
+
+  // 회의 종료 (방장 전용 — 모든 참가자 퇴장)
+  const handleEndMeeting = useCallback(async () => {
+    try { await endMeeting(); } catch (_) {}
+    await doCleanupAndNavigate({ cleanupBackground, cleanupWebRTC, localStreamRef, wsRef, navigate });
+  }, [endMeeting, cleanupBackground, cleanupWebRTC, localStreamRef, navigate]);
 
   // ==========================================================
   // 채팅 메시지 전송
@@ -600,12 +575,10 @@ function VideoMeetingRoom() {
     return () => {
       cleanupBackground();
       cleanupWebRTC();
-      // ✅ 카메라/마이크 트랙을 여기서 최종 정리
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
       }
-      
       if (wsRef.current) {
         wsRef.current.close(1000, 'Component unmounting');
         wsRef.current = null;
@@ -743,24 +716,24 @@ function VideoMeetingRoom() {
 
   // ==========================================================
   // allVideos 계산
-  // ===========================
-   const allVideos = useMemo(() => {
-       // ★ 배경 효과 ON이면 outputStream, OFF면 rawStream
-      const localStream = backgroundMode !== 'none' && outputStreamRef?.current
-        ? outputStreamRef.current
-        : (localStreamReady ? localStreamRef.current : null);
+  // ==========================================================
+  const allVideos = useMemo(() => {
+    // ★ 배경 효과 ON이면 outputStream, OFF면 rawStream
+    const localStream = backgroundMode !== 'none' && outputStreamRef?.current
+      ? outputStreamRef.current
+      : (localStreamReady ? localStreamRef.current : null);
 
-      const local = {
-        peerId:     user?.username,
-        username:   `${user?.username} (나)`,
-        stream:     localStream,
-        isLocal:    true,
-        isMuted:    !isMicOn,
-        isVideoOff: !isVideoOn,
-        ref:        localVideoRef,
-        isHandRaised,
-      };
-     const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
+    const local = {
+      peerId:     user?.username,
+      username:   `${user?.username} (나)`,
+      stream:     localStream,
+      isLocal:    true,
+      isMuted:    !isMicOn,
+      isVideoOff: !isVideoOn,
+      ref:        localVideoRef,
+      isHandRaised,
+    };
+    const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
       peerId,
       username: streamData.username && streamData.username !== peerId
         ? streamData.username
@@ -770,17 +743,17 @@ function VideoMeetingRoom() {
       isMuted:     streamData.isMuted    ?? false,
       isVideoOff:  streamData.isVideoOff ?? false,
       isHandRaised: raisedHands.some(h => h.username === streamData.username || h.username === peerId),
-     }));
-     const all = [local, ...remote].filter(v => v.stream || v.isLocal);
+    }));
+    const all = [local, ...remote].filter(v => v.stream || v.isLocal);
 
-     if (process.env.NODE_ENV === 'development') {
-       RD('01', `allVideos 재계산 — total=${all.length}`);
-       if (remote.length === 0 && remoteStreams.size === 0) {
-         RDW('01', `remoteStreams 비어있음`);
-       }
-     }
-     return all;
-   }, [user?.username, localStreamReady, backgroundMode, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
+    if (process.env.NODE_ENV === 'development') {
+      RD('01', `allVideos 재계산 — total=${all.length}`);
+      if (remote.length === 0 && remoteStreams.size === 0) {
+        RDW('01', `remoteStreams 비어있음`);
+      }
+    }
+    return all;
+  }, [user?.username, localStreamReady, backgroundMode, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
 
   // ==========================================================
   // 렌더링
@@ -822,12 +795,10 @@ function VideoMeetingRoom() {
   const isDev = process.env.NODE_ENV === 'development';
 
   return (
-    // ★ fixed + inset-0: 사이트 네비게이션 바를 완전히 덮음
     <div className="fixed inset-0 bg-gray-900 flex flex-col" style={{ zIndex: 9000 }}>
 
       {/* ── 헤더 + 대기패널 래퍼 ── */}
       <div className="flex-shrink-0 relative">
-        {/* 통합 헤더 (방이름 + 참가자수 + 뷰선택 + 벨 + 진단바) */}
         <RoomHeader
           title={room.title}
           participantCount={allVideos.length}
@@ -837,7 +808,6 @@ function VideoMeetingRoom() {
           onTogglePendingPanel={() => setShowPendingPanel(!showPendingPanel)}
           layout={layout}
           onLayoutChange={handleLayoutChange}
-          // 진단 상태 (개발 모드에서만 표시)
           showDiag={isDev}
           wsConnected={wsConnected}
           wsReady={wsReady}
@@ -850,7 +820,6 @@ function VideoMeetingRoom() {
           participantStatus={room.participant_status}
         />
 
-        {/* 참가 대기 패널: 헤더 바로 아래 absolute (비디오 영역 위에 float) */}
         {room.is_host && showPendingPanel && (
           <div
             className="absolute left-0 right-0 shadow-2xl"
@@ -866,7 +835,7 @@ function VideoMeetingRoom() {
         )}
       </div>
 
-      {/* ── 비디오 그리드 (최대 공간 확보) ── */}
+      {/* ── 비디오 그리드 ── */}
       <div className="flex-1 min-h-0">
         <VideoGrid
           videos={allVideos}
@@ -883,20 +852,23 @@ function VideoMeetingRoom() {
 
       <IOSPlayButton show={showIOSPlayButton} onPlay={handleIOSPlay} />
 
-      {/* ── 하단 컨트롤 바 (최소 높이) ── */}
+      {/* ── 하단 컨트롤 바 ── */}
       <div className="flex-shrink-0 bg-gray-800 border-t border-gray-700 px-3 md:px-6 py-2">
         <div className="flex justify-center items-center gap-2 md:gap-4">
           <div className="relative">
+            {/* ✅ isHost / onEndMeeting prop 전달 → 방장 팝오버 메뉴 활성화 */}
             <ControlBar
               isMicOn={isMicOn}
               isVideoOn={isVideoOn}
               onToggleMic={handleToggleMic}
               onToggleVideo={handleToggleVideo}
               onLeave={handleLeave}
+              onEndMeeting={handleEndMeeting}
+              isHost={room.is_host}
               backgroundMode={backgroundMode}
               onToggleBackground={() => setShowBackgroundPanel(prev => !prev)}
             />
-          
+
             {/* 배경 선택 패널 */}
             <BackgroundSelector
               isOpen={showBackgroundPanel}

@@ -20,19 +20,42 @@ ENV VITE_WS_URL=$VITE_WS_URL
 
 # ✅ MediaPipe wasm/모델 파일을 public/mediapipe/ 로 복사
 #    - COPY . . 이후에 실행해야 소스의 public/ 폴더에 덮어쓰여지지 않음
-#    - Vite build.copyPublicDir:true 설정으로 dist/mediapipe/ 에 자동 포함
-#    - 파일명은 @mediapipe/selfie_segmentation 0.1.x 기준
+#    - Vite build.copyPublicDir:true(기본값) 설정으로 dist/mediapipe/ 에 자동 포함
+#    - SIMD 버전(Chrome 91+) + non-SIMD fallback 버전 모두 복사
+#      → 구형 브라우저/모바일에서도 MediaPipe 동작 보장
 RUN mkdir -p public/mediapipe && \
+    \
+    # ── 공통 JS 로더 ─────────────────────────────────────── \
     cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.js \
        public/mediapipe/ && \
+    \
+    # ── SIMD 버전 (Chrome 91+, 최신 Safari/Firefox) ────────── \
     cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.js \
        public/mediapipe/ && \
     cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.wasm \
        public/mediapipe/ && \
-    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_landscape.tflite \
+    \
+    # ── non-SIMD fallback 버전 (구형 브라우저/기기 대응) ────── \
+    # 파일이 없는 패키지 버전도 있으므로 2>/dev/null || true 처리
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_wasm_bin.js \
        public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_wasm_bin.wasm \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
+    # ── 모델 파일 ────────────────────────────────────────── \
     cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.binarypb \
        public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_landscape.tflite \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_general.tflite \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
+    # ── packed assets 로더 (일부 버전에서 필요) ──────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_packed_assets_loader.js \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_packed_assets.data \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
     echo "✅ MediaPipe 파일 목록:" && \
     ls -la public/mediapipe/
 
