@@ -223,31 +223,46 @@ const {
         RD('02', `participants_list — count=${data.participants?.length}`);
         break;
 
+      // case 'approval_notification': {
+      //   RD('03', `approval_notification 수신`, {
+      //     room_id: data.room_id,
+      //     participant_user_id: data.participant_user_id,
+      //     approved: data.approved,
+      //   });
+
+      //   if (String(data.room_id) !== String(roomId)) {
+      //     RDW('03', `room_id 불일치 — 무시`);
+      //     break;
+      //   }
+      //   if (String(data.participant_user_id) !== String(user?.id)) {
+      //     RDW('03', `participant_user_id 불일치 — 무시`);
+      //     break;
+      //   }
+
+      //   RD('03', `[Step 1] fetchRoomDetails 호출`);
+      //   fetchRoomDetails().then(() => {
+      //     RD('03', `[Step 1] fetchRoomDetails OK`);
+      //     if (wsRef.current?.readyState === WebSocket.OPEN && wsRef.current?._wsReady) {
+      //       RD('03', `[Step 2] WS 이미 준비됨 — wsReady 강제 세트`);
+      //       setWsReady(true);
+      //     }
+      //   }).catch(e => {
+      //     RDE('03', `fetchRoomDetails 실패:`, e.message);
+      //   });
+      //   break;
+      // }
+
       case 'approval_notification': {
-        RD('03', `approval_notification 수신`, {
-          room_id: data.room_id,
-          participant_user_id: data.participant_user_id,
-          approved: data.approved,
-        });
+        if (String(data.room_id) !== String(roomId)) break;
+        if (String(data.participant_user_id) !== String(user?.id)) break;
 
-        if (String(data.room_id) !== String(roomId)) {
-          RDW('03', `room_id 불일치 — 무시`);
-          break;
-        }
-        if (String(data.participant_user_id) !== String(user?.id)) {
-          RDW('03', `participant_user_id 불일치 — 무시`);
-          break;
-        }
-
-        RD('03', `[Step 1] fetchRoomDetails 호출`);
         fetchRoomDetails().then(() => {
-          RD('03', `[Step 1] fetchRoomDetails OK`);
-          if (wsRef.current?.readyState === WebSocket.OPEN && wsRef.current?._wsReady) {
-            RD('03', `[Step 2] WS 이미 준비됨 — wsReady 강제 세트`);
-            setWsReady(true);
-          }
-        }).catch(e => {
-          RDE('03', `fetchRoomDetails 실패:`, e.message);
+          // sfuInitializedRef 리셋 없이 wsReady만 보장
+          // → SFU useEffect의 조건이 모두 충족되면 자동 실행
+          setWsReady(prev => {
+            if (!prev && wsRef.current?._wsReady) return true;
+            return prev;
+          });
         });
         break;
       }
