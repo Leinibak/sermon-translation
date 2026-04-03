@@ -43,9 +43,16 @@ const VideoElementContain = forwardRef(({ stream, isLocal, isVideoOff }, ref) =>
   useEffect(() => {
     const videoEl = resolvedRef.current;
     if (!videoEl) return;
-    if (!stream) { if (videoEl.srcObject) videoEl.srcObject = null; return; }
+    if (!stream) {
+      // [BUG-D fix] isLocal 비디오는 배경 전환 중 stream=null이 될 수 있으므로
+      // srcObject를 즉시 null로 해제하지 않음
+      if (videoEl.srcObject && !isLocal) {
+        videoEl.srcObject = null;
+      }
+      return;
+    }
     if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
-  }, [stream, resolvedRef]);
+  }, [stream, resolvedRef, isLocal]);
 
   return (
     <video

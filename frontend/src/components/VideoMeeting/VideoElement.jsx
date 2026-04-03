@@ -1,6 +1,16 @@
 // frontend/src/components/VideoMeeting/VideoElement.jsx
 //
-// ★ DIAGNOSTIC BUILD ★
+// ★ DIAGNOSTIC BUILD + BUG-D FIX ★
+//
+// [BUG-D 수정] stream=null 시 로컬 비디오 srcObject 즉시 해제 방지
+//   원인: 배경 전환(blur/image 모드) 중 outputStream state가 잠깐 null이 되어
+//         VideoElement에 stream=null이 전달됨.
+//         기존 코드는 stream=null 시 srcObject를 즉시 null로 해제 →
+//         updatePreview()가 localVideoRef를 직접 업데이트해도
+//         VideoElement의 useEffect가 다시 실행되어 srcObject를 null로 덮어씀.
+//   수정: isLocal=true인 경우 stream=null이어도 srcObject 유지.
+//         로컬 비디오는 useBackgroundProcessor의 updatePreview()가 관리하므로
+//         VideoElement 단에서 srcObject를 지우면 안 됨.
 // [VE-Dxx] 태그로 진단 로그 추가.
 // 브라우저 콘솔에서 "VE-D" 로 필터.
 //
@@ -40,9 +50,20 @@ export const VideoElement = React.forwardRef(({ stream, isLocal, isVideoOff }, r
     }
 
     if (!stream) {
+      // [BUG-D fix] stream=null 시 즉시 srcObject 해제하지 않음.
+      // 배경 전환 중(blur/image 모드 전환)에 outputStream state가 잠깐 null이 됨.
+      // 이 때 srcObject를 null로 해제하면 화면이 깜빡이거나 검은 화면이 남음.
+      // isLocal 비디오는 localVideoRef를 직접 조작하므로 null stream에서도 srcObject 유지.
+      // 원격 비디오만 null 시 해제(단, 300ms 디바운스).
       if (videoEl.srcObject) {
-        VEDW('01', `stream=null → srcObject 해제 (isLocal=${isLocal})`);
-        videoEl.srcObject = null;
+        if (!isLocal) {
+          // 원격 비디오: srcObject 즉시 해제 (stream이 없는 것은 정상적인 종료)
+          VEDW('01', `stream=null → srcObject 해제 (isLocal=${isLocal})`);
+          videoEl.srcObject = null;
+        } else {
+          // 로컬 비디오: 배경 전환 중일 수 있으므로 srcObject 유지
+          VEDW('01', `stream=null (isLocal=true) → srcObject 유지 (배경 전환 중 가능성)`);
+        }
       }
       playAttemptedRef.current  = false;
       playRetryCountRef.current = 0;

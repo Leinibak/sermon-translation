@@ -1,6 +1,24 @@
 // frontend/src/components/VideoMeetingRoom.jsx
 //
-// ★ LAYOUT TOGGLE BUILD — v2 ★
+// ★ LAYOUT TOGGLE BUILD — v2 + BUG FIX v10 ★
+//
+// [수정 내역 — 인물 미표시 버그 수정]
+//
+// [BUG-A] ★★★ 핵심: 배경 blur/image/파일업로드 시 인물이 전혀 안 보이는 버그
+//   원인: allVideos useMemo가 outputStreamRef(useRef)를 참조.
+//         useRef .current 변경은 React 재렌더를 트리거하지 않음.
+//         → setBackground('blur') 호출 후 ensureInfrastructure()가 async로
+//           captureStream을 outputStreamRef.current에 할당해도 React는 재렌더 안 함.
+//         → allVideos: localStream = outputStreamRef.current(=null) → null
+//         → VideoElement에 stream=null → srcObject=null → 검은/blank 화면
+//   수정: useBackgroundProcessor가 outputStream(useState)도 반환.
+//         ensureInfrastructure 완료 시 setOutputStream() 호출 → React 재렌더 트리거.
+//         allVideos에서 outputStreamRef.current 대신 outputStream(state) 사용.
+//         useMemo 의존성 배열에 outputStream 추가.
+//
+// [BUG-C] 배경 효과 ON 상태에서 SFU initSFU 완료 시 raw 카메라 트랙 produce 문제
+//   원인: startProducing(localStreamRef.current) 항상 raw stream 사용.
+//   수정: outputStreamRef.current 있으면 canvas video track + raw audio track으로 produce.
 //
 // [변경 내역]
 // - Speaker / Gallery / Dynamic Gallery 3가지 뷰 선택 옵션 추가
@@ -147,7 +165,7 @@ function VideoMeetingRoom() {
     cleanup: cleanupWebRTC,
   } = useSFU({ wsRef, roomId });
 
-  const processedStreamRef = useRef(null);  // eslint-disable-line no-unused-vars
+  // [BUG-A fix] processedStreamRef 제거 — outputStream(state) 사용
 
   // ── 배경 효과 훅 ──────────────────────────────────────────
   const {
@@ -156,7 +174,8 @@ function VideoMeetingRoom() {
     setBackground,
     setBackgroundImage,
     cleanup: cleanupBackground,
-    outputStreamRef,
+    outputStream,      // [BUG-A fix] state로 변경됨 (ref → state)
+    outputStreamRef,   // 내부 동기 참조용으로 유지
   } = useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef });
 
   // 배경 선택 패널 표시 상태
@@ -659,7 +678,17 @@ function VideoMeetingRoom() {
         RD('04', `${room.is_host ? '👑 방장' : '👤 참가자'} initSFU 시작`);
         await initSFU();
         RD('04', 'initSFU OK → startProducing 시작');
-        await startProducing(localStreamRef.current);
+        // [BUG-C fix] 배경 효과 ON 상태에서 SFU 초기화 완료 시:
+        // outputStreamRef.current(canvas captureStream)의 video track + 원본 audio track으로 produce
+        // 배경 효과 OFF 상태 (초기 진입 시 일반)에서는 localStreamRef.current 그대로 사용
+        const streamForProducing = outputStreamRef.current
+          ? new MediaStream([
+              ...outputStreamRef.current.getVideoTracks(),
+              ...localStreamRef.current.getAudioTracks(),
+            ])
+          : localStreamRef.current;
+        RD('04', `produce stream: ${outputStreamRef.current ? 'canvas(배경효과)' : 'raw(카메라)'}`);
+        await startProducing(streamForProducing);
         RD('04', `✅ SFU 초기화 완료`);
       } catch (e) {
         RDE('04', '❌ SFU 초기화 실패:', e.message);
@@ -718,9 +747,11 @@ function VideoMeetingRoom() {
   // allVideos 계산
   // ==========================================================
   const allVideos = useMemo(() => {
-    // ★ 배경 효과 ON이면 outputStream, OFF면 rawStream
-    const localStream = backgroundMode !== 'none' && outputStreamRef?.current
-      ? outputStreamRef.current
+    // [BUG-A fix] outputStream(state) 사용 → React가 재렌더를 감지함
+    // outputStreamRef.current(ref)는 React 재렌더를 트리거하지 않으므로
+    // ensureInfrastructure 완료 후 setOutputStream()으로 업데이트된 state를 사용
+    const localStream = backgroundMode !== 'none' && outputStream
+      ? outputStream
       : (localStreamReady ? localStreamRef.current : null);
 
     const local = {
@@ -753,7 +784,8 @@ function VideoMeetingRoom() {
       }
     }
     return all;
-  }, [user?.username, localStreamReady, backgroundMode, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
+  }, [user?.username, localStreamReady, backgroundMode, outputStream, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
+  // [BUG-A fix] outputStream(state) 추가 → captureStream 생성 완료 시 재렌더 보장
 
   // ==========================================================
   // 렌더링
