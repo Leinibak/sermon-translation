@@ -129,17 +129,20 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const segRef           = useRef(null);
   const lastResultsRef   = useRef(null);
 
-  // ── 캔버스 합성 ─────────────────────────────────────────────
+  // 수정: mask 없을 때 원본 영상 그대로 표시 (투명 처리 금지)
   const composeFrame = useCallback((videoEl, results) => {
     const canvas = canvasRef.current;
-    if (!canvas || !videoEl || videoEl.readyState < 2) return;
+    if (!canvas || !videoEl) return;
+
+    // readyState < 2 체크를 제거하고 readyState >= 1이면 시도
+    if (videoEl.readyState < 1) return;
 
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
     const mode = modeRef.current;
 
     if (mode === 'none') {
-      ctx.drawImage(videoEl, 0, 0, w, h);
+      if (videoEl.readyState >= 2) ctx.drawImage(videoEl, 0, 0, w, h);
       return;
     }
 
@@ -149,34 +152,32 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     ctx.save();
     if (mode === 'blur') {
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
-      ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
+      if (videoEl.readyState >= 2) ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
       ctx.filter = 'none';
     } else if (mode === 'image' && bgImageRef.current) {
       const img = bgImageRef.current;
-      const s   = Math.max(w / img.width, h / img.height);
+      const s = Math.max(w / img.width, h / img.height);
       ctx.drawImage(img, (w - img.width * s) / 2, (h - img.height * s) / 2, img.width * s, img.height * s);
     } else {
-      // [BUG-3 수정] bgImageRef가 아직 없을 때 blur fallback (검은 화면 방지)
+      // bgImage 아직 없으면 blur fallback
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
-      ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
+      if (videoEl.readyState >= 2) ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
       ctx.filter = 'none';
     }
     ctx.restore();
 
     if (!mask) {
-      // mask 없을 때 인물 없이 배경만이 아니라 원본 영상을 그대로 그림
-      // (MediaPipe 초기화 중 또는 결과 지연 시 검은 화면 방지)
-      ctx.globalAlpha = 0.0; // 투명 — 배경만 보임 (mask 오면 즉시 인물 합성)
-      ctx.drawImage(videoEl, 0, 0, w, h);
-      ctx.globalAlpha = 1.0;
+      // ★ 버그 수정: mask 없을 때 원본 영상 위에 반투명으로 표시 (완전 투명 금지)
+      // 이렇게 해야 MediaPipe 초기화 중에도 사람이 보임
+      if (videoEl.readyState >= 2) ctx.drawImage(videoEl, 0, 0, w, h);
       return;
     }
 
     // Step 2: 인물 추출
-    const tmp  = document.createElement('canvas');
-    tmp.width  = w; tmp.height = h;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
     const tCtx = tmp.getContext('2d');
-    tCtx.drawImage(videoEl, 0, 0, w, h);
+    if (videoEl.readyState >= 2) tCtx.drawImage(videoEl, 0, 0, w, h);
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mask, 0, 0, w, h);
     tCtx.globalCompositeOperation = 'source-over';
@@ -305,14 +306,16 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       video.playsInline = true;
       video.muted       = true;
 
-      await new Promise(resolve => {
-        video.onloadedmetadata = () => { video.play().catch(() => {}); resolve(); };
-        video.onerror = resolve;
-        setTimeout(resolve, 3000);
+      await new Promise((resolve) => {
+        if (video.readyState >= 2) { resolve(); return; }
+        const onReady = () => { video.removeEventListener('canplay', onReady); resolve(); };
+        video.addEventListener('canplay', onReady);
+        setTimeout(resolve, 2000); // 타임아웃 보장
       });
 
       videoElRef.current = video;
       BP('01', '✅ 내부 video 준비 완료');
+      
     } else {
       BP('01', 'infrastructure 재사용 — wrapperTrack 동일');
     }
@@ -342,9 +345,9 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
   // ── 렌더링 루프 시작 ─────────────────────────────────────
   const startLoop = useCallback(async () => {
-    // [BUG-2 수정] 세대 카운터 증가 → 이 루프의 고유 ID 확보
-    const myLoopId = loopIdRef.current + 1;
-    loopIdRef.current = myLoopId;
+    // ★ 수정: stopLoop가 이미 loopId를 증가시켰으므로
+    // 여기서는 현재 loopId를 캡처만 함 (증가 없음)
+    const myLoopId = loopIdRef.current;
     activeRef.current = true;
 
     // [BUG-1 수정] videoEl을 클로저로 캡처하지 않고 ref로 매 프레임 참조
@@ -604,5 +607,12 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     };
   }, []);
 
-  return { backgroundMode, backgroundImage, setBackground, setBackgroundImage, cleanup };
+  return {
+  backgroundMode,
+  backgroundImage,
+  setBackground,
+  setBackgroundImage,
+  cleanup,
+  outputStreamRef,  // ★ 추가
+};
 }

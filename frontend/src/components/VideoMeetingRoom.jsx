@@ -113,15 +113,17 @@ function VideoMeetingRoom() {
   const localVideoRef     = useRef(null);
   const initializationRef = useRef(false);
 
-const {
-  localStreamRef, remoteStreams, connectionStatus,
-  getLocalMedia, initSFU, startProducing,
-  muteAudio, unmuteAudio, muteVideo, unmuteVideo,
-  handleSFUMessage, dispatchSFUMessage,
-  producersRef,
-  cleanup: cleanupWebRTC,
-} = useSFU({ wsRef, roomId });
+  const {
+    localStreamRef, remoteStreams, connectionStatus,
+    getLocalMedia, initSFU, startProducing,
+    muteAudio, unmuteAudio, muteVideo, unmuteVideo,
+    handleSFUMessage, dispatchSFUMessage,
+    producersRef,
+    cleanup: cleanupWebRTC,
+  } = useSFU({ wsRef, roomId });
  
+  const processedStreamRef = useRef(null);  // outputStream 참조 보관
+
   // ── 배경 효과 훅 ──────────────────────────────────────────
   const {
     backgroundMode,
@@ -129,6 +131,7 @@ const {
     setBackground,
     setBackgroundImage,
     cleanup: cleanupBackground,
+    outputStreamRef,   // ★ 추가로 노출해야 함
   } = useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef });
   
   // 배경 선택 패널 표시 상태
@@ -742,16 +745,21 @@ const {
   // allVideos 계산
   // ===========================
    const allVideos = useMemo(() => {
-     const local = {
-       peerId:      user?.username,
-       username:    `${user?.username} (나)`,
-       stream:      localStreamReady ? localStreamRef.current : null,
-       isLocal:     true,
-       isMuted:     !isMicOn,
-       isVideoOff:  !isVideoOn,
-       ref:         localVideoRef,
-       isHandRaised,
-     };
+       // ★ 배경 효과 ON이면 outputStream, OFF면 rawStream
+      const localStream = backgroundMode !== 'none' && outputStreamRef?.current
+        ? outputStreamRef.current
+        : (localStreamReady ? localStreamRef.current : null);
+
+      const local = {
+        peerId:     user?.username,
+        username:   `${user?.username} (나)`,
+        stream:     localStream,
+        isLocal:    true,
+        isMuted:    !isMicOn,
+        isVideoOff: !isVideoOn,
+        ref:        localVideoRef,
+        isHandRaised,
+      };
      const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
       peerId,
       username: streamData.username && streamData.username !== peerId
@@ -772,8 +780,7 @@ const {
        }
      }
      return all;
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [user?.username, localStreamReady, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
+   }, [user?.username, localStreamReady, backgroundMode, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
 
   // ==========================================================
   // 렌더링
