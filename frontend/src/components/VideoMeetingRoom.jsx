@@ -540,7 +540,7 @@ const {
   const handleSendChatMessage = useCallback(async (content) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('WebSocket 연결 없음');
-    ws.send(JSON.stringify({ type: 'chat_message', content }));
+    ws.send(JSON.stringify({ type: 'chat', content }));
   }, []);
 
   // ==========================================================
@@ -738,15 +738,15 @@ const {
        isHandRaised,
      };
      const remote = [...remoteStreams.entries()].map(([peerId, streamData]) => ({
-//       peerId,
-//       username: streamData.username && streamData.username !== peerId
-//         ? streamData.username
-//         : (peerId.startsWith('user_') ? peerId.replace('user_', 'User ') : peerId),
-//       stream:      streamData.stream,
-//       isLocal:     false,
-//       isMuted:     streamData.isMuted    ?? false,
-//       isVideoOff:  streamData.isVideoOff ?? false,
-//       isHandRaised: raisedHands.some(h => h.username === streamData.username || h.username === peerId),
+      peerId,
+      username: streamData.username && streamData.username !== peerId
+        ? streamData.username
+        : (peerId.startsWith('user_') ? peerId.replace('user_', 'User ') : peerId),
+      stream:      streamData.stream,
+      isLocal:     false,
+      isMuted:     streamData.isMuted    ?? false,
+      isVideoOff:  streamData.isVideoOff ?? false,
+      isHandRaised: raisedHands.some(h => h.username === streamData.username || h.username === peerId),
      }));
      const all = [local, ...remote].filter(v => v.stream || v.isLocal);
 
