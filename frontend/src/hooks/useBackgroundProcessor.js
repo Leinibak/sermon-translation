@@ -1,8 +1,8 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v11 — 영상 미표시 버그 완전 수정 ★
+// ★ 배경 처리 훅 v12 — 반복 전환 버그 완전 수정 ★
 //
-// ■ v11 수정 내용 (v10 → v11)
+// ■ v12 수정 내용 (v11 → v12)
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // [BUG-E] ★★★ 배경 ON 시 검은 화면 — srcObject=null 트랙 종료 버그
@@ -48,6 +48,37 @@
 //         onResults가 실제 results를 가지고 composeFrame을 직접 호출.
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-H] ★★★ none 전환 시 resetSegmentationCache() → 다음 배경 선택 시 트랙 ended
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//   증상: blur → none → 배경이미지(또는 blur) 선택 시
+//         매번 MediaPipe가 재로드되고, rawStream 트랙이 ended되어
+//         새 getUserMedia 획득 필요 → 배경 적용 후 영상 안 보임.
+//   원인: setBackground('none')에서 segRef.current = null + resetSegmentationCache()
+//         → _segInstance = null, _segPromise = null로 초기화.
+//         다음 getSegmentation() 호출 시 new SelfieSegmentation() 재생성.
+//         이전 seg 인스턴스가 GC(가비지 컬렉션)될 때 MediaPipe 내부 WebGL context가
+//         연결된 video element의 트랙을 정리하면서 rawStream 트랙이 ended됨.
+//         Chrome 콘솔 로그: "[BG-04] 트랙 ended — getLocalMedia 재호출 후 재시도"
+//   수정: none 전환 시 resetSegmentationCache() 및 segRef.current = null 완전 제거.
+//         MediaPipe 인스턴스를 앱 전체 생명주기 동안 유지 (싱글턴 유지).
+//         seg 인스턴스는 cleanup(컴포넌트 언마운트)에서만 해제.
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-I] ★★ none 전환 후 재진입 시 wrapperTrack=none으로 항상 infrastructure 재생성
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//   증상: none 이후 배경 재선택 시 항상 "infrastructure 재생성 필요 — wrapperTrack=none"
+//         → video 엘리먼트 재생성 → 타이밍 지연 → 첫 프레임 검은 화면.
+//   원인: teardownInfrastructure()에서 wrapperStreamRef.current = null 설정.
+//         다음 ensureInfrastructure() 진입 시 wrapperLive = null → 항상 needsRebuild=true.
+//         불필요한 재생성 + video.play() 재호출로 rawStream 트랙 상태 불안정.
+//   수정: teardownInfrastructure()를 호출하되, wrapperStreamRef를 null로 초기화하지 않고
+//         대신 rawStream이 살아있으면 wrapper를 재사용.
+//         none 전환 시에는 stopLoop()와 outputStream 정리만 하고,
+//         videoEl/wrapperStream은 유지 → 다음 배경 선택 시 재사용 가능.
+//         (실제 videoEl 정리는 컴포넌트 언마운트 시에만)
+//
+// v11 수정 내용 유지 (BUG-E, F, G):
 // v10 수정 내용 유지:
 //  [BUG-A] outputStream state 반환 → React 재렌더 보장
 //  [BUG-B] ctx.filter restore 후 명시적 none 리셋
@@ -201,33 +232,39 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('02', '처리 루프 중지');
   }, []);
 
-  // ── infrastructure 전체 정리 ─────────────────────────────────
-  const teardownInfrastructure = useCallback(() => {
+  // ── canvas/outputStream만 정리 (videoEl/wrapper는 유지) ────────
+  // [BUG-I 수정] none 전환 시 videoEl과 wrapperStream을 유지해서
+  // 다음 배경 선택 시 불필요한 재생성 및 트랙 불안정 방지
+  const teardownOutputStream = useCallback(() => {
     if (outputStreamRef.current) {
       outputStreamRef.current.getTracks().forEach(t => {
         try { t.stop(); } catch (_) {}
       });
       outputStreamRef.current = null;
-      // [BUG-A] state도 null로 업데이트 → React 재렌더
       setOutputStream(null);
-      BP('02', 'outputStream 트랙 stop 완료');
+      BP('02', 'outputStream(canvas captureStream) 트랙 stop 완료');
     }
+    canvasRef.current = null;
+    BP('02', 'canvas/outputStream 정리 완료 (videoEl/wrapper 유지)');
+  }, []);
+
+  // ── infrastructure 전체 정리 (컴포넌트 언마운트 또는 강제 재생성 시) ──
+  const teardownInfrastructure = useCallback(() => {
+    teardownOutputStream();
 
     if (videoElRef.current) {
       try {
         videoElRef.current.pause();
         // [BUG-E 수정] srcObject = null 절대 금지 → Chrome이 rawStream 트랙을 ended 시킴
-        // videoElRef.current.srcObject = null;  ← 제거
       } catch (_) {}
       videoElRef.current = null;
     }
 
     // [BUG-E 수정] wrapperStream 참조만 해제 (트랙 stop 안 함 — 원본 트랙 보호)
     wrapperStreamRef.current = null;
-    canvasRef.current = null;
 
     BP('02', 'infrastructure 전체 정리 완료');
-  }, []);
+  }, [teardownOutputStream]);
 
   // ── SFU producer 트랙 교체 ────────────────────────────────
   const replaceSFUTrack = useCallback(async (newTrack, kind = 'video') => {
@@ -273,34 +310,33 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     const rawLive = liveTracks[0];
 
-    // [BUG-E 수정] wrapperStream 트랙 ID로 재사용 여부 판단
-    const wrapperTracks = wrapperStreamRef.current?.getVideoTracks() || [];
-    const wrapperLive = wrapperTracks.find(t => t.readyState === 'live');
+    // [BUG-I 수정] wrapperStream이 null이어도 videoElRef가 살아있고
+    // rawStream 트랙이 동일하면 재사용 가능한지 확인
+    // wrapperStream 트랙 ID 대신 videoEl의 srcObject 트랙으로 비교
+    const videoElTracks = videoElRef.current?.srcObject?.getVideoTracks() || [];
+    const videoElLive = videoElTracks.find(t => t.readyState === 'live');
 
     const needsRebuild = !videoElRef.current
-      || !wrapperLive
-      || wrapperLive.id !== rawLive.id;
+      || !videoElLive
+      || videoElLive.id !== rawLive.id;
 
     if (needsRebuild) {
-      BP('01', `infrastructure 재생성 필요 — wrapperTrack=${wrapperLive?.id?.slice(0,8) ?? 'none'} rawTrack=${rawLive.id.slice(0,8)}`);
+      BP('01', `infrastructure 재생성 필요 — videoElTrack=${videoElLive?.id?.slice(0,8) ?? 'none'} rawTrack=${rawLive.id.slice(0,8)}`);
 
       if (videoElRef.current) {
         try {
           videoElRef.current.pause();
-          // [BUG-E 수정] srcObject = null 제거! pause()만 사용
-          // Chrome에서 srcObject=null 하면 getUserMedia 트랙이 ended됨
+          // [BUG-E 수정] srcObject = null 절대 금지
         } catch (_) {}
         videoElRef.current = null;
       }
 
-      // [BUG-E 수정] 이전 wrapperStream 참조만 해제 (트랙은 살아있음)
       wrapperStreamRef.current = null;
 
       BP('01', '내부 video 엘리먼트 생성');
       const video = document.createElement('video');
 
-      // [BUG-E 수정] rawStream 직접 사용 대신 트랙을 공유하는 새 래퍼 스트림 생성
-      // 래퍼가 해제/null이 돼도 원본 rawStream의 트랙은 ended 안 됨
+      // [BUG-E 수정] rawStream 트랙을 공유하는 새 래퍼 스트림 생성
       const wrapper = new MediaStream(rawStream.getTracks());
       wrapperStreamRef.current = wrapper;
 
@@ -309,9 +345,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       video.playsInline = true;
       video.muted       = true;
 
-      // [BUG-F 수정] readyState >= 2(HAVE_CURRENT_DATA) 이상이 될 때까지 대기
-      // 이전: readyState >= 2 즉시 resolve → video.play() 미호출 → readyState 진행 안 됨
-      // 수정: video.play()를 먼저 호출하고 canplay 이벤트 대기
+      // [BUG-F 수정] video.play() 먼저 호출 후 canplay/loadeddata 이벤트 대기
       video.play().catch(() => {});
       await new Promise((resolve) => {
         if (video.readyState >= 2) { resolve(); return; }
@@ -329,7 +363,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       BP('01', `✅ 내부 video 준비 완료 — readyState=${video.readyState}`);
 
     } else {
-      BP('01', 'infrastructure 재사용 — wrapperTrack 동일');
+      BP('01', `infrastructure 재사용 — videoElTrack 동일 (id=${videoElLive.id.slice(0,8)})`);
     }
 
     // canvas + captureStream: 없거나 ended 트랙이면 재생성
@@ -528,11 +562,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         }
       }
 
-      teardownInfrastructure();
+      // [BUG-H 수정] teardownInfrastructure() 대신 teardownOutputStream()만 호출
+      // videoEl/wrapperStream은 유지 → 다음 배경 선택 시 재사용 가능
+      // segRef, _segInstance 절대 null로 만들지 않음 → MediaPipe GC로 인한 트랙 ended 방지
+      teardownOutputStream();
       setBackgroundImageState(null);
-      // 세그멘테이션 캐시 초기화 (다음 사용 시 재로드)
-      segRef.current = null;
-      resetSegmentationCache();
 
     } else {
       // ── 배경 ON (blur / image) ──────────────────────────
@@ -543,16 +577,10 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       const ok = await ensureInfrastructure(rawStream);
       if (!ok) return;
 
-      // [BUG-6] 모드 전환 시 이전 results 초기화
-      // lastResultsRef 제거됨 → onResults 콜백이 직접 처리하므로 불필요
-
       // 2) 루프 처리
-      if (!activeRef.current) {
-        stopLoop(); // 혹시 남아있는 루프 정리
-        await startLoop();
-      } else {
-        refreshOnResults();
-      }
+      // [BUG-I 수정] none 전환 후 재진입 시 activeRef=false이므로 항상 startLoop 호출
+      stopLoop(); // 혹시 남아있는 루프 세대 카운터 증가
+      await startLoop();
 
       // 3) outputStream 트랙 live 확인 후 SFU + 미리보기 연결
       const outStream = outputStreamRef.current;
@@ -562,9 +590,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
           // [BUG-C] 배경 ON 시 canvas 트랙으로 SFU produce 교체
           await replaceSFUTrack(outTrack, 'video');
         } else {
-          BPW('04', 'outputStream track ended — infrastructure 재생성 시도');
+          BPW('04', 'outputStream track ended — infrastructure 강제 재생성');
           teardownInfrastructure();
-          segRef.current = null;
           const ok2 = await ensureInfrastructure(rawStream);
           if (ok2) {
             await startLoop();
@@ -579,7 +606,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
   }, [
     localStreamRef, stopLoop, startLoop, ensureInfrastructure,
-    teardownInfrastructure, replaceSFUTrack, updatePreview,
+    teardownInfrastructure, teardownOutputStream, replaceSFUTrack, updatePreview,
     refreshOnResults, localVideoRef, getOrRefreshRawStream,
   ]);
 
@@ -612,10 +639,12 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       updatePreview(rawStream);
     }
 
+    // 컴포넌트 언마운트 시에는 전체 정리
     teardownInfrastructure();
 
     bgImageRef.current = null;
     modeRef.current    = 'none';
+    // [BUG-H 수정] segRef/캐시는 언마운트 시에만 정리 (none 전환 시엔 유지)
     segRef.current     = null;
     resetSegmentationCache();
 
