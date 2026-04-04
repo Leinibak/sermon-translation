@@ -1,12 +1,40 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v13 — 트랙 ended 근본 원인 완전 제거 ★
+// ★ 배경 처리 훅 v14 — 파일 업로드 후 영상 소실 버그 수정 ★
 //
-// ■ 핵심 설계 원칙 (v13)
+// ■ v14 수정 내용 (v13 → v14)
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-J] ★★★ 파일 업로드 후 영상 소실 — 두 가지 원인 동시 수정
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+//  ■ 원인 1: getOrRefreshRawStream에서 이전 stream을 stop하지 않아
+//    카메라 이중 점유 → 다음 getUserMedia 트랙이 즉시 ended로 시작
+//
+//    재현 경로:
+//      배경 이미지 선택 → none → 배경 이미지 선택(파일 업로드)
+//      → getOrRefreshRawStream 호출 시 rawStream 트랙이 ended 상태
+//      → getUserMedia 재획득 시도
+//      → 기존 rawStream 트랙이 stop 안 된 상태로 카메라 이중 점유
+//      → 새 트랙 immediately ended
+//    수정: getUserMedia 호출 전 기존 stream의 트랙을 명시적으로 stop
+//
+//  ■ 원인 2: setBackground 비동기 처리 중 race condition
+//    setBackgroundImage('image') 진행 중에 또 다른 setBackground('none')
+//    호출이 끼어들어 mode가 뒤섞임
+//
+//    재현 경로:
+//      파일 업로드 → onSetBackgroundImage → setBackgroundImage →
+//      이미지 로드(await) 중에 React 리렌더로 setBackground('none') 호출
+//      → ensureInfrastructure 이후 teardown이 먼저 실행됨
+//    수정: setBackgroundCallIdRef로 각 호출에 고유 ID 부여,
+//          비동기 대기 완료 후 자신이 최신 호출인지 확인 후 abort
+//
+// ■ 핵심 설계 원칙 (v13 유지)
 //
 //  1. rawStream(getUserMedia 원본) 트랙은 절대 ended되지 않아야 한다.
 //     → srcObject = null 금지
-//     → rawStream.getTracks().stop() 금지
+//     → rawStream.getTracks().stop() 금지 (localStreamRef가 가리키는 스트림)
 //     → MediaPipe 인스턴스 GC 방지 (window.__mediapipeSeg에 고정)
 //
 //  2. none 전환 시 최소한의 정리만 수행한다.
@@ -20,6 +48,8 @@
 //     → none 전환 후 재선택 시 재로드 없이 즉시 사용 가능
 //
 // ■ 수정 이력
+//  v14: [BUG-J] getOrRefreshRawStream — 이전 stream stop 후 재획득 (카메라 이중 점유 해제)
+//              setBackground — callId race condition 가드 추가
 //  v13: window.__mediapipeSeg로 MediaPipe 인스턴스 영구 고정
 //       none 전환 시 videoEl/wrapperStream/seg 완전 유지
 //       teardownOutputStream 분리 (canvas/captureStream만 정리)
@@ -81,12 +111,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const [outputStream,    setOutputStream]         = useState(null);
 
   // ── refs ──────────────────────────────────────────────────
-  const modeRef          = useRef('none');
-  const bgImageRef       = useRef(null);
-  const activeRef        = useRef(false);
-  const loopIdRef        = useRef(0);
-  const rafRef           = useRef(null);
-  const intervalRef      = useRef(null);
+  const modeRef               = useRef('none');
+  const bgImageRef            = useRef(null);
+  const activeRef             = useRef(false);
+  const loopIdRef             = useRef(0);
+  const rafRef                = useRef(null);
+  const intervalRef           = useRef(null);
+  // [BUG-J 수정] setBackground 호출마다 고유 ID → race condition 감지
+  const setBackgroundCallIdRef = useRef(0);
 
   // videoEl, wrapperStream: none 전환 시에도 유지 → 재사용
   const videoElRef       = useRef(null);
@@ -388,6 +420,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, [composeFrame]);
 
   // ── 안전한 rawStream 획득 ────────────────────────────────
+  // [BUG-J 수정] 새 stream 획득 전 이전 stream의 트랙을 명시적 stop
+  // → 카메라 이중 점유 해제 → 새 getUserMedia 트랙이 즉시 ended 되는 문제 방지
   const getOrRefreshRawStream = useCallback(async () => {
     const rawStream = localStreamRef?.current;
     if (!rawStream) { BPW('04', 'rawStream 없음'); return null; }
@@ -397,6 +431,13 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     BPW('04', '트랙 ended — getLocalMedia 재호출 후 재시도');
     try {
+      // ★ [BUG-J 수정] 기존 stream 트랙을 먼저 stop → 카메라 점유 해제
+      // localStreamRef.current는 교체 후 이 stream을 더 이상 사용하지 않으므로 안전
+      rawStream.getTracks().forEach(t => {
+        try { t.stop(); } catch (_) {}
+      });
+      BP('04', '기존 stream 트랙 stop 완료 (카메라 점유 해제)');
+
       const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = newStream;
       BP('04', `새 stream 획득 — id=${newStream.id}`);
@@ -421,8 +462,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, [localStreamRef, producersRef]);
 
   // ── 배경 모드 설정 (공개 API) ────────────────────────────
+  // [BUG-J 수정] callId로 race condition 감지 → 비동기 완료 후 최신 호출 여부 확인
   const setBackground = useCallback(async (mode) => {
-    BP('04', `setBackground — mode="${mode}"`);
+    // ★ [BUG-J 수정] 이 호출의 고유 ID 발급
+    const callId = ++setBackgroundCallIdRef.current;
+    BP('04', `setBackground — mode="${mode}" callId=${callId}`);
 
     modeRef.current = mode;
     setBackgroundMode(mode);
@@ -432,6 +476,13 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       stopLoop();
 
       const rawStream = await getOrRefreshRawStream();
+
+      // ★ [BUG-J 수정] 비동기 대기 중 더 새로운 호출이 왔으면 중단
+      if (callId !== setBackgroundCallIdRef.current) {
+        BP('04', `setBackground none callId=${callId} 취소 — 더 새로운 호출 있음 (current=${setBackgroundCallIdRef.current})`);
+        return;
+      }
+
       if (rawStream) {
         const liveTrack = rawStream.getVideoTracks().find(t => t.readyState === 'live');
         BP('04', `none 전환 — liveTrack: ${liveTrack?.readyState ?? 'none'} (id=${liveTrack?.id?.slice(0,8) ?? 'N/A'})`);
@@ -453,9 +504,23 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     } else {
       // ── 배경 ON (blur / image) ──────────────────────────
       const rawStream = await getOrRefreshRawStream();
+
+      // ★ [BUG-J 수정] 비동기 대기 중 더 새로운 호출이 왔으면 중단
+      if (callId !== setBackgroundCallIdRef.current) {
+        BP('04', `setBackground ${mode} callId=${callId} 취소 — 더 새로운 호출 있음 (current=${setBackgroundCallIdRef.current})`);
+        return;
+      }
+
       if (!rawStream) return;
 
       const ok = await ensureInfrastructure(rawStream);
+
+      // ★ [BUG-J 수정] ensureInfrastructure 이후에도 재확인
+      if (callId !== setBackgroundCallIdRef.current) {
+        BP('04', `setBackground ${mode} callId=${callId} 취소 (ensureInfra 후) — current=${setBackgroundCallIdRef.current}`);
+        return;
+      }
+
       if (!ok) return;
 
       stopLoop();
