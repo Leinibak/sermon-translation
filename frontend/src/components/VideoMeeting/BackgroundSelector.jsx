@@ -1,12 +1,17 @@
 // frontend/src/components/VideoMeeting/BackgroundSelector.jsx
 //
+// ✅ v4 수정:
+//   - [BUG-R1 UI] bgChanging 상태 추가 → 배경 전환 처리 중 버튼 비활성화
+//     (useBackgroundProcessor v14의 operationId 직렬화와 이중 방어)
+//   - 처리 중 스피너 표시 → 사용자에게 진행 중임을 명확히 안내
+//   - onSetBackground / onSetBackgroundImage → async 함수로 래핑
 // ✅ v3 수정:
 //   - 드래그로 창 이동 가능 (데스크톱 전용)
 //   - fixed 위치 + useState position으로 드래그 구현
 //   - 헤더 전체를 드래그 핸들로 사용
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Blend, ImageOff, ImagePlus, X, GripVertical } from 'lucide-react';
+import { Blend, ImageOff, ImagePlus, X, GripVertical, Loader2 } from 'lucide-react';
 
 // ── 배경 이미지 프리셋 ──────────────────────────────────────
 // ✅ SVG id 충돌 수정: 각 SVG마다 고유 id 사용
@@ -48,6 +53,11 @@ export function BackgroundSelector({
   const fileInputRef = useRef(null);
   const panelRef = useRef(null);
 
+  // ── [BUG-R1 UI] 처리 중 상태 ────────────────────────────
+  // useBackgroundProcessor v14의 operationId 직렬화와 이중 방어.
+  // 처리 중에는 모든 배경 옵션 버튼을 비활성화하여 연속 클릭 방지.
+  const [bgChanging, setBgChanging] = useState(false);
+
   // ── 드래그 상태 ──────────────────────────────────────────
   const [position, setPosition] = useState(null); // null = 초기 위치 미설정
   const [isDragging, setIsDragging] = useState(false);
@@ -61,7 +71,7 @@ export function BackgroundSelector({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 패널이 열릴 때 초기 위치를 화면 중앙 하단으로 설정
+  // 패널이 열릴 때 초기 위치를 화면 중앙으로 설정
   useEffect(() => {
     if (isOpen && position === null) {
       const panelW = 320;
@@ -73,8 +83,31 @@ export function BackgroundSelector({
     }
     if (!isOpen) {
       setPosition(null); // 닫으면 초기화 → 다음에 열릴 때 다시 중앙
+      setBgChanging(false); // 패널 닫힐 때 처리 중 상태 초기화
     }
   }, [isOpen]);
+
+  // ── [BUG-R1 UI] 래핑된 핸들러 ──────────────────────────
+  // async 처리 중 bgChanging=true → 버튼 비활성화
+  const handleSetBackground = useCallback(async (mode) => {
+    if (bgChanging) return;
+    setBgChanging(true);
+    try {
+      await onSetBackground(mode);
+    } finally {
+      setBgChanging(false);
+    }
+  }, [bgChanging, onSetBackground]);
+
+  const handleSetBackgroundImage = useCallback(async (dataUrl) => {
+    if (bgChanging) return;
+    setBgChanging(true);
+    try {
+      await onSetBackgroundImage(dataUrl);
+    } finally {
+      setBgChanging(false);
+    }
+  }, [bgChanging, onSetBackgroundImage]);
 
   // ── 드래그 핸들러 ─────────────────────────────────────────
   const handleDragStart = (e) => {
@@ -124,10 +157,10 @@ export function BackgroundSelector({
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => { onSetBackgroundImage(ev.target.result); };
+    reader.onload = (ev) => { handleSetBackgroundImage(ev.target.result); };
     reader.readAsDataURL(file);
     e.target.value = '';
-  }, [onSetBackgroundImage]);
+  }, [handleSetBackgroundImage]);
 
   if (!isOpen || position === null) return null;
 
@@ -137,15 +170,16 @@ export function BackgroundSelector({
       <>
         <div className="fixed inset-0 z-40 md:hidden" onClick={onClose} />
         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in">
-          <MobileHeader onClose={onClose} />
+          <MobileHeader onClose={onClose} bgChanging={bgChanging} />
           <PanelBody
             backgroundMode={backgroundMode}
             backgroundImage={backgroundImage}
-            onSetBackground={onSetBackground}
-            onSetBackgroundImage={onSetBackgroundImage}
+            onSetBackground={handleSetBackground}
+            onSetBackgroundImage={handleSetBackgroundImage}
             fileInputRef={fileInputRef}
             handleFileChange={handleFileChange}
             onClose={onClose}
+            bgChanging={bgChanging}
           />
         </div>
       </>
@@ -179,10 +213,14 @@ export function BackgroundSelector({
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-gray-500 flex-shrink-0" />
             <span className="text-white font-semibold text-sm">배경 효과</span>
+            {/* [BUG-R1 UI] 처리 중 스피너 */}
+            {bgChanging && (
+              <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin ml-1" />
+            )}
           </div>
           <button
             onClick={onClose}
-            onMouseDown={(e) => e.stopPropagation()} // 닫기 버튼 클릭 시 드래그 시작 방지
+            onMouseDown={(e) => e.stopPropagation()}
             className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-gray-700"
             type="button"
           >
@@ -193,11 +231,12 @@ export function BackgroundSelector({
         <PanelBody
           backgroundMode={backgroundMode}
           backgroundImage={backgroundImage}
-          onSetBackground={onSetBackground}
-          onSetBackgroundImage={onSetBackgroundImage}
+          onSetBackground={handleSetBackground}
+          onSetBackgroundImage={handleSetBackgroundImage}
           fileInputRef={fileInputRef}
           handleFileChange={handleFileChange}
           onClose={onClose}
+          bgChanging={bgChanging}
         />
       </div>
     </>
@@ -205,10 +244,15 @@ export function BackgroundSelector({
 }
 
 // ── 모바일 헤더 (드래그 없음) ─────────────────────────────
-function MobileHeader({ onClose }) {
+function MobileHeader({ onClose, bgChanging }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-      <span className="text-white font-semibold text-sm">배경 효과</span>
+      <div className="flex items-center gap-2">
+        <span className="text-white font-semibold text-sm">배경 효과</span>
+        {bgChanging && (
+          <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+        )}
+      </div>
       <button
         onClick={onClose}
         className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-gray-700"
@@ -229,6 +273,7 @@ function PanelBody({
   fileInputRef,
   handleFileChange,
   onClose,
+  bgChanging,
 }) {
   return (
     <div className="p-4 space-y-4">
@@ -240,8 +285,10 @@ function PanelBody({
         <button
           type="button"
           onClick={() => onSetBackground('none')}
+          disabled={bgChanging}
           className={`
             flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            ${bgChanging ? 'opacity-50 cursor-not-allowed' : ''}
             ${backgroundMode === 'none'
               ? 'border-blue-500 bg-blue-900/30'
               : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
@@ -252,8 +299,11 @@ function PanelBody({
             <ImageOff className="w-5 h-5 text-gray-300" />
           </div>
           <span className="text-xs text-gray-200 font-medium">배경 없음</span>
-          {backgroundMode === 'none' && (
+          {backgroundMode === 'none' && !bgChanging && (
             <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
+          )}
+          {bgChanging && backgroundMode === 'none' && (
+            <span className="text-[10px] text-blue-300 font-semibold">처리 중...</span>
           )}
         </button>
 
@@ -261,8 +311,10 @@ function PanelBody({
         <button
           type="button"
           onClick={() => onSetBackground('blur')}
+          disabled={bgChanging}
           className={`
             flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            ${bgChanging ? 'opacity-50 cursor-not-allowed' : ''}
             ${backgroundMode === 'blur'
               ? 'border-blue-500 bg-blue-900/30'
               : 'border-gray-600 bg-gray-700/50 hover:border-gray-400 hover:bg-gray-700'
@@ -273,8 +325,11 @@ function PanelBody({
             <Blend className="w-5 h-5 text-blue-300" />
           </div>
           <span className="text-xs text-gray-200 font-medium">배경 블러</span>
-          {backgroundMode === 'blur' && (
+          {backgroundMode === 'blur' && !bgChanging && (
             <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
+          )}
+          {bgChanging && backgroundMode === 'blur' && (
+            <span className="text-[10px] text-blue-300 font-semibold">처리 중...</span>
           )}
         </button>
       </div>
@@ -288,8 +343,10 @@ function PanelBody({
               key={preset.id}
               type="button"
               onClick={() => onSetBackgroundImage(preset.url)}
+              disabled={bgChanging}
               className={`
                 relative aspect-video rounded-lg overflow-hidden border-2 transition-all
+                ${bgChanging ? 'opacity-50 cursor-not-allowed' : ''}
                 ${backgroundMode === 'image' && backgroundImage === preset.url
                   ? 'border-blue-500 ring-2 ring-blue-500/50'
                   : 'border-gray-600 hover:border-gray-400'
@@ -317,8 +374,16 @@ function PanelBody({
         <p className="text-xs text-gray-400 font-medium mb-2">직접 업로드</p>
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-600 hover:border-gray-400 rounded-xl text-gray-400 hover:text-gray-200 transition-all hover:bg-gray-700/50 text-sm"
+          onClick={() => !bgChanging && fileInputRef.current?.click()}
+          disabled={bgChanging}
+          className={`
+            w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed
+            border-gray-600 rounded-xl text-sm transition-all
+            ${bgChanging
+              ? 'opacity-50 cursor-not-allowed text-gray-500'
+              : 'hover:border-gray-400 text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+            }
+          `}
         >
           <ImagePlus className="w-4 h-4" />
           이미지 파일 선택 (최대 5MB)
@@ -346,12 +411,21 @@ function PanelBody({
           </div>
           <button
             type="button"
-            onClick={() => onSetBackground('none')}
-            className="text-gray-400 hover:text-red-400 transition flex-shrink-0"
+            onClick={() => !bgChanging && onSetBackground('none')}
+            disabled={bgChanging}
+            className={`transition flex-shrink-0 ${bgChanging ? 'opacity-50 cursor-not-allowed text-gray-600' : 'text-gray-400 hover:text-red-400'}`}
             title="배경 제거"
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* 처리 중 안내 메시지 */}
+      {bgChanging && (
+        <div className="flex items-center gap-2 text-[11px] text-blue-300 bg-blue-900/20 rounded-xl px-3 py-2">
+          <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+          배경 효과를 적용하는 중입니다...
         </div>
       )}
 
