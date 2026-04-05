@@ -1,32 +1,43 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v16 — none→blur 검은 화면 버그 수정 ★
+// ★ 배경 처리 훅 v17 — none→blur 검은 화면 버그 수정 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-S] ★★★ none → blur 전환 시 검은 화면 (v15 신규 버그)
+// [BUG-T] ★★★ none 선택 후 blur 재선택 시 검은 화면 (v16 잔류 버그)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //
-//  ■ 원인: v15 에서 도입한 firstFrameDrawn Promise 설계 결함.
+//  ■ 원인 1: getOrRefreshRawStream() 이 rawStream 트랙 전체를 stop() 한 뒤
+//    localStreamRef.current = newStream 으로 새 stream 을 할당하지만,
+//    videoElRef.current / wrapperStreamRef.current 는 그대로 남아 있음.
+//    → 이후 ensureInfrastructure() 의 "videoEl 재사용" 체크가
+//      wrapperStream 안의 ended 트랙을 live 로 오판하거나,
+//      새 rawLive.id 와 불일치하여 needsRebuild=true 가 되더라도
+//      내부 상태가 꼬인 채로 진행됨.
 //
-//    startLoop() 내부 실행 순서 (MediaPipe 이미 로드된 경우):
-//      1) firstFrameDrawn = new Promise(r => firstFrameResolveRef.current = r)
-//      2) seg = window.__mediapipeSeg  (동기 반환)
-//      3) stopLoop() 호출  ← ★ 여기서 firstFrameResolveRef.current() 즉시 실행
-//                               → firstFrameDrawn 즉시 resolved (아직 프레임 없음!)
-//      4) RAF 루프 등록
-//      5) return firstFrameDrawn  ← 이미 resolved 상태
+//  ■ 원인 2: none 전환 시 teardownOutputStream() 이 canvas captureStream
+//    트랙만 stop 하고 videoEl / wrapperStream 은 "유지" 함.
+//    그런데 getOrRefreshRawStream() 이 rawStream.getTracks().forEach(stop)
+//    을 먼저 실행하면 wrapperStream 안의 동일 트랙 객체도 ended 됨.
+//    → 다음 blur 선택 시 videoEl.srcObject 의 트랙이 ended 상태 → 검은 화면.
 //
-//    → await Promise.race([firstFrameDrawn, 500ms]) 즉시 통과
-//    → replaceSFUTrack(outTrack) 호출 → canvas 검은 상태 그대로 전달
+//  ■ 수정:
+//    (1) getOrRefreshRawStream() 에서 newStream 재획득 시
+//        즉시 videoElRef / wrapperStreamRef 를 null 로 무효화.
+//        → ensureInfrastructure() 가 항상 needsRebuild=true 로 판단,
+//          새 stream 의 트랙으로 videoEl 을 올바르게 재생성.
 //
-//  ■ 수정: firstFrameDrawn 관리를 startLoop/stopLoop 에서 완전히 분리.
-//    - stopLoop() 는 firstFrameResolveRef 를 절대 건드리지 않음.
-//    - waitForFirstFrame() 를 독립 함수로 제공.
-//    - setBackground() 에서 startLoop() 후 waitForFirstFrame() 를 별도 await.
-//    - waitForFirstFrame() 는 composeFrame() 의 첫 실행 시 resolve.
+//    (2) setBackground('none') 에서 teardownOutputStream() 호출 후
+//        videoElRef / wrapperStreamRef 도 함께 정리.
+//        → 다음 blur/image 선택 시 stale videoEl 이 남지 않음.
+//
+//    (3) none 전환 시 callId 체크를 teardown 직전에 한 번 더 수행하여
+//        경쟁 조건(race condition) 방어.
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 수정 이력
+//  v17: [BUG-T] getOrRefreshRawStream 에서 videoEl/wrapper 즉시 무효화,
+//               none 전환 시 videoEl/wrapper 추가 정리,
+//               none teardown 직전 callId 재확인
 //  v16: [BUG-S] waitForFirstFrame() 독립 분리, stopLoop에서 firstFrame 제거
 //  v15: [BUG-K][BUG-N] canvas 재사용, firstFrameDrawn 후 SFU replace
 //       [BUG-M] 이미지 로드 실패 시 이전 bgImage 유지
@@ -421,6 +432,10 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, [composeFrame]);
 
   // ── 안전한 rawStream 획득 ────────────────────────────────
+  // [BUG-T] 수정: newStream 재획득 시 videoElRef/wrapperStreamRef 즉시 무효화.
+  //   rawStream.getTracks().forEach(stop) 으로 wrapperStream 내 트랙도 ended 되므로
+  //   videoEl 을 그대로 유지하면 ensureInfrastructure 에서 ended 트랙을 재사용하는
+  //   문제가 발생함. null 로 초기화하여 needsRebuild=true 를 보장.
   const getOrRefreshRawStream = useCallback(async () => {
     const rawStream = localStreamRef?.current;
     if (!rawStream) { BPW('04', 'rawStream 없음'); return null; }
@@ -432,6 +447,17 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     try {
       rawStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
       BP('04', '기존 stream 트랙 stop 완료');
+
+      // ★ [BUG-T] 수정 (1): stream 교체 전 videoEl/wrapper 즉시 무효화
+      //   rawStream 트랙이 stop 되면 wrapperStream 안의 동일 트랙도 ended 됨.
+      //   videoElRef 를 null 로 초기화해야 ensureInfrastructure 가
+      //   needsRebuild=true 로 판단하여 새 videoEl 을 올바르게 생성함.
+      if (videoElRef.current) {
+        try { videoElRef.current.pause(); } catch (_) {}
+        videoElRef.current = null;
+        BP('04', 'videoElRef 무효화 (stream 교체 전)');
+      }
+      wrapperStreamRef.current = null;
 
       const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = newStream;
@@ -489,7 +515,26 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         }
       }
 
+      // ★ [BUG-T] 수정 (3): teardown 직전 callId 재확인 (경쟁 조건 방어)
+      if (callId !== setBackgroundCallIdRef.current) {
+        BP('04', `setBackground none callId=${callId} 취소 (teardown 직전)`);
+        return;
+      }
+
       teardownOutputStream();
+
+      // ★ [BUG-T] 수정 (2): none 전환 시 videoEl/wrapper 도 함께 정리.
+      //   getOrRefreshRawStream 이 이미 무효화했을 수 있으나,
+      //   rawStream 트랙이 live 상태로 재획득 없이 통과한 경우에도
+      //   wrapperStream 내 트랙이 teardownOutputStream 후 inconsistent 상태가
+      //   될 수 있으므로 항상 초기화하여 다음 blur 선택 시 깨끗하게 재생성.
+      if (videoElRef.current) {
+        try { videoElRef.current.pause(); } catch (_) {}
+        videoElRef.current = null;
+        BP('02', 'videoElRef 정리 (none 전환)');
+      }
+      wrapperStreamRef.current = null;
+
       setBackgroundImageState(null);
 
     } else {
