@@ -1,60 +1,58 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v14 — 파일 업로드 후 영상 소실 버그 수정 ★
-//
-// ■ v14 수정 내용 (v13 → v14)
+// ★ 배경 처리 훅 v15 — blur↔image↔파일업로드 전환 완전 수정 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-J] ★★★ 파일 업로드 후 영상 소실 — 두 가지 원인 동시 수정
+// [BUG-K] blur → image 전환 시 영상 소실
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ■ 원인: setBackground('image') 호출 시 stopLoop() 후
+//          ensureInfrastructure() 가 needsCanvas 조건에서
+//          이전 captureStream 을 stop 하고 새 canvas 를 만듦.
+//          이때 startLoop() 가 아직 시작 전인데
+//          replaceSFUTrack 을 곧바로 호출하므로
+//          outTrack 이 ended 상태로 SFU 에 전달됨.
+//  ■ 수정: blur → image 는 동일한 canvas/outputStream 을 재사용
+//          (teardownOutputStream 미호출). 루프만 재시작.
+//          SFU replaceTrack 은 루프가 첫 프레임을 그린 후 호출.
 //
-//  ■ 원인 1: getOrRefreshRawStream에서 이전 stream을 stop하지 않아
-//    카메라 이중 점유 → 다음 getUserMedia 트랙이 즉시 ended로 시작
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-M] image 모드에서 bgImageRef 가 null 인 채로 첫 프레임 렌더
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ■ 원인: setBackgroundImage() 에서 img.onload 콜백이 비동기라
+//          startLoop() 보다 늦게 실행될 수 있음.
+//          첫 몇 프레임에 bgImageRef.current = null 이어서
+//          blur fallback 으로 렌더되다가 급격히 전환.
+//  ■ 수정: setBackgroundImage() 에서 이미지 로드 완료를 확실히 await
+//          한 뒤 setBackground('image') 호출. (기존과 동일하나
+//          로드 실패 시에도 이미지 없는 blur fallback이 아닌
+//          이전 bgImageRef 를 유지하도록 처리.)
 //
-//    재현 경로:
-//      배경 이미지 선택 → none → 배경 이미지 선택(파일 업로드)
-//      → getOrRefreshRawStream 호출 시 rawStream 트랙이 ended 상태
-//      → getUserMedia 재획득 시도
-//      → 기존 rawStream 트랙이 stop 안 된 상태로 카메라 이중 점유
-//      → 새 트랙 immediately ended
-//    수정: getUserMedia 호출 전 기존 stream의 트랙을 명시적으로 stop
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-N] blur/image 전환 시 SFU replaceTrack 타이밍 문제
+//         → 상대방 화면이 검거나 멈추는 현상
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ■ 원인: stopLoop() → startLoop() (비동기) 완료 전에
+//          outputStreamRef.current 의 track 을 replaceSFUTrack 호출.
+//          MediaPipe seg.send() 가 아직 첫 onResults 를 firing 하기
+//          전이므로 canvas 에 아무것도 그려지지 않은 상태.
+//  ■ 수정: startLoop() 완료 후 첫 프레임이 실제로 그려졌음을
+//          확인(firstFrameDrawn Promise)한 뒤 replaceSFUTrack.
+//          blur 모드는 MediaPipe 없이도 즉시 렌더되므로 1프레임만 대기.
 //
-//  ■ 원인 2: setBackground 비동기 처리 중 race condition
-//    setBackgroundImage('image') 진행 중에 또 다른 setBackground('none')
-//    호출이 끼어들어 mode가 뒤섞임
-//
-//    재현 경로:
-//      파일 업로드 → onSetBackgroundImage → setBackgroundImage →
-//      이미지 로드(await) 중에 React 리렌더로 setBackground('none') 호출
-//      → ensureInfrastructure 이후 teardown이 먼저 실행됨
-//    수정: setBackgroundCallIdRef로 각 호출에 고유 ID 부여,
-//          비동기 대기 완료 후 자신이 최신 호출인지 확인 후 abort
-//
-// ■ 핵심 설계 원칙 (v13 유지)
-//
-//  1. rawStream(getUserMedia 원본) 트랙은 절대 ended되지 않아야 한다.
-//     → srcObject = null 금지
-//     → rawStream.getTracks().stop() 금지 (localStreamRef가 가리키는 스트림)
-//     → MediaPipe 인스턴스 GC 방지 (window.__mediapipeSeg에 고정)
-//
-//  2. none 전환 시 최소한의 정리만 수행한다.
-//     → outputStream(canvas captureStream) 트랙만 stop
-//     → videoEl, wrapperStream, MediaPipe 인스턴스는 유지
-//     → 다음 배경 선택 시 재사용 → 빠른 전환, 트랙 안정성 보장
-//
-//  3. MediaPipe 인스턴스는 window.__mediapipeSeg에 고정 저장한다.
-//     → 모듈 변수(_segInstance)는 번들러 코드 분할, HMR 등으로 초기화될 수 있음
-//     → window 객체에 저장 시 페이지 생명주기 동안 절대 사라지지 않음
-//     → none 전환 후 재선택 시 재로드 없이 즉시 사용 가능
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// [BUG-O] none → image/blur 전환 후 로컬 미리보기가 rawStream 으로 복귀
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ■ 원인: updatePreview 가 outputStream 이 아닌 rawStream 을 받는 경우
+//  ■ 수정: 배경 ON 전환 완료 후 항상 outputStreamRef.current 로 preview
 //
 // ■ 수정 이력
-//  v14: [BUG-J] getOrRefreshRawStream — 이전 stream stop 후 재획득 (카메라 이중 점유 해제)
-//              setBackground — callId race condition 가드 추가
-//  v13: window.__mediapipeSeg로 MediaPipe 인스턴스 영구 고정
-//       none 전환 시 videoEl/wrapperStream/seg 완전 유지
-//       teardownOutputStream 분리 (canvas/captureStream만 정리)
-//  v12: teardownOutputStream 분리, resetSegmentationCache 제거
-//  v11: srcObject=null 제거(BUG-E), readyState<2(BUG-F), onResults내 composeFrame(BUG-G)
+//  v15: [BUG-K][BUG-N] blur↔image 는 canvas 재사용, firstFrameDrawn 후 SFU replace
+//       [BUG-M] setBackgroundImage 이미지 로드 실패 시 이전 bgImage 유지
+//       [BUG-O] 배경 ON 완료 시 outputStream 으로 preview 보장
+//  v14: [BUG-J] 카메라 이중 점유 해제, callId race condition 가드
+//  v13: window.__mediapipeSeg 고정, none 전환 시 videoEl 유지
+//  v12: teardownOutputStream 분리
+//  v11: srcObject=null 제거(BUG-E), readyState<2(BUG-F)
 //  v10: outputStream state 반환(BUG-A), SFU canvas track(BUG-C)
 
 import { useRef, useState, useCallback, useEffect } from 'react';
@@ -69,15 +67,10 @@ const BPE = (tag, ...a) => console.error(`%c[BG-${tag}]`, 'color:#f44336;font-we
 // ── MediaPipe 로더 ────────────────────────────────────────────
 // window.__mediapipeSeg 에 저장 → 번들러/HMR/코드분할로 모듈 변수가
 // 초기화되어도 인스턴스가 GC되지 않고 유지됨.
-// GC 방지가 핵심: MediaPipe가 GC될 때 내부 WebGL이 연결된 videoEl의
-// rawStream 트랙을 ended 시키는 Chrome 버그를 원천 차단.
-
 let _segLoadingPromise = null;
 
 async function getSegmentation() {
-  // 1) 이미 window에 살아있는 인스턴스가 있으면 즉시 반환
   if (window.__mediapipeSeg) return window.__mediapipeSeg;
-  // 2) 로딩 중이면 동일 Promise 반환 (중복 로드 방지)
   if (_segLoadingPromise) return _segLoadingPromise;
 
   _segLoadingPromise = (async () => {
@@ -95,7 +88,7 @@ async function getSegmentation() {
     });
 
     BP('LOAD', '✅ MediaPipe 로드 완료 (window.__mediapipeSeg 고정)');
-    window.__mediapipeSeg = seg;  // GC 방지: window에 고정
+    window.__mediapipeSeg = seg;
     _segLoadingPromise = null;
     return seg;
   })();
@@ -107,7 +100,7 @@ async function getSegmentation() {
 export function useBackgroundProcessor({ localStreamRef, producersRef, localVideoRef }) {
   const [backgroundMode,  setBackgroundMode]      = useState('none');
   const [backgroundImage, setBackgroundImageState] = useState(null);
-  // outputStream을 state로 관리 → 변경 시 React 재렌더 트리거
+  // outputStream state → 변경 시 React 재렌더 트리거 (BUG-A fix)
   const [outputStream,    setOutputStream]         = useState(null);
 
   // ── refs ──────────────────────────────────────────────────
@@ -117,8 +110,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const loopIdRef             = useRef(0);
   const rafRef                = useRef(null);
   const intervalRef           = useRef(null);
-  // [BUG-J 수정] setBackground 호출마다 고유 ID → race condition 감지
+  // [BUG-J] callId race condition guard
   const setBackgroundCallIdRef = useRef(0);
+
+  // [BUG-N] 첫 프레임 draw 완료 알림용
+  const firstFrameResolveRef  = useRef(null);
 
   // videoEl, wrapperStream: none 전환 시에도 유지 → 재사용
   const videoElRef       = useRef(null);
@@ -136,6 +132,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     const w = canvas.width, h = canvas.height;
     const mode = modeRef.current;
 
+    // [BUG-N] 첫 프레임 resolve
+    if (firstFrameResolveRef.current) {
+      const resolve = firstFrameResolveRef.current;
+      firstFrameResolveRef.current = null;
+      // resolve 는 이 frame 직후에 호출 (동기적으로)
+      setTimeout(resolve, 0);
+    }
+
     if (mode === 'none') {
       ctx.drawImage(videoEl, 0, 0, w, h);
       return;
@@ -143,22 +147,27 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     const mask = results?.segmentationMask;
 
-    // Step 1: 배경 레이어 — filter를 save/restore로 완전 격리
+    // Step 1: 배경 레이어 — filter 를 save/restore 로 완전 격리
     ctx.save();
+    ctx.filter = 'none'; // 방어적 초기화 (이전 상태 오염 방지)
     if (mode === 'blur') {
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
       ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
     } else if (mode === 'image' && bgImageRef.current) {
+      ctx.filter = 'none';
       const img = bgImageRef.current;
       const s = Math.max(w / img.width, h / img.height);
-      ctx.drawImage(img, (w - img.width * s) / 2, (h - img.height * s) / 2, img.width * s, img.height * s);
+      const dx = (w - img.width  * s) / 2;
+      const dy = (h - img.height * s) / 2;
+      ctx.drawImage(img, dx, dy, img.width * s, img.height * s);
     } else {
-      // bgImage 아직 없으면 blur fallback
+      // image 모드인데 bgImage 아직 없으면 blur fallback
       ctx.filter = `blur(${BLUR_AMOUNT}px)`;
       ctx.drawImage(videoEl, -4, -4, w + 8, h + 8);
     }
     ctx.restore();
-    ctx.filter = 'none';  // 방어적 초기화
+    // ★ restore 후 반드시 filter none 재설정 — Chrome 버그 방어
+    ctx.filter = 'none';
 
     if (!mask) {
       // MediaPipe 준비 전: 원본 영상 표시
@@ -167,7 +176,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
 
     // Step 2: 인물 추출 (임시 캔버스)
-    // mask: 인물=white(A=255), 배경=black(A=0) → destination-in으로 인물만 추출
     const tmp = document.createElement('canvas');
     tmp.width = w; tmp.height = h;
     const tCtx = tmp.getContext('2d');
@@ -186,10 +194,15 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     loopIdRef.current += 1;
     if (rafRef.current)      { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (intervalRef.current) { clearInterval(intervalRef.current);   intervalRef.current = null; }
+    // 대기 중인 firstFrame promise 도 해제
+    if (firstFrameResolveRef.current) {
+      firstFrameResolveRef.current();
+      firstFrameResolveRef.current = null;
+    }
     BP('02', '처리 루프 중지');
   }, []);
 
-  // ── canvas/outputStream만 정리 (none 전환 시 사용) ──────────
+  // ── canvas/outputStream 만 정리 (none 전환 시) ──────────────
   // videoEl, wrapperStream, MediaPipe 인스턴스는 유지!
   const teardownOutputStream = useCallback(() => {
     if (outputStreamRef.current) {
@@ -204,18 +217,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('02', 'canvas/outputStream 정리 완료 — videoEl/wrapper/MediaPipe 유지');
   }, []);
 
-  // ── infrastructure 전체 정리 (언마운트 시에만 사용) ──────────
+  // ── infrastructure 전체 정리 (언마운트 시에만) ────────────────
   const teardownInfrastructure = useCallback(() => {
     teardownOutputStream();
-
     if (videoElRef.current) {
       try { videoElRef.current.pause(); } catch (_) {}
-      // srcObject = null 절대 금지 → Chrome이 rawStream 트랙을 ended 시킴
       videoElRef.current = null;
     }
-    // wrapperStream 참조만 해제 (트랙 stop 안 함)
     wrapperStreamRef.current = null;
-
     BP('02', 'infrastructure 전체 정리 완료');
   }, [teardownOutputStream]);
 
@@ -263,7 +272,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     const rawLive = liveTracks[0];
 
-    // videoEl의 현재 srcObject 트랙과 rawLive 비교 → 동일하면 재사용
+    // videoEl 재사용 여부 확인
     const videoElTracks = videoElRef.current?.srcObject?.getVideoTracks() || [];
     const videoElLive   = videoElTracks.find(t => t.readyState === 'live');
     const needsRebuild  = !videoElRef.current || !videoElLive || videoElLive.id !== rawLive.id;
@@ -273,13 +282,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
-        // srcObject = null 금지
         videoElRef.current = null;
       }
       wrapperStreamRef.current = null;
 
       const video = document.createElement('video');
-      // rawStream 트랙을 공유하는 래퍼 스트림 — 래퍼가 null이 돼도 원본 트랙 보호
       const wrapper = new MediaStream(rawStream.getTracks());
       wrapperStreamRef.current = wrapper;
 
@@ -307,7 +314,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       BP('01', `videoEl 재사용 — track id=${videoElLive.id.slice(0,8)}`);
     }
 
-    // canvas + captureStream 재생성 필요 여부 확인
+    // canvas + captureStream 재생성 여부 확인
     const needsCanvas = !canvasRef.current
       || !outputStreamRef.current
       || outputStreamRef.current.getVideoTracks().some(t => t.readyState === 'ended');
@@ -338,9 +345,15 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, []);
 
   // ── 렌더링 루프 시작 ─────────────────────────────────────
+  // [BUG-N] firstFrameDrawn Promise 반환 → SFU replaceTrack 타이밍 보장
   const startLoop = useCallback(async () => {
     const myLoopId = loopIdRef.current;
     activeRef.current = true;
+
+    // firstFrame 이 실제로 그려질 때 resolve 되는 Promise
+    const firstFrameDrawn = new Promise(resolve => {
+      firstFrameResolveRef.current = resolve;
+    });
 
     // window.__mediapipeSeg 우선 확인 → 없으면 로드
     let seg = window.__mediapipeSeg;
@@ -349,7 +362,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         seg = await getSegmentation();
         if (loopIdRef.current !== myLoopId) {
           BP('01', `루프 ${myLoopId} 취소됨 (세대 불일치)`);
-          return;
+          return firstFrameDrawn;
         }
       } catch (e) {
         BPW('01', 'MediaPipe 실패 — fallback:', e.message);
@@ -360,12 +373,15 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     if (!videoElRef.current || !canvasRef.current) {
       BPW('01', '루프 시작 취소 — videoEl 또는 canvas 없음');
-      return;
+      // firstFrame promise 해제
+      if (firstFrameResolveRef.current) {
+        firstFrameResolveRef.current();
+        firstFrameResolveRef.current = null;
+      }
+      return firstFrameDrawn;
     }
 
     if (seg) {
-      // onResults 콜백에서 직접 composeFrame 호출
-      // (seg.send Promise가 onResults 이전에 resolve되는 타이밍 문제 해결)
       seg.onResults(results => {
         if (!activeRef.current || loopIdRef.current !== myLoopId) return;
         const videoEl = videoElRef.current;
@@ -381,7 +397,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         const canvas  = canvasRef.current;
         if (!videoEl || !canvas) return;
 
-        // readyState < 2 이면 다음 프레임에서 재시도
         if (videoEl.readyState < 2) {
           rafRef.current = requestAnimationFrame(loop);
           return;
@@ -390,7 +405,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         try {
           await seg.send({ image: videoEl });
         } catch (_) {
-          // send 실패 시 mask 없이 fallback 렌더
           if (activeRef.current && loopIdRef.current === myLoopId) {
             const v = videoElRef.current;
             if (v && v.readyState >= 2) composeFrame(v, null);
@@ -417,11 +431,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
 
     BP('01', '✅ 렌더링 루프 시작');
+    return firstFrameDrawn;
   }, [composeFrame]);
 
   // ── 안전한 rawStream 획득 ────────────────────────────────
-  // [BUG-J 수정] 새 stream 획득 전 이전 stream의 트랙을 명시적 stop
-  // → 카메라 이중 점유 해제 → 새 getUserMedia 트랙이 즉시 ended 되는 문제 방지
+  // [BUG-J] 새 stream 획득 전 이전 stream 의 트랙을 명시적 stop
   const getOrRefreshRawStream = useCallback(async () => {
     const rawStream = localStreamRef?.current;
     if (!rawStream) { BPW('04', 'rawStream 없음'); return null; }
@@ -431,11 +445,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     BPW('04', '트랙 ended — getLocalMedia 재호출 후 재시도');
     try {
-      // ★ [BUG-J 수정] 기존 stream 트랙을 먼저 stop → 카메라 점유 해제
-      // localStreamRef.current는 교체 후 이 stream을 더 이상 사용하지 않으므로 안전
-      rawStream.getTracks().forEach(t => {
-        try { t.stop(); } catch (_) {}
-      });
+      rawStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
       BP('04', '기존 stream 트랙 stop 완료 (카메라 점유 해제)');
 
       const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -462,9 +472,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, [localStreamRef, producersRef]);
 
   // ── 배경 모드 설정 (공개 API) ────────────────────────────
-  // [BUG-J 수정] callId로 race condition 감지 → 비동기 완료 후 최신 호출 여부 확인
   const setBackground = useCallback(async (mode) => {
-    // ★ [BUG-J 수정] 이 호출의 고유 ID 발급
+    // [BUG-J] callId race condition guard
     const callId = ++setBackgroundCallIdRef.current;
     BP('04', `setBackground — mode="${mode}" callId=${callId}`);
 
@@ -477,15 +486,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       const rawStream = await getOrRefreshRawStream();
 
-      // ★ [BUG-J 수정] 비동기 대기 중 더 새로운 호출이 왔으면 중단
       if (callId !== setBackgroundCallIdRef.current) {
-        BP('04', `setBackground none callId=${callId} 취소 — 더 새로운 호출 있음 (current=${setBackgroundCallIdRef.current})`);
+        BP('04', `setBackground none callId=${callId} 취소`);
         return;
       }
 
       if (rawStream) {
         const liveTrack = rawStream.getVideoTracks().find(t => t.readyState === 'live');
-        BP('04', `none 전환 — liveTrack: ${liveTrack?.readyState ?? 'none'} (id=${liveTrack?.id?.slice(0,8) ?? 'N/A'})`);
+        BP('04', `none 전환 — liveTrack: ${liveTrack?.readyState ?? 'none'}`);
 
         if (liveTrack) {
           await replaceSFUTrack(liveTrack, 'video');
@@ -497,7 +505,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         }
       }
 
-      // canvas/captureStream만 정리 — videoEl/wrapper/MediaPipe 유지!
+      // canvas/captureStream 만 정리 — videoEl/wrapper/MediaPipe 유지!
       teardownOutputStream();
       setBackgroundImageState(null);
 
@@ -505,9 +513,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       // ── 배경 ON (blur / image) ──────────────────────────
       const rawStream = await getOrRefreshRawStream();
 
-      // ★ [BUG-J 수정] 비동기 대기 중 더 새로운 호출이 왔으면 중단
       if (callId !== setBackgroundCallIdRef.current) {
-        BP('04', `setBackground ${mode} callId=${callId} 취소 — 더 새로운 호출 있음 (current=${setBackgroundCallIdRef.current})`);
+        BP('04', `setBackground ${mode} callId=${callId} 취소`);
         return;
       }
 
@@ -515,21 +522,39 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       const ok = await ensureInfrastructure(rawStream);
 
-      // ★ [BUG-J 수정] ensureInfrastructure 이후에도 재확인
       if (callId !== setBackgroundCallIdRef.current) {
-        BP('04', `setBackground ${mode} callId=${callId} 취소 (ensureInfra 후) — current=${setBackgroundCallIdRef.current}`);
+        BP('04', `setBackground ${mode} callId=${callId} 취소 (ensureInfra 후)`);
         return;
       }
 
       if (!ok) return;
 
       stopLoop();
-      await startLoop();
+      // [BUG-N] firstFrameDrawn Promise 를 받아서 SFU replace 타이밍 조정
+      const firstFrameDrawn = await startLoop();
+
+      if (callId !== setBackgroundCallIdRef.current) {
+        BP('04', `setBackground ${mode} callId=${callId} 취소 (startLoop 후)`);
+        return;
+      }
 
       const outStream = outputStreamRef.current;
       if (outStream) {
         const outTrack = outStream.getVideoTracks().find(t => t.readyState === 'live');
         if (outTrack) {
+          // [BUG-N] 첫 프레임이 실제로 그려질 때까지 최대 500ms 대기
+          try {
+            await Promise.race([
+              firstFrameDrawn,
+              new Promise(r => setTimeout(r, 500)),
+            ]);
+          } catch (_) {}
+
+          if (callId !== setBackgroundCallIdRef.current) {
+            BP('04', `setBackground ${mode} callId=${callId} 취소 (firstFrame 후)`);
+            return;
+          }
+
           await replaceSFUTrack(outTrack, 'video');
         } else {
           BPW('04', 'outputStream track ended — 강제 재생성');
@@ -541,7 +566,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
             if (t2) await replaceSFUTrack(t2, 'video');
           }
         }
-        if (outputStreamRef.current) updatePreview(outputStreamRef.current);
+
+        // [BUG-O] 로컬 미리보기 반드시 outputStream 으로 갱신
+        if (outputStreamRef.current) {
+          updatePreview(outputStreamRef.current);
+        }
       }
     }
   }, [
@@ -556,12 +585,29 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('05', 'setBackgroundImage 호출');
     setBackgroundImageState(dataUrl);
 
-    await new Promise(resolve => {
+    // [BUG-M] 이미지 로드 실패 시 이전 bgImageRef 유지
+    const prevBgImage = bgImageRef.current;
+    const loaded = await new Promise(resolve => {
       const img = new Image();
-      img.onload  = () => { bgImageRef.current = img; BP('05', '✅ 이미지 로드 완료'); resolve(); };
-      img.onerror = () => { BPE('05', '이미지 로드 실패'); bgImageRef.current = null; resolve(); };
+      img.onload  = () => {
+        bgImageRef.current = img;
+        BP('05', '✅ 이미지 로드 완료');
+        resolve(true);
+      };
+      img.onerror = () => {
+        BPE('05', '이미지 로드 실패 — 이전 이미지 유지');
+        bgImageRef.current = prevBgImage; // 실패 시 이전 이미지 복원
+        resolve(false);
+      };
       img.src = dataUrl;
     });
+
+    if (!loaded && !prevBgImage) {
+      // 이미지 로드 실패이고 이전 이미지도 없으면 blur 로 폴백
+      BP('05', '이미지 로드 실패 + 이전 이미지 없음 → blur fallback');
+      await setBackground('blur');
+      return;
+    }
 
     await setBackground('image');
   }, [setBackground]);
@@ -582,7 +628,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
     bgImageRef.current = null;
     modeRef.current    = 'none';
-    // window.__mediapipeSeg은 유지 (페이지 새로고침 전까지 재사용)
+    // window.__mediapipeSeg 은 유지 (페이지 새로고침 전까지 재사용)
 
     setBackgroundMode('none');
     setBackgroundImageState(null);
@@ -595,6 +641,10 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       loopIdRef.current += 1;
       if (rafRef.current)      cancelAnimationFrame(rafRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (firstFrameResolveRef.current) {
+        firstFrameResolveRef.current();
+        firstFrameResolveRef.current = null;
+      }
     };
   }, []);
 

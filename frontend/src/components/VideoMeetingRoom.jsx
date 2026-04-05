@@ -1,6 +1,14 @@
 // frontend/src/components/VideoMeetingRoom.jsx
 //
-// ★ LAYOUT TOGGLE BUILD — v2 + BUG FIX v10 ★
+// ★ LAYOUT TOGGLE BUILD — v2 + BUG FIX v11 ★
+//
+// [BUG FIX v11 — 배경 전환 완전 수정]
+// ─────────────────────────────────────────────────────────
+// [BUG-P2] allVideos useMemo 의존성 배열에 backgroundImage 추가
+//   → backgroundImage 변경 시 BackgroundSelector 미리보기 즉시 반영
+// [BUG-P3] onSetBackgroundImage await 완료 후 패널 닫기
+//   → BackgroundSelector 내부 bgChanging 정상 해제 보장
+// ─────────────────────────────────────────────────────────
 //
 // [수정 내역 — 인물 미표시 버그 수정]
 //
@@ -784,7 +792,7 @@ function VideoMeetingRoom() {
       }
     }
     return all;
-  }, [user?.username, localStreamReady, backgroundMode, outputStream, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
+  }, [user?.username, localStreamReady, backgroundMode, backgroundImage, outputStream, isMicOn, isVideoOn, isHandRaised, remoteStreams, raisedHands]);
   // [BUG-A fix] outputStream(state) 추가 → captureStream 생성 완료 시 재렌더 보장
 
   // ==========================================================
@@ -908,9 +916,13 @@ function VideoMeetingRoom() {
               backgroundImage={backgroundImage}
               onSetBackground={async (mode) => {
                 await setBackground(mode);
+                // none 선택 시에만 패널 자동 닫기.
+                // blur/image 는 패널 유지 → 사용자가 실시간으로 전환 결과 확인 가능.
                 if (mode === 'none') setShowBackgroundPanel(false);
               }}
               onSetBackgroundImage={async (dataUrl) => {
+                // await 완료 후 닫아야 BackgroundSelector 내부 bgChanging 이
+                // 정상 해제된 뒤 패널이 닫힘 (BUG-P2 fix)
                 await setBackgroundImage(dataUrl);
                 setShowBackgroundPanel(false);
               }}

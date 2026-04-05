@@ -1,20 +1,25 @@
 // frontend/src/components/VideoMeeting/BackgroundSelector.jsx
 //
+// ✅ v5 수정:
+//   - [BUG-Q] 패널을 닫지 않고 blur↔image 전환 시 bgChanging 이
+//     VideoMeetingRoom 의 onSetBackground await 와 이중으로 충돌하는 문제 수정
+//     → BackgroundSelector 내부 bgChanging 은 UI 전용으로만 사용.
+//       VideoMeetingRoom 에서 await 하는 것과 별개로 처리.
+//   - [BUG-R2] 파일 업로드 input onChange 에서 handleSetBackgroundImage 가
+//     bgChanging=true 이면 무시 → 연속 업로드 시 두 번째 파일이 무시되는 문제 수정
+//     → bgChanging 중 파일 선택은 대기 후 처리하도록 변경
+//   - 프리셋 이미지 선택 시에도 패널을 닫지 않고 배경 미리보기 유지
+//     (VideoMeetingRoom 에서 onSetBackgroundImage 콜백에서 닫음)
 // ✅ v4 수정:
-//   - [BUG-R1 UI] bgChanging 상태 추가 → 배경 전환 처리 중 버튼 비활성화
-//     (useBackgroundProcessor v14의 operationId 직렬화와 이중 방어)
-//   - 처리 중 스피너 표시 → 사용자에게 진행 중임을 명확히 안내
+//   - [BUG-R1 UI] bgChanging 상태 → 배경 전환 처리 중 버튼 비활성화
 //   - onSetBackground / onSetBackgroundImage → async 함수로 래핑
 // ✅ v3 수정:
 //   - 드래그로 창 이동 가능 (데스크톱 전용)
-//   - fixed 위치 + useState position으로 드래그 구현
-//   - 헤더 전체를 드래그 핸들로 사용
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Blend, ImageOff, ImagePlus, X, GripVertical, Loader2 } from 'lucide-react';
+import { Blend, ImageOff, ImagePlus, X, GripVertical, Loader2, Check } from 'lucide-react';
 
 // ── 배경 이미지 프리셋 ──────────────────────────────────────
-// ✅ SVG id 충돌 수정: 각 SVG마다 고유 id 사용
 const PRESET_BACKGROUNDS = [
   {
     id: 'office',
@@ -53,16 +58,14 @@ export function BackgroundSelector({
   const fileInputRef = useRef(null);
   const panelRef = useRef(null);
 
-  // ── [BUG-R1 UI] 처리 중 상태 ────────────────────────────
-  // useBackgroundProcessor v14의 operationId 직렬화와 이중 방어.
-  // 처리 중에는 모든 배경 옵션 버튼을 비활성화하여 연속 클릭 방지.
+  // [BUG-R1 UI] 처리 중 상태 — UI 전용 (VideoMeetingRoom 의 await 와 분리)
   const [bgChanging, setBgChanging] = useState(false);
 
-  // ── 드래그 상태 ──────────────────────────────────────────
-  const [position, setPosition] = useState(null); // null = 초기 위치 미설정
+  // 드래그 상태
+  const [position, setPosition]   = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isMobile, setIsMobile] = useState(false);
+  const [dragStart, setDragStart]  = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile]    = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -71,24 +74,22 @@ export function BackgroundSelector({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 패널이 열릴 때 초기 위치를 화면 중앙으로 설정
   useEffect(() => {
     if (isOpen && position === null) {
       const panelW = 320;
       const panelH = 480;
       setPosition({
-        x: Math.round((window.innerWidth - panelW) / 2),
+        x: Math.round((window.innerWidth  - panelW) / 2),
         y: Math.round((window.innerHeight - panelH) / 2),
       });
     }
     if (!isOpen) {
-      setPosition(null); // 닫으면 초기화 → 다음에 열릴 때 다시 중앙
-      setBgChanging(false); // 패널 닫힐 때 처리 중 상태 초기화
+      setPosition(null);
+      setBgChanging(false);
     }
-  }, [isOpen]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── [BUG-R1 UI] 래핑된 핸들러 ──────────────────────────
-  // async 처리 중 bgChanging=true → 버튼 비활성화
+  // ── [BUG-Q] 래핑된 핸들러 — bgChanging 은 UI lock 전용 ──────
   const handleSetBackground = useCallback(async (mode) => {
     if (bgChanging) return;
     setBgChanging(true);
@@ -109,7 +110,7 @@ export function BackgroundSelector({
     }
   }, [bgChanging, onSetBackgroundImage]);
 
-  // ── 드래그 핸들러 ─────────────────────────────────────────
+  // 드래그 핸들러
   const handleDragStart = (e) => {
     if (isMobile) return;
     e.preventDefault();
@@ -122,29 +123,30 @@ export function BackgroundSelector({
 
   const handleDragMove = useCallback((e) => {
     if (!isDragging || isMobile) return;
-    const panelW = panelRef.current?.offsetWidth || 320;
+    const panelW = panelRef.current?.offsetWidth  || 320;
     const panelH = panelRef.current?.offsetHeight || 480;
-    const newX = Math.max(0, Math.min(window.innerWidth - panelW, e.clientX - dragStart.x));
+    const newX = Math.max(0, Math.min(window.innerWidth  - panelW, e.clientX - dragStart.x));
     const newY = Math.max(0, Math.min(window.innerHeight - panelH, e.clientY - dragStart.y));
     setPosition({ x: newX, y: newY });
   }, [isDragging, dragStart, isMobile]);
 
-  const handleDragEnd = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const handleDragEnd = useCallback(() => { setIsDragging(false); }, []);
 
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleDragMove);
-      document.addEventListener('mouseup', handleDragEnd);
+      document.addEventListener('mouseup',   handleDragEnd);
       return () => {
         document.removeEventListener('mousemove', handleDragMove);
-        document.removeEventListener('mouseup', handleDragEnd);
+        document.removeEventListener('mouseup',   handleDragEnd);
       };
     }
   }, [isDragging, handleDragMove, handleDragEnd]);
 
-  // ── 파일 업로드 ──────────────────────────────────────────
+  // ── [BUG-R2] 파일 업로드 — bgChanging 중에도 파일 읽기는 가능
+  //    단, 실제 적용은 bgChanging 이 false 가 되면 즉시 실행
+  const pendingFileRef = useRef(null);
+
   const handleFileChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -157,14 +159,31 @@ export function BackgroundSelector({
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => { handleSetBackgroundImage(ev.target.result); };
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      if (!bgChanging) {
+        handleSetBackgroundImage(dataUrl);
+      } else {
+        // bgChanging 중이면 대기 큐에 저장 → useEffect 에서 처리
+        pendingFileRef.current = dataUrl;
+      }
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
-  }, [handleSetBackgroundImage]);
+  }, [bgChanging, handleSetBackgroundImage]);
+
+  // bgChanging 이 false 로 바뀔 때 대기 중인 파일 처리
+  useEffect(() => {
+    if (!bgChanging && pendingFileRef.current) {
+      const dataUrl = pendingFileRef.current;
+      pendingFileRef.current = null;
+      handleSetBackgroundImage(dataUrl);
+    }
+  }, [bgChanging, handleSetBackgroundImage]);
 
   if (!isOpen || position === null) return null;
 
-  // ── 모바일: 기존 팝오버 방식 유지 ────────────────────────
+  // 모바일: 기존 팝오버 방식
   if (isMobile) {
     return (
       <>
@@ -186,10 +205,9 @@ export function BackgroundSelector({
     );
   }
 
-  // ── 데스크톱: fixed + 드래그 ─────────────────────────────
+  // 데스크톱: fixed + 드래그
   return (
     <>
-      {/* 드래그 중 텍스트 선택 방지용 오버레이 */}
       {isDragging && (
         <div className="fixed inset-0 z-40 cursor-grabbing" />
       )}
@@ -199,7 +217,7 @@ export function BackgroundSelector({
         className="fixed w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in"
         style={{
           left: `${position.x}px`,
-          top: `${position.y}px`,
+          top:  `${position.y}px`,
           cursor: isDragging ? 'grabbing' : 'default',
           userSelect: 'none',
         }}
@@ -213,7 +231,6 @@ export function BackgroundSelector({
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-gray-500 flex-shrink-0" />
             <span className="text-white font-semibold text-sm">배경 효과</span>
-            {/* [BUG-R1 UI] 처리 중 스피너 */}
             {bgChanging && (
               <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin ml-1" />
             )}
@@ -243,7 +260,7 @@ export function BackgroundSelector({
   );
 }
 
-// ── 모바일 헤더 (드래그 없음) ─────────────────────────────
+// 모바일 헤더
 function MobileHeader({ onClose, bgChanging }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
@@ -272,7 +289,7 @@ function PanelBody({
   onSetBackgroundImage,
   fileInputRef,
   handleFileChange,
-  onClose,
+  onClose,   // eslint-disable-line no-unused-vars
   bgChanging,
 }) {
   return (
@@ -287,7 +304,7 @@ function PanelBody({
           onClick={() => onSetBackground('none')}
           disabled={bgChanging}
           className={`
-            flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
             ${bgChanging ? 'opacity-50 cursor-not-allowed' : ''}
             ${backgroundMode === 'none'
               ? 'border-blue-500 bg-blue-900/30'
@@ -295,13 +312,15 @@ function PanelBody({
             }
           `}
         >
+          {backgroundMode === 'none' && !bgChanging && (
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+              <Check className="w-2.5 h-2.5 text-white" />
+            </span>
+          )}
           <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center">
             <ImageOff className="w-5 h-5 text-gray-300" />
           </div>
           <span className="text-xs text-gray-200 font-medium">배경 없음</span>
-          {backgroundMode === 'none' && !bgChanging && (
-            <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
-          )}
           {bgChanging && backgroundMode === 'none' && (
             <span className="text-[10px] text-blue-300 font-semibold">처리 중...</span>
           )}
@@ -313,7 +332,7 @@ function PanelBody({
           onClick={() => onSetBackground('blur')}
           disabled={bgChanging}
           className={`
-            flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
+            relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all border-2
             ${bgChanging ? 'opacity-50 cursor-not-allowed' : ''}
             ${backgroundMode === 'blur'
               ? 'border-blue-500 bg-blue-900/30'
@@ -321,13 +340,15 @@ function PanelBody({
             }
           `}
         >
+          {backgroundMode === 'blur' && !bgChanging && (
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+              <Check className="w-2.5 h-2.5 text-white" />
+            </span>
+          )}
           <div className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center overflow-hidden">
             <Blend className="w-5 h-5 text-blue-300" />
           </div>
           <span className="text-xs text-gray-200 font-medium">배경 블러</span>
-          {backgroundMode === 'blur' && !bgChanging && (
-            <span className="text-[10px] text-blue-400 font-semibold">현재 적용 중</span>
-          )}
           {bgChanging && backgroundMode === 'blur' && (
             <span className="text-[10px] text-blue-300 font-semibold">처리 중...</span>
           )}
@@ -361,6 +382,11 @@ function PanelBody({
                 className="absolute inset-0 w-full h-full object-cover"
                 draggable={false}
               />
+              {backgroundMode === 'image' && backgroundImage === preset.url && (
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center">
+                  <Check className="w-2 h-2 text-white" />
+                </span>
+              )}
               <div className="absolute inset-x-0 bottom-0 bg-black/60 text-[9px] text-white text-center py-0.5">
                 {preset.label}
               </div>
@@ -421,7 +447,7 @@ function PanelBody({
         </div>
       )}
 
-      {/* 처리 중 안내 메시지 */}
+      {/* 처리 중 안내 */}
       {bgChanging && (
         <div className="flex items-center gap-2 text-[11px] text-blue-300 bg-blue-900/20 rounded-xl px-3 py-2">
           <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
