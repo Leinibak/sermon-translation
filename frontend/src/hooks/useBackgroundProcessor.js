@@ -1,34 +1,49 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v19 — captureStream stop 시 rawStream track ended 수정 ★
+// ★ 배경 처리 훅 v20 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-V] ★★★ none 전환 시 매번 rawStream track ended 되는 버그
+// [BUG-W] ★★★ image 모드 전환 시 사람 영상 안보이는 버그 +
+//         blur/image → none 사이클마다 rawTrack ended 반복 버그
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //
-//  ■ 현상: blur/image → none 전환 시 매번
-//    "[BG-04] 트랙 ended — getUserMedia 재호출" 이 발생.
-//    v18 에서 GC 시 track ended 는 수정됐지만 여전히 반복 발생.
+//  ■ 버그 1: 배경이미지 선택 시 사람 영상 안보임
 //
-//  ■ 근본 원인: teardownOutputStream() 에서 captureStream 트랙을
-//    stop 할 때 Chrome 이 해당 canvas 에 연결된 video element 의
-//    srcObject 트랙까지 함께 ended 시키는 현상.
+//    원인: composeFrame() 에서 mode='image' 일 때 배경 이미지를 먼저
+//          그리고 mask 로 인물을 합성한 뒤 ctx.drawImage(tmp) 로 올림.
+//          그런데 tmp canvas 의 getContext('2d') 에서
+//          willReadFrequently 옵션 없이 destination-in 합성을 하면
+//          일부 GPU 드라이버 환경에서 알파 채널이 0으로 초기화되어
+//          인물 영역이 투명(=배경이미지만 보임)해지는 현상 발생.
 //
-//    순서:
-//      1. blur ON → video.srcObject = wrapper(rawTrack 포함)
-//                 → canvas.captureStream() 생성
-//      2. none  → teardownOutputStream() → captureStream 트랙 stop
-//              → Chrome 이 video.srcObject 의 rawTrack 도 ended
-//      3. videoElRef.srcObject = new MediaStream([]) 처리는
-//         이미 rawTrack 이 ended 된 이후라 효과 없음
+//          또한 tmp canvas 를 매 프레임마다 createElement 로 생성하면
+//          GPU 텍스처 업로드 지연으로 첫 몇 프레임은 빈 캔버스가
+//          destination-in 에 사용되어 인물이 완전히 지워짐.
 //
-//  ■ 수정: teardownOutputStream() 에서 captureStream 트랙 stop 전에
-//    videoEl.srcObject 를 빈 MediaStream 으로 먼저 교체.
-//    → rawTrack 과의 연결을 captureStream stop 전에 미리 해제.
-//    → setBackground('none') 의 중복 videoEl 정리 코드 제거.
+//    수정:
+//      - tmp canvas 를 매 프레임 생성하지 않고 한 번만 생성하여 재사용
+//        (tmpCanvasRef 에 보관)
+//      - tmp canvas 재사용 시 clearRect 로 명시적 초기화
+//      - getContext('2d', { willReadFrequently: true }) 옵션 추가
+//
+//  ■ 버그 2: image/blur → none 사이클마다 rawTrack ended 반복
+//
+//    원인: teardownOutputStream() 에서
+//          wrapperStreamRef.current = null 만 하면 wrapper MediaStream 객체가
+//          GC(가비지 컬렉션) 대상이 됨. Chrome 은 MediaStream 객체가 GC 될 때
+//          해당 스트림에 포함된 track 들을 ended 시킬 수 있음.
+//          wrapper 는 rawStream 의 track 을 참조하므로 rawTrack 이 ended.
+//
+//    수정:
+//      - wrapperStreamRef.current = null 전에
+//        wrapper.getTracks().forEach(t => wrapper.removeTrack(t)) 호출
+//        → track 을 stream 에서 제거하면 stream GC 시 track 이 ended 되지 않음
+//      - ensureInfrastructure 에서도 기존 wrapper 교체 시 동일 처리
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 수정 이력
+//  v20: [BUG-W] tmp canvas 재사용 + willReadFrequently → 이미지 인물 합성 수정
+//               wrapperStream 폐기 시 removeTrack → rawTrack ended 방지
 //  v19: [BUG-V] teardownOutputStream 에서 captureStream stop 전
 //               videoEl srcObject 먼저 해제 → rawTrack ended 방지
 //  v18: [BUG-U] videoEl 폐기 시 srcObject = new MediaStream([]) 로 교체
@@ -106,6 +121,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const wrapperStreamRef = useRef(null);
   const canvasRef        = useRef(null);
   const outputStreamRef  = useRef(null);
+  // ★ [BUG-W] tmp canvas 재사용 — 매 프레임 createElement 하지 않음
+  const tmpCanvasRef     = useRef(null);
 
   // ── composeFrame ─────────────────────────────────────────
   const composeFrame = useCallback((videoEl, results) => {
@@ -158,10 +175,21 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
 
     // Step 2: 인물 추출
-    const tmp  = document.createElement('canvas');
-    tmp.width  = w;
-    tmp.height = h;
-    const tCtx = tmp.getContext('2d');
+    // ★ [BUG-W] tmp canvas 재사용 (매 프레임 createElement 하지 않음)
+    //   매 프레임 new canvas 를 만들면 GPU 텍스처 업로드 지연으로
+    //   첫 몇 프레임이 빈 캔버스로 destination-in 되어 인물이 사라짐.
+    if (!tmpCanvasRef.current
+      || tmpCanvasRef.current.width  !== w
+      || tmpCanvasRef.current.height !== h) {
+      const tc  = document.createElement('canvas');
+      tc.width  = w;
+      tc.height = h;
+      tmpCanvasRef.current = tc;
+    }
+    const tmp  = tmpCanvasRef.current;
+    // ★ 명시적 초기화 (이전 프레임 잔상 제거)
+    const tCtx = tmp.getContext('2d', { willReadFrequently: true });
+    tCtx.clearRect(0, 0, w, h);
     tCtx.drawImage(videoEl, 0, 0, w, h);
     tCtx.globalCompositeOperation = 'destination-in';
     tCtx.drawImage(mask, 0, 0, w, h);
@@ -223,6 +251,18 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       videoElRef.current = null;
       BP('02', 'videoElRef 선제 정리 (captureStream stop 전)');
     }
+
+    // ★ [BUG-W] wrapper 폐기 전 removeTrack 으로 rawTrack 참조 해제
+    //   wrapperStreamRef = null 만 하면 wrapper MediaStream 이 GC 될 때
+    //   Chrome 이 포함된 rawTrack 도 ended 시킬 수 있음.
+    //   removeTrack 으로 미리 제거하면 stream GC 시 track 이 살아있음.
+    if (wrapperStreamRef.current) {
+      try {
+        wrapperStreamRef.current.getTracks().forEach(t => {
+          try { wrapperStreamRef.current.removeTrack(t); } catch (_) {}
+        });
+      } catch (_) {}
+    }
     wrapperStreamRef.current = null;
 
     // 그 다음 captureStream 트랙 stop
@@ -232,7 +272,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       setOutputStream(null);
       BP('02', 'outputStream(canvas captureStream) 트랙 stop 완료');
     }
-    canvasRef.current = null;
+    canvasRef.current    = null;
+    tmpCanvasRef.current = null;  // ★ [BUG-W] tmp canvas 도 함께 정리
     BP('02', 'canvas/outputStream 정리 완료 — MediaPipe 유지');
   }, []);
 
@@ -298,6 +339,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         // ★ [BUG-U] srcObject 를 빈 스트림으로 교체
         try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
+      }
+      // ★ [BUG-W] 기존 wrapper 교체 시 removeTrack 으로 rawTrack 참조 해제
+      if (wrapperStreamRef.current) {
+        try {
+          wrapperStreamRef.current.getTracks().forEach(t => {
+            try { wrapperStreamRef.current.removeTrack(t); } catch (_) {}
+          });
+        } catch (_) {}
       }
       wrapperStreamRef.current = null;
 
@@ -453,6 +502,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
         BP('04', 'videoElRef 무효화 (stream 교체 전)');
+      }
+      // ★ [BUG-W] wrapper 폐기 시 removeTrack 으로 rawTrack 참조 해제
+      if (wrapperStreamRef.current) {
+        try {
+          wrapperStreamRef.current.getTracks().forEach(t => {
+            try { wrapperStreamRef.current.removeTrack(t); } catch (_) {}
+          });
+        } catch (_) {}
       }
       wrapperStreamRef.current = null;
 
