@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.http import FileResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.permissions import AllowAny 
 
 from .models import PastoralLetter
 from .serializers import (
@@ -40,13 +41,11 @@ class PastoralLetterViewSet(viewsets.ModelViewSet):
         return PastoralLetterDetailSerializer
     
     def get_permissions(self):
-        """액션에 따라 다른 권한 적용"""
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            # 생성/수정/삭제는 관리자만
             permission_classes = [IsAdminOrReadOnly]
         else:
-            # 조회는 교인만
-            permission_classes = [IsMemberUser]
+            # 조회는 누구나 가능
+            permission_classes = [AllowAny]
         
         return [permission() for permission in permission_classes]
     

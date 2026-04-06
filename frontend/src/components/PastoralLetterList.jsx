@@ -5,7 +5,7 @@ import axios from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Search, Upload, Calendar, User, Eye, 
-  FileText, Lock, AlertCircle, ChevronRight 
+  FileText, ChevronRight 
 } from 'lucide-react';
 
 function PastoralLetterList() {
@@ -13,10 +13,9 @@ function PastoralLetterList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [accessDenied, setAccessDenied] = useState(false);
   
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const isAdmin = user?.is_staff || user?.is_superuser;
 
   useEffect(() => {
@@ -26,21 +25,12 @@ function PastoralLetterList() {
   const fetchLetters = async () => {
     try {
       setLoading(true);
-      setAccessDenied(false);
       const response = await axios.get('/pastoral-letters/');
       setLetters(response.data.results || response.data);
       setError(null);
     } catch (err) {
       console.error('목회서신 로딩 실패:', err);
-      
-      if (err.response?.status === 403) {
-        setAccessDenied(true);
-        setError(err.response?.data?.detail || '목회서신은 Arche 공동체가 열람할 수 있습니다');
-      } else if (err.response?.status === 401) {
-        setError('로그인이 필요합니다.');
-      } else {
-        setError('목회서신을 불러오는데 실패했습니다.');
-      }
+      setError('목회서신을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -63,12 +53,7 @@ function PastoralLetterList() {
       setError(null);
     } catch (err) {
       console.error('검색 실패:', err);
-      if (err.response?.status === 403) {
-        setAccessDenied(true);
-        setError(err.response?.data?.detail || '접근 권한이 없습니다.');
-      } else {
-        setError('검색에 실패했습니다.');
-      }
+      setError('검색에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -83,70 +68,6 @@ function PastoralLetterList() {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
-      </div>
-    );
-  }
-
-  // 접근 권한 없음
-  if (accessDenied) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-2xl text-gray-200 font-bold mb-1">목회서신</h1>
-            <p className="text-slate-300 text-sm">
-              Arche 교회 교인을 위한 목회서신
-            </p>
-          </div>
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-12 text-center">
-              <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Lock className="w-10 h-10 text-amber-600" />
-              </div>
-              
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                접근 권한이 필요합니다
-              </h2>
-              
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                {error}
-              </p>
-
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-6 mb-6">
-                <h3 className="font-semibold text-blue-900 mb-3 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 mr-2" />
-                  접근 방법
-                </h3>
-                <ul className="text-sm text-blue-800 space-y-2 text-left max-w-md mx-auto">
-                  <li className="flex items-start">
-                    <span className="mr-2">1.</span>
-                    <span>회원가입 시 Arche 교회 등록 교인인 경우 해당항목을 체크하세요</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">2.</span>
-                    <span>관리자의 승인을 기다려주세요</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">3.</span>
-                    <span>승인 후 목회서신을 열람하실 수 있습니다</span>
-                  </li>
-                </ul>
-              </div>
-
-              {!isAuthenticated && (
-                <button
-                  onClick={() => navigate('/login')}
-                  className="px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition"
-                >
-                  로그인하기
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -225,7 +146,7 @@ function PastoralLetterList() {
           </h2>
         </div>
 
-        {error && !accessDenied ? (
+        {error ? (
           <div className="text-center py-20">
             <p className="text-red-500 text-lg">{error}</p>
             <button
