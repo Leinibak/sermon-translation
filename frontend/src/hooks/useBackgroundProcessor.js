@@ -1,40 +1,48 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v17 — none→blur 검은 화면 버그 수정 ★
+// ★ 배경 처리 훅 v18 — rawStream track ended 근본 원인 수정 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-T] ★★★ none 선택 후 blur 재선택 시 검은 화면 (v16 잔류 버그)
+// [BUG-U] ★★★ none→blur 반복 시 rawStream track 이 ended 되는 버그
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //
-//  ■ 원인 1: getOrRefreshRawStream() 이 rawStream 트랙 전체를 stop() 한 뒤
-//    localStreamRef.current = newStream 으로 새 stream 을 할당하지만,
-//    videoElRef.current / wrapperStreamRef.current 는 그대로 남아 있음.
-//    → 이후 ensureInfrastructure() 의 "videoEl 재사용" 체크가
-//      wrapperStream 안의 ended 트랙을 live 로 오판하거나,
-//      새 rawLive.id 와 불일치하여 needsRebuild=true 가 되더라도
-//      내부 상태가 꼬인 채로 진행됨.
+//  ■ 현상: none→blur 를 2회 이상 반복하면 blur 선택 후 검은 화면.
+//    콘솔: "[BG-04] 트랙 ended — getUserMedia 재호출" 이 매번 발생.
+//    원인을 찾아 getUserMedia 를 재호출해도 다음 none 에서 또 ended 발생.
 //
-//  ■ 원인 2: none 전환 시 teardownOutputStream() 이 canvas captureStream
-//    트랙만 stop 하고 videoEl / wrapperStream 은 "유지" 함.
-//    그런데 getOrRefreshRawStream() 이 rawStream.getTracks().forEach(stop)
-//    을 먼저 실행하면 wrapperStream 안의 동일 트랙 객체도 ended 됨.
-//    → 다음 blur 선택 시 videoEl.srcObject 의 트랙이 ended 상태 → 검은 화면.
+//  ■ 근본 원인: Chrome 의 video element GC(가비지 컬렉션) 동작
 //
-//  ■ 수정:
-//    (1) getOrRefreshRawStream() 에서 newStream 재획득 시
-//        즉시 videoElRef / wrapperStreamRef 를 null 로 무효화.
-//        → ensureInfrastructure() 가 항상 needsRebuild=true 로 판단,
-//          새 stream 의 트랙으로 videoEl 을 올바르게 재생성.
+//    blur 처리 시 ensureInfrastructure() 가 내부 video element 를 생성:
+//      video.srcObject = new MediaStream(rawStream.getTracks())
+//      → wrapper 안에 rawStream 의 원본 track(예: 989cdafd) 참조 포함
 //
-//    (2) setBackground('none') 에서 teardownOutputStream() 호출 후
-//        videoElRef / wrapperStreamRef 도 함께 정리.
-//        → 다음 blur/image 선택 시 stale videoEl 이 남지 않음.
+//    none 전환 시 videoEl.pause() 후 videoElRef = null 로만 처리하면:
+//      → JS 참조는 끊겼지만 video element 는 아직 DOM/메모리에 존재
+//      → video element 의 srcObject 는 wrapper (rawStream tracks 참조) 유지
+//      → 이후 GC 가 video element 를 수거할 때
+//        Chrome 이 srcObject 의 track 들을 자동으로 ended 시킴
+//      → rawStream 의 원본 track(989cdafd) 이 ended → 다음 none 에서 감지
 //
-//    (3) none 전환 시 callId 체크를 teardown 직전에 한 번 더 수행하여
-//        경쟁 조건(race condition) 방어.
+//    ★ Chrome 명세: video element 가 GC 될 때 srcObject 트랙을 자동 종료함.
+//      srcObject = null 로 해제하면 즉시 ended 되고,
+//      srcObject 를 유지한 채 element 가 GC 되면 나중에 ended 됨.
+//
+//  ■ 수정: videoEl 을 폐기할 때 반드시 srcObject 를 빈 MediaStream 으로 교체.
+//    → videoEl.srcObject = new MediaStream([])
+//    → 원본 track 과의 연결을 즉시 해제하므로 GC 시 track ended 방지.
+//    → srcObject = null 은 Chrome 에서 즉시 track ended 를 유발하므로 사용 금지.
+//
+//  ■ 수정 위치: videoEl 을 폐기하는 모든 곳에 적용:
+//    (A) teardownInfrastructure()
+//    (B) ensureInfrastructure() 의 needsRebuild 분기
+//    (C) setBackground('none') 의 videoElRef 정리
+//    (D) getOrRefreshRawStream() 의 videoElRef 무효화
+//    (E) cleanup() 의 videoEl 정리
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 수정 이력
+//  v18: [BUG-U] videoEl 폐기 시 srcObject = new MediaStream([]) 로 교체
+//               → Chrome GC 시 rawStream track ended 방지
 //  v17: [BUG-T] getOrRefreshRawStream 에서 videoEl/wrapper 즉시 무효화,
 //               none 전환 시 videoEl/wrapper 추가 정리,
 //               none teardown 직전 callId 재확인
@@ -234,6 +242,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     teardownOutputStream();
     if (videoElRef.current) {
       try { videoElRef.current.pause(); } catch (_) {}
+      // ★ [BUG-U] srcObject 를 빈 스트림으로 교체하여 원본 track 참조 해제.
+      //   srcObject = null 은 Chrome 에서 track 을 즉시 ended 시키므로 금지.
+      //   video element 가 GC 될 때 srcObject 에 원본 track 이 남아있으면
+      //   Chrome 이 rawStream track 을 ended 시키는 현상 방지.
+      try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
       videoElRef.current = null;
     }
     wrapperStreamRef.current = null;
@@ -292,6 +305,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
+        // ★ [BUG-U] srcObject 를 빈 스트림으로 교체 후 null
+        try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
       }
       wrapperStreamRef.current = null;
@@ -448,12 +463,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       rawStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
       BP('04', '기존 stream 트랙 stop 완료');
 
-      // ★ [BUG-T] 수정 (1): stream 교체 전 videoEl/wrapper 즉시 무효화
+      // ★ [BUG-T] 수정 (1) + [BUG-U]: stream 교체 전 videoEl/wrapper 즉시 무효화.
       //   rawStream 트랙이 stop 되면 wrapperStream 안의 동일 트랙도 ended 됨.
       //   videoElRef 를 null 로 초기화해야 ensureInfrastructure 가
       //   needsRebuild=true 로 판단하여 새 videoEl 을 올바르게 생성함.
+      //   srcObject 를 빈 스트림으로 교체하여 GC 시 track ended 방지.
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
+        try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
         BP('04', 'videoElRef 무효화 (stream 교체 전)');
       }
@@ -523,13 +540,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       teardownOutputStream();
 
-      // ★ [BUG-T] 수정 (2): none 전환 시 videoEl/wrapper 도 함께 정리.
-      //   getOrRefreshRawStream 이 이미 무효화했을 수 있으나,
-      //   rawStream 트랙이 live 상태로 재획득 없이 통과한 경우에도
-      //   wrapperStream 내 트랙이 teardownOutputStream 후 inconsistent 상태가
-      //   될 수 있으므로 항상 초기화하여 다음 blur 선택 시 깨끗하게 재생성.
+      // ★ [BUG-T] 수정 (2) + [BUG-U]: none 전환 시 videoEl/wrapper 함께 정리.
+      //   srcObject 를 빈 스트림으로 교체하여 GC 시 rawStream track ended 방지.
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
+        try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
         BP('02', 'videoElRef 정리 (none 전환)');
       }
