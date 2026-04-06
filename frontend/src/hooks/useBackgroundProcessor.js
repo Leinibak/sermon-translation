@@ -1,10 +1,52 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v20 ★
+// ★ 배경 처리 훅 v21 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-W] ★★★ image 모드 전환 시 사람 영상 안보이는 버그 +
-//         blur/image → none 사이클마다 rawTrack ended 반복 버그
+// [BUG-X] ★★★ image/blur → none 사이클마다 rawTrack ended 반복 (v20 미해결)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+//  ■ 로그로 확인된 사실:
+//    callId=4 none 시작 시 [BG-02] 처리 루프 중지 직후
+//    getOrRefreshRawStream() 호출 전에 이미 rawTrack이 ended.
+//    즉 teardownOutputStream의 captureStream.stop() 이전에 발생.
+//    stopLoop()의 cancelAnimationFrame도 track에 영향 없음.
+//
+//    → rawTrack이 callId=3 image 처리 완료 시점부터 이미 ended 상태.
+//
+//  ■ 근본 원인:
+//    ensureInfrastructure에서
+//      wrapper = new MediaStream(rawStream.getTracks())
+//    로 rawTrack 원본을 wrapper에 직접 넣음.
+//
+//    MediaPipe(WebGL/WASM)가 seg.send({ image: videoEl })를 통해
+//    videoEl → wrapper → rawTrack에 접근하는 과정에서,
+//    Chrome이 내부적으로 해당 rawTrack을 ended시키는 현상 발생.
+//    (Chrome의 MediaStreamTrack 수명 관리와 WebGL 텍스처 처리의 상호작용)
+//
+//  ■ 수정: wrapper에 rawTrack 원본 대신 clone() 사용
+//
+//    const clonedVideoTrack = rawLive.clone();
+//    const wrapper = new MediaStream([clonedVideoTrack, ...audioTracks]);
+//
+//    clone된 트랙이 ended되어도 rawStream 원본 rawTrack은 살아있음.
+//    teardown 시 clonedVideoTrack.stop()으로 clone 정리.
+//
+//    wrapperClonedVideoRef 에 clone track 보관 → teardown 시 stop().
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 수정 이력
+//  v21: [BUG-X] wrapper에 rawTrack.clone() 사용 → 원본 rawTrack 보호
+//  v20: [BUG-W] tmp canvas 재사용 + willReadFrequently → 이미지 인물 합성 수정
+//               wrapperStream 폐기 시 removeTrack → rawTrack ended 방지 (미해결)
+//  v19: [BUG-V] teardownOutputStream 에서 captureStream stop 전
+//               videoEl srcObject 먼저 해제 → rawTrack ended 방지 (미해결)
+//  v18: [BUG-U] videoEl 폐기 시 srcObject = new MediaStream([]) 로 교체
+//  v17: [BUG-T] getOrRefreshRawStream 에서 videoEl/wrapper 즉시 무효화
+//  v16: [BUG-S] waitForFirstFrame() 독립 분리
+//  v15: [BUG-K][BUG-N][BUG-M][BUG-O]
+//  v14: [BUG-J] 카메라 이중 점유 해제, callId race condition 가드
+//  v13: window.__mediapipeSeg 고정
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //
 //  ■ 버그 1: 배경이미지 선택 시 사람 영상 안보임
@@ -123,6 +165,8 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   const outputStreamRef  = useRef(null);
   // ★ [BUG-W] tmp canvas 재사용 — 매 프레임 createElement 하지 않음
   const tmpCanvasRef     = useRef(null);
+  // ★ [BUG-X] wrapper에 넣은 cloned video track 보관 → teardown 시 stop()
+  const wrapperClonedVideoRef = useRef(null);
 
   // ── composeFrame ─────────────────────────────────────────
   const composeFrame = useCallback((videoEl, results) => {
@@ -265,6 +309,12 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     }
     wrapperStreamRef.current = null;
 
+    // ★ [BUG-X] clone된 video track 정리 (원본 rawTrack 과 별개)
+    if (wrapperClonedVideoRef.current) {
+      try { wrapperClonedVideoRef.current.stop(); } catch (_) {}
+      wrapperClonedVideoRef.current = null;
+    }
+
     // 그 다음 captureStream 트랙 stop
     if (outputStreamRef.current) {
       outputStreamRef.current.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
@@ -349,10 +399,24 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         } catch (_) {}
       }
       wrapperStreamRef.current = null;
+      // ★ [BUG-X] 기존 cloned track 정리
+      if (wrapperClonedVideoRef.current) {
+        try { wrapperClonedVideoRef.current.stop(); } catch (_) {}
+        wrapperClonedVideoRef.current = null;
+      }
 
-      const video   = document.createElement('video');
-      const wrapper = new MediaStream(rawStream.getTracks());
+      // ★ [BUG-X] wrapper 에 rawTrack 원본 대신 clone 사용
+      //   MediaPipe(WebGL)가 videoEl → wrapper → rawTrack 에 접근하는 과정에서
+      //   Chrome 이 rawTrack 을 ended 시키는 현상 방지.
+      //   clone 이 ended 되어도 rawStream 원본 rawTrack 은 살아있음.
+      const clonedVideoTrack = rawLive.clone();
+      wrapperClonedVideoRef.current = clonedVideoTrack;
+
+      const audioTracks = rawStream.getAudioTracks();
+      const wrapper = new MediaStream([clonedVideoTrack, ...audioTracks]);
       wrapperStreamRef.current = wrapper;
+
+      const video = document.createElement('video');
 
       video.srcObject   = wrapper;
       video.autoplay    = true;
@@ -512,6 +576,11 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         } catch (_) {}
       }
       wrapperStreamRef.current = null;
+      // ★ [BUG-X] cloned track 정리
+      if (wrapperClonedVideoRef.current) {
+        try { wrapperClonedVideoRef.current.stop(); } catch (_) {}
+        wrapperClonedVideoRef.current = null;
+      }
 
       const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = newStream;
