@@ -167,7 +167,7 @@ function App() {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Home />} />
- 
+
             {/* Sermons */}
             <Route path="/sermons" element={<SermonList />} />
             <Route path="/sermons/:id" element={<SermonDetail />} />
@@ -177,15 +177,11 @@ function App() {
             <Route path="/sermons/edit/:id" element={
               <PrivateRoute><SermonUpload /></PrivateRoute>
             } />
- 
-            {/* Pastoral Letters */}
-            <Route path="/pastoral-letters" element={
-              <PrivateRoute><PastoralLetterList /></PrivateRoute>
-            } />
-            <Route path="/pastoral-letters/:id" element={
-              <PrivateRoute><PastoralLetterDetail /></PrivateRoute>
-            } />
- 
+
+            {/* Pastoral Letters - 로그인 없이 접근 가능 (설교와 동일) */}
+            <Route path="/pastoral-letters" element={<PastoralLetterList />} />
+            <Route path="/pastoral-letters/:id" element={<PastoralLetterDetail />} />
+
             {/* Blog */}
             <Route path="/blog" element={<PostList />} />
             <Route path="/post/:id" element={<PostDetail />} />
@@ -195,15 +191,15 @@ function App() {
             <Route path="/create" element={
               <PrivateRoute><PostForm /></PrivateRoute>
             } />
- 
-            {/* Video Meetings */}
+
+            {/* Video Meetings - 목록/룸 모두 로그인 필요 */}
             <Route path="/video-meetings" element={
               <PrivateRoute><VideoMeetingList /></PrivateRoute>
             } />
             <Route path="/video-meetings/:id" element={
               <PrivateRoute><VideoMeetingRoom /></PrivateRoute>
             } />
- 
+
             {/* Auth */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

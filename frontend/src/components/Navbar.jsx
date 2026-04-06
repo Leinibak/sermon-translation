@@ -109,9 +109,8 @@ function Navbar() {
               <Link to="/pastoral-letters" className="hover:text-blue-600 font-medium">목회서신</Link>
               <Link to="/blog" className="hover:text-blue-600 font-medium">블로그</Link>
 
-              {isAuthenticated && (
-                <Link to="/video-meetings" className="hover:text-blue-600 font-medium">화상회의</Link>
-              )}
+              {/* 화상회의 메뉴 - 로그인 여부 관계없이 항상 표시 */}
+              <Link to="/video-meetings" className="hover:text-blue-600 font-medium">화상회의</Link>
 
               {isAuthenticated ? (
                 <div className="flex items-center space-x-4">
@@ -162,11 +161,10 @@ function Navbar() {
             <Link to="/pastoral-letters" className="block font-medium py-1" onClick={() => setIsOpen(false)}>목회서신</Link>
             <Link to="/blog" className="block font-medium py-1" onClick={() => setIsOpen(false)}>블로그</Link>
 
-            {isAuthenticated && (
-              <Link to="/video-meetings" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
-                화상회의
-              </Link>
-            )}
+            {/* 화상회의 메뉴 - 로그인 여부 관계없이 항상 표시 */}
+            <Link to="/video-meetings" className="block font-medium py-1" onClick={() => setIsOpen(false)}>
+              화상회의
+            </Link>
 
             <div className="mt-4 pt-3 border-t border-gray-200">
               {isAuthenticated ? (
