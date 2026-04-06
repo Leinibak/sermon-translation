@@ -1,46 +1,36 @@
 // frontend/src/hooks/useBackgroundProcessor.js
 //
-// ★ 배경 처리 훅 v18 — rawStream track ended 근본 원인 수정 ★
+// ★ 배경 처리 훅 v19 — captureStream stop 시 rawStream track ended 수정 ★
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// [BUG-U] ★★★ none→blur 반복 시 rawStream track 이 ended 되는 버그
+// [BUG-V] ★★★ none 전환 시 매번 rawStream track ended 되는 버그
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //
-//  ■ 현상: none→blur 를 2회 이상 반복하면 blur 선택 후 검은 화면.
-//    콘솔: "[BG-04] 트랙 ended — getUserMedia 재호출" 이 매번 발생.
-//    원인을 찾아 getUserMedia 를 재호출해도 다음 none 에서 또 ended 발생.
+//  ■ 현상: blur/image → none 전환 시 매번
+//    "[BG-04] 트랙 ended — getUserMedia 재호출" 이 발생.
+//    v18 에서 GC 시 track ended 는 수정됐지만 여전히 반복 발생.
 //
-//  ■ 근본 원인: Chrome 의 video element GC(가비지 컬렉션) 동작
+//  ■ 근본 원인: teardownOutputStream() 에서 captureStream 트랙을
+//    stop 할 때 Chrome 이 해당 canvas 에 연결된 video element 의
+//    srcObject 트랙까지 함께 ended 시키는 현상.
 //
-//    blur 처리 시 ensureInfrastructure() 가 내부 video element 를 생성:
-//      video.srcObject = new MediaStream(rawStream.getTracks())
-//      → wrapper 안에 rawStream 의 원본 track(예: 989cdafd) 참조 포함
+//    순서:
+//      1. blur ON → video.srcObject = wrapper(rawTrack 포함)
+//                 → canvas.captureStream() 생성
+//      2. none  → teardownOutputStream() → captureStream 트랙 stop
+//              → Chrome 이 video.srcObject 의 rawTrack 도 ended
+//      3. videoElRef.srcObject = new MediaStream([]) 처리는
+//         이미 rawTrack 이 ended 된 이후라 효과 없음
 //
-//    none 전환 시 videoEl.pause() 후 videoElRef = null 로만 처리하면:
-//      → JS 참조는 끊겼지만 video element 는 아직 DOM/메모리에 존재
-//      → video element 의 srcObject 는 wrapper (rawStream tracks 참조) 유지
-//      → 이후 GC 가 video element 를 수거할 때
-//        Chrome 이 srcObject 의 track 들을 자동으로 ended 시킴
-//      → rawStream 의 원본 track(989cdafd) 이 ended → 다음 none 에서 감지
-//
-//    ★ Chrome 명세: video element 가 GC 될 때 srcObject 트랙을 자동 종료함.
-//      srcObject = null 로 해제하면 즉시 ended 되고,
-//      srcObject 를 유지한 채 element 가 GC 되면 나중에 ended 됨.
-//
-//  ■ 수정: videoEl 을 폐기할 때 반드시 srcObject 를 빈 MediaStream 으로 교체.
-//    → videoEl.srcObject = new MediaStream([])
-//    → 원본 track 과의 연결을 즉시 해제하므로 GC 시 track ended 방지.
-//    → srcObject = null 은 Chrome 에서 즉시 track ended 를 유발하므로 사용 금지.
-//
-//  ■ 수정 위치: videoEl 을 폐기하는 모든 곳에 적용:
-//    (A) teardownInfrastructure()
-//    (B) ensureInfrastructure() 의 needsRebuild 분기
-//    (C) setBackground('none') 의 videoElRef 정리
-//    (D) getOrRefreshRawStream() 의 videoElRef 무효화
-//    (E) cleanup() 의 videoEl 정리
+//  ■ 수정: teardownOutputStream() 에서 captureStream 트랙 stop 전에
+//    videoEl.srcObject 를 빈 MediaStream 으로 먼저 교체.
+//    → rawTrack 과의 연결을 captureStream stop 전에 미리 해제.
+//    → setBackground('none') 의 중복 videoEl 정리 코드 제거.
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 수정 이력
+//  v19: [BUG-V] teardownOutputStream 에서 captureStream stop 전
+//               videoEl srcObject 먼저 해제 → rawTrack ended 방지
 //  v18: [BUG-U] videoEl 폐기 시 srcObject = new MediaStream([]) 로 교체
 //               → Chrome GC 시 rawStream track ended 방지
 //  v17: [BUG-T] getOrRefreshRawStream 에서 videoEl/wrapper 즉시 무효화,
@@ -87,7 +77,7 @@ async function getSegmentation() {
     BP('LOAD', '✅ MediaPipe 로드 완료 (window.__mediapipeSeg 고정)');
     window.__mediapipeSeg = seg;
     _segLoadingPromise = null;
-    return seg;
+    return seg;  // ★ null 이 아닌 seg 반환
   })();
 
   return _segLoadingPromise;
@@ -182,10 +172,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, []);
 
   // ── [BUG-S] waitForFirstFrame — stopLoop/startLoop 과 완전 독립 ──
-  // 다음 composeFrame() 이 실제로 실행될 때까지 대기.
-  // maxWait ms 초과 시 자동 resolve (안전망).
   const waitForFirstFrame = useCallback((maxWait = 800) => {
-    // 이전 대기 중인 Promise 가 있으면 즉시 해제
     if (firstFrameResolveRef.current) {
       firstFrameResolveRef.current();
       firstFrameResolveRef.current = null;
@@ -216,7 +203,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, []);
 
   // ── 처리 루프 중지 ──────────────────────────────────────────
-  // [BUG-S] firstFrameResolveRef 를 건드리지 않음!
   const stopLoop = useCallback(() => {
     activeRef.current  = false;
     loopIdRef.current += 1;
@@ -225,8 +211,21 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
     BP('02', '처리 루프 중지');
   }, []);
 
-  // ── canvas/outputStream 만 정리 (none 전환 시) ──────────────
+  // ── canvas/outputStream 정리 ──────────────────────────────
+  // ★ [BUG-V] captureStream 트랙 stop 전에 videoEl srcObject 를 먼저 해제.
+  //   Chrome 은 captureStream 트랙 stop 시 연결된 video 의 rawTrack 도
+  //   ended 시킬 수 있으므로, videoEl 을 먼저 분리해야 함.
   const teardownOutputStream = useCallback(() => {
+    // ★ 먼저 videoEl srcObject 해제 (captureStream stop 보다 앞서야 함)
+    if (videoElRef.current) {
+      try { videoElRef.current.pause(); } catch (_) {}
+      try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
+      videoElRef.current = null;
+      BP('02', 'videoElRef 선제 정리 (captureStream stop 전)');
+    }
+    wrapperStreamRef.current = null;
+
+    // 그 다음 captureStream 트랙 stop
     if (outputStreamRef.current) {
       outputStreamRef.current.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
       outputStreamRef.current = null;
@@ -234,22 +233,13 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       BP('02', 'outputStream(canvas captureStream) 트랙 stop 완료');
     }
     canvasRef.current = null;
-    BP('02', 'canvas/outputStream 정리 완료 — videoEl/wrapper/MediaPipe 유지');
+    BP('02', 'canvas/outputStream 정리 완료 — MediaPipe 유지');
   }, []);
 
   // ── infrastructure 전체 정리 (언마운트 시에만) ────────────────
   const teardownInfrastructure = useCallback(() => {
     teardownOutputStream();
-    if (videoElRef.current) {
-      try { videoElRef.current.pause(); } catch (_) {}
-      // ★ [BUG-U] srcObject 를 빈 스트림으로 교체하여 원본 track 참조 해제.
-      //   srcObject = null 은 Chrome 에서 track 을 즉시 ended 시키므로 금지.
-      //   video element 가 GC 될 때 srcObject 에 원본 track 이 남아있으면
-      //   Chrome 이 rawStream track 을 ended 시키는 현상 방지.
-      try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
-      videoElRef.current = null;
-    }
-    wrapperStreamRef.current = null;
+    // teardownOutputStream 에서 videoEl 이미 정리됨
     BP('02', 'infrastructure 전체 정리 완료');
   }, [teardownOutputStream]);
 
@@ -305,7 +295,7 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
-        // ★ [BUG-U] srcObject 를 빈 스트림으로 교체 후 null
+        // ★ [BUG-U] srcObject 를 빈 스트림으로 교체
         try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
         videoElRef.current = null;
       }
@@ -369,7 +359,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, []);
 
   // ── 렌더링 루프 시작 ─────────────────────────────────────
-  // [BUG-S] firstFrame 관리 없음. waitForFirstFrame() 를 외부에서 호출.
   const startLoop = useCallback(async () => {
     const myLoopId    = loopIdRef.current;
     activeRef.current = true;
@@ -447,10 +436,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
   }, [composeFrame]);
 
   // ── 안전한 rawStream 획득 ────────────────────────────────
-  // [BUG-T] 수정: newStream 재획득 시 videoElRef/wrapperStreamRef 즉시 무효화.
-  //   rawStream.getTracks().forEach(stop) 으로 wrapperStream 내 트랙도 ended 되므로
-  //   videoEl 을 그대로 유지하면 ensureInfrastructure 에서 ended 트랙을 재사용하는
-  //   문제가 발생함. null 로 초기화하여 needsRebuild=true 를 보장.
   const getOrRefreshRawStream = useCallback(async () => {
     const rawStream = localStreamRef?.current;
     if (!rawStream) { BPW('04', 'rawStream 없음'); return null; }
@@ -463,11 +448,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       rawStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
       BP('04', '기존 stream 트랙 stop 완료');
 
-      // ★ [BUG-T] 수정 (1) + [BUG-U]: stream 교체 전 videoEl/wrapper 즉시 무효화.
-      //   rawStream 트랙이 stop 되면 wrapperStream 안의 동일 트랙도 ended 됨.
-      //   videoElRef 를 null 로 초기화해야 ensureInfrastructure 가
-      //   needsRebuild=true 로 판단하여 새 videoEl 을 올바르게 생성함.
-      //   srcObject 를 빈 스트림으로 교체하여 GC 시 track ended 방지.
       if (videoElRef.current) {
         try { videoElRef.current.pause(); } catch (_) {}
         try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
@@ -532,23 +512,14 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
         }
       }
 
-      // ★ [BUG-T] 수정 (3): teardown 직전 callId 재확인 (경쟁 조건 방어)
       if (callId !== setBackgroundCallIdRef.current) {
         BP('04', `setBackground none callId=${callId} 취소 (teardown 직전)`);
         return;
       }
 
+      // ★ [BUG-V] teardownOutputStream 내부에서 videoEl 먼저 정리 후 captureStream stop
+      //   (중복 videoEl 정리 코드 제거 — teardownOutputStream 이 담당)
       teardownOutputStream();
-
-      // ★ [BUG-T] 수정 (2) + [BUG-U]: none 전환 시 videoEl/wrapper 함께 정리.
-      //   srcObject 를 빈 스트림으로 교체하여 GC 시 rawStream track ended 방지.
-      if (videoElRef.current) {
-        try { videoElRef.current.pause(); } catch (_) {}
-        try { videoElRef.current.srcObject = new MediaStream([]); } catch (_) {}
-        videoElRef.current = null;
-        BP('02', 'videoElRef 정리 (none 전환)');
-      }
-      wrapperStreamRef.current = null;
 
       setBackgroundImageState(null);
 
@@ -572,7 +543,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
 
       if (!ok) return;
 
-      // [BUG-S] stopLoop → startLoop. waitForFirstFrame 은 이 다음에 별도 호출.
       stopLoop();
       await startLoop();
 
@@ -585,8 +555,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
       if (outStream) {
         const outTrack = outStream.getVideoTracks().find(t => t.readyState === 'live');
         if (outTrack) {
-          // [BUG-S] startLoop() 완료 후 waitForFirstFrame() 별도 호출
-          //         → canvas 에 첫 픽셀이 실제로 그려진 뒤 SFU replace
           BP('04', '첫 프레임 대기 중...');
           await waitForFirstFrame(800);
 
@@ -608,7 +576,6 @@ export function useBackgroundProcessor({ localStreamRef, producersRef, localVide
           }
         }
 
-        // [BUG-O] 로컬 미리보기 반드시 outputStream 으로 갱신
         if (outputStreamRef.current) {
           updatePreview(outputStreamRef.current);
         }
