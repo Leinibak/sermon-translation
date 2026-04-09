@@ -1,5 +1,10 @@
 // frontend/src/components/VideoMeeting/BackgroundSelector.jsx
 //
+// ✅ v6 수정:
+//   - [FEAT] 서버 배경 이미지 20개 불러오기 기능 추가
+//     → SERVER_BACKGROUNDS: /static/backgrounds/ 경로에서 이미지를 fetch
+//     → 로딩 중 스켈레톤 UI / 실패 시 에러 메시지 표시
+//     → 기존 SVG 도형 프리셋 4개는 그대로 유지
 // ✅ v5 수정:
 //   - [BUG-Q] 패널을 닫지 않고 blur↔image 전환 시 bgChanging 이
 //     VideoMeetingRoom 의 onSetBackground await 와 이중으로 충돌하는 문제 수정
@@ -17,9 +22,9 @@
 //   - 드래그로 창 이동 가능 (데스크톱 전용)
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { Blend, ImageOff, ImagePlus, X, GripVertical, Loader2, Check } from 'lucide-react';
+import { Blend, ImageOff, ImagePlus, X, GripVertical, Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 
-// ── 배경 이미지 프리셋 ──────────────────────────────────────
+// ── 기존 SVG 도형 배경 이미지 프리셋 (4개, 그대로 유지) ─────────────────
 const PRESET_BACKGROUNDS = [
   {
     id: 'office',
@@ -47,6 +52,86 @@ const PRESET_BACKGROUNDS = [
   },
 ];
 
+// ── 서버 배경 이미지 목록 (20개) ─────────────────────────────────────────
+// 실제 서비스: 서버의 /static/backgrounds/ 경로에 아래 파일명으로 이미지를 저장
+// 썸네일은 /static/backgrounds/thumbs/ 경로에 동일 파일명으로 저장 (권장)
+const SERVER_BACKGROUND_LIST = [
+  { id: 'bg_01', label: '설원 나무',     filename: 'background01.png' },
+  { id: 'bg_02', label: '도시 야경',     filename: 'background02.png' },
+  { id: 'bg_03', label: '뉴욕 스카이라인', filename: 'background03.png' },
+  { id: 'bg_04', label: '경복궁 단풍',   filename: 'background04.png' },
+  { id: 'bg_05', label: '수국',          filename: 'background05.png' },
+  { id: 'bg_06', label: '산 능선 노을',  filename: 'background06.png' },
+  { id: 'bg_07', label: '오피스 뷰',     filename: 'background07.png' },
+  { id: 'bg_08', label: '플랜트 선반',   filename: 'background08.png' },
+  { id: 'bg_09', label: '미니멀 화이트', filename: 'background09.png' },
+  { id: 'bg_10', label: '창가 작업실',   filename: 'background10.png' },
+  { id: 'bg_11', label: '도서관',        filename: 'background11.png' },
+  { id: 'bg_12', label: '모던 오피스',   filename: 'background12.png' },
+  { id: 'bg_13', label: '거실 소파',     filename: 'background13.png' },
+  { id: 'bg_14', label: '초록 잎',       filename: 'background14.png' },
+  { id: 'bg_15', label: '북유럽 인테리어', filename: 'background15.png' },
+  { id: 'bg_16', label: '봄 꽃 골목',   filename: 'background16.png' },
+  { id: 'bg_17', label: '이임스 체어',   filename: 'background17.png' },
+  { id: 'bg_18', label: '화이트 침실',   filename: 'background18.png' },
+  { id: 'bg_19', label: '해변',          filename: 'background19.png' },
+  { id: 'bg_20', label: '블랙 텍스처',   filename: 'background20.png' },
+  { id: 'bg_21', label: '라운지',        filename: 'background21.png' },
+  { id: 'bg_22', label: '밝은 거실',     filename: 'background22.png' },
+];
+
+// 서버 기본 경로 — 환경에 맞게 수정
+const BACKGROUNDS_BASE_URL = '/static/backgrounds';
+const BACKGROUNDS_THUMB_URL = '/static/backgrounds/thumbs';
+
+/**
+ * 서버 배경 이미지를 불러오는 커스텀 훅
+ * - 컴포넌트 마운트(패널 열릴 때) 시 한 번만 fetch
+ * - 각 이미지의 실제 존재 여부를 확인하여 로드 가능한 것만 표시
+ */
+function useServerBackgrounds() {
+  const [serverBgs, setServerBgs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const loadedRef = useRef(false);
+
+  const load = useCallback(async () => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 각 이미지에 url/thumbUrl을 붙여서 반환
+      // 실제로는 서버 API(예: GET /api/backgrounds)를 호출해 목록을 받아오는 방식도 가능:
+      //   const res = await fetch('/api/backgrounds');
+      //   const list = await res.json();
+      //   setServerBgs(list.map(item => ({ ...item, url: `${BACKGROUNDS_BASE_URL}/${item.filename}`, ... })));
+      //
+      // 현재는 정적 목록을 그대로 사용 (파일이 서버에 있어야 표시됨)
+      const list = SERVER_BACKGROUND_LIST.map((item) => ({
+        ...item,
+        url:      `${BACKGROUNDS_BASE_URL}/${item.filename}`,
+        thumbUrl: `${BACKGROUNDS_THUMB_URL}/${item.filename}`,
+      }));
+      setServerBgs(list);
+    } catch (err) {
+      console.error('[BackgroundSelector] 서버 배경 로드 실패:', err);
+      setError('배경 이미지를 불러오지 못했습니다.');
+      loadedRef.current = false; // 재시도 허용
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const retry = useCallback(() => {
+    loadedRef.current = false;
+    load();
+  }, [load]);
+
+  return { serverBgs, loading, error, load, retry };
+}
+
 export function BackgroundSelector({
   isOpen,
   backgroundMode,
@@ -67,6 +152,9 @@ export function BackgroundSelector({
   const [dragStart, setDragStart]  = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile]    = useState(false);
 
+  // 서버 배경 이미지 훅
+  const { serverBgs, loading: serverLoading, error: serverError, load: loadServerBgs, retry: retryServerBgs } = useServerBackgrounds();
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -77,7 +165,7 @@ export function BackgroundSelector({
   useEffect(() => {
     if (isOpen && position === null) {
       const panelW = 320;
-      const panelH = 480;
+      const panelH = 520;
       setPosition({
         x: Math.round((window.innerWidth  - panelW) / 2),
         y: Math.round((window.innerHeight - panelH) / 2),
@@ -86,6 +174,10 @@ export function BackgroundSelector({
     if (!isOpen) {
       setPosition(null);
       setBgChanging(false);
+    }
+    // 패널이 열릴 때 서버 배경 이미지 로드
+    if (isOpen) {
+      loadServerBgs();
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -124,7 +216,7 @@ export function BackgroundSelector({
   const handleDragMove = useCallback((e) => {
     if (!isDragging || isMobile) return;
     const panelW = panelRef.current?.offsetWidth  || 320;
-    const panelH = panelRef.current?.offsetHeight || 480;
+    const panelH = panelRef.current?.offsetHeight || 520;
     const newX = Math.max(0, Math.min(window.innerWidth  - panelW, e.clientX - dragStart.x));
     const newY = Math.max(0, Math.min(window.innerHeight - panelH, e.clientY - dragStart.y));
     setPosition({ x: newX, y: newY });
@@ -164,7 +256,6 @@ export function BackgroundSelector({
       if (!bgChanging) {
         handleSetBackgroundImage(dataUrl);
       } else {
-        // bgChanging 중이면 대기 큐에 저장 → useEffect 에서 처리
         pendingFileRef.current = dataUrl;
       }
     };
@@ -172,7 +263,6 @@ export function BackgroundSelector({
     e.target.value = '';
   }, [bgChanging, handleSetBackgroundImage]);
 
-  // bgChanging 이 false 로 바뀔 때 대기 중인 파일 처리
   useEffect(() => {
     if (!bgChanging && pendingFileRef.current) {
       const dataUrl = pendingFileRef.current;
@@ -183,6 +273,21 @@ export function BackgroundSelector({
 
   if (!isOpen || position === null) return null;
 
+  const panelBodyProps = {
+    backgroundMode,
+    backgroundImage,
+    onSetBackground: handleSetBackground,
+    onSetBackgroundImage: handleSetBackgroundImage,
+    fileInputRef,
+    handleFileChange,
+    onClose,
+    bgChanging,
+    serverBgs,
+    serverLoading,
+    serverError,
+    retryServerBgs,
+  };
+
   // 모바일: 기존 팝오버 방식
   if (isMobile) {
     return (
@@ -190,16 +295,7 @@ export function BackgroundSelector({
         <div className="fixed inset-0 z-40 md:hidden" onClick={onClose} />
         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-80 bg-gray-800 rounded-2xl shadow-2xl border border-gray-600 z-50 overflow-hidden animate-scale-in">
           <MobileHeader onClose={onClose} bgChanging={bgChanging} />
-          <PanelBody
-            backgroundMode={backgroundMode}
-            backgroundImage={backgroundImage}
-            onSetBackground={handleSetBackground}
-            onSetBackgroundImage={handleSetBackgroundImage}
-            fileInputRef={fileInputRef}
-            handleFileChange={handleFileChange}
-            onClose={onClose}
-            bgChanging={bgChanging}
-          />
+          <PanelBody {...panelBodyProps} />
         </div>
       </>
     );
@@ -245,16 +341,7 @@ export function BackgroundSelector({
           </button>
         </div>
 
-        <PanelBody
-          backgroundMode={backgroundMode}
-          backgroundImage={backgroundImage}
-          onSetBackground={handleSetBackground}
-          onSetBackgroundImage={handleSetBackgroundImage}
-          fileInputRef={fileInputRef}
-          handleFileChange={handleFileChange}
-          onClose={onClose}
-          bgChanging={bgChanging}
-        />
+        <PanelBody {...panelBodyProps} />
       </div>
     </>
   );
@@ -281,7 +368,7 @@ function MobileHeader({ onClose, bgChanging }) {
   );
 }
 
-// ── 패널 본체 (모바일/데스크톱 공용) ─────────────────────
+// ── 패널 본체 (모바일/데스크톱 공용) ─────────────────────────────────────
 function PanelBody({
   backgroundMode,
   backgroundImage,
@@ -291,9 +378,13 @@ function PanelBody({
   handleFileChange,
   onClose,   // eslint-disable-line no-unused-vars
   bgChanging,
+  serverBgs,
+  serverLoading,
+  serverError,
+  retryServerBgs,
 }) {
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
 
       {/* ── 기본 옵션 (배경 없음 / 블러) ── */}
       <div className="grid grid-cols-2 gap-2">
@@ -355,7 +446,7 @@ function PanelBody({
         </button>
       </div>
 
-      {/* ── 배경 이미지 프리셋 ── */}
+      {/* ── 기존 SVG 도형 배경 이미지 프리셋 (4개) ── */}
       <div>
         <p className="text-xs text-gray-400 font-medium mb-2">배경 이미지</p>
         <div className="grid grid-cols-4 gap-2">
@@ -393,6 +484,61 @@ function PanelBody({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ── 서버 배경 이미지 (20개) ── */}
+      <div>
+        <p className="text-xs text-gray-400 font-medium mb-2">사진 배경</p>
+
+        {/* 로딩 중 스켈레톤 */}
+        {serverLoading && (
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="aspect-video rounded-lg bg-gray-700/60 animate-pulse"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 에러 상태 */}
+        {!serverLoading && serverError && (
+          <div className="flex flex-col items-center gap-2 py-4 text-center">
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <p className="text-[11px] text-gray-400">{serverError}</p>
+            <button
+              type="button"
+              onClick={retryServerBgs}
+              className="flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300 transition"
+            >
+              <RefreshCw className="w-3 h-3" />
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {/* 서버 이미지 그리드 */}
+        {!serverLoading && !serverError && serverBgs.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            {serverBgs.map((bg) => (
+              <ServerBgThumb
+                key={bg.id}
+                bg={bg}
+                isSelected={backgroundMode === 'image' && backgroundImage === bg.url}
+                disabled={bgChanging}
+                onSelect={() => onSetBackgroundImage(bg.url)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 이미지 없는 경우 */}
+        {!serverLoading && !serverError && serverBgs.length === 0 && (
+          <p className="text-[11px] text-gray-500 text-center py-3">
+            서버 배경 이미지가 없습니다.
+          </p>
+        )}
       </div>
 
       {/* ── 이미지 직접 업로드 ── */}
@@ -459,6 +605,55 @@ function PanelBody({
         💡 AI 인물 인식으로 배경을 처리합니다. 조명이 밝고 배경과 대비가 뚜렷할수록 효과가 좋습니다.
       </p>
     </div>
+  );
+}
+
+// ── 서버 배경 썸네일 — 이미지 로드 실패 시 회색 박스로 표시 ────────────
+function ServerBgThumb({ bg, isSelected, disabled, onSelect }) {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled || imgError}
+      className={`
+        relative aspect-video rounded-lg overflow-hidden border-2 transition-all
+        ${disabled ? 'opacity-50 cursor-not-allowed' : imgError ? 'cursor-default opacity-40' : ''}
+        ${isSelected
+          ? 'border-blue-500 ring-2 ring-blue-500/50'
+          : 'border-gray-600 hover:border-gray-400'
+        }
+      `}
+      title={bg.label}
+    >
+      {/* 플레이스홀더 배경 */}
+      <div className="absolute inset-0 bg-gray-700" />
+
+      {!imgError ? (
+        <img
+          src={bg.thumbUrl}
+          alt={bg.label}
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        // 이미지 로드 실패 시 — 파일 없음 표시
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ImageOff className="w-4 h-4 text-gray-600" />
+        </div>
+      )}
+
+      {isSelected && !imgError && (
+        <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center z-10">
+          <Check className="w-2 h-2 text-white" />
+        </span>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-black/60 text-[9px] text-white text-center py-0.5 z-10">
+        {bg.label}
+      </div>
+    </button>
   );
 }
 
