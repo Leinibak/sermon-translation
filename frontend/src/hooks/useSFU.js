@@ -35,9 +35,11 @@
  *  D50  handleSFUMessage 수신
  *  D51  new_producer 처리 경로
  *  D60  removeRemoteStream
+ *  D70  visibilitychange / focus — 탭 전환 시 트랙 복원  ★NEW★
  */
 
-import { useRef, useState, useCallback } from 'react';
+// ★ [FIX] useEffect 추가 — 탭/창 전환 시 오디오·비디오 트랙 복원에 필요
+import { useRef, useState, useCallback, useEffect } from 'react';
 import * as mediasoupClient from 'mediasoup-client';
 
 // ── 진단 로거 ────────────────────────────────────────────────
@@ -94,6 +96,10 @@ export function useSFU({ wsRef, roomId }) {
 
   // 메시지 큐: key = messageType, value = Array<{resolve, reject, timer, filter}>
   const pendingRef = useRef(new Map());
+
+  // ★ [FIX-D70] 사용자가 명시적으로 mute 했는지 추적
+  //   탭 복귀 시 사용자가 끈 마이크/카메라는 자동 복원하지 않기 위한 플래그
+  const pausedByUserRef = useRef({ audio: false, video: false });
 
   const [remoteStreams, setRemoteStreams]        = useState(new Map());
   const [connectionStatus, setConnectionStatus]  = useState('disconnected');
@@ -564,7 +570,10 @@ export function useSFU({ wsRef, roomId }) {
   }, []);
 
   // ── Mute / Unmute ───────────────────────────────────────────
+  // ★ [FIX-D70] pausedByUserRef 플래그를 함께 관리
+  //   탭 복귀 시 사용자가 직접 끈 트랙은 복원하지 않기 위해 의도를 기록
   const muteAudio = useCallback(() => {
+    pausedByUserRef.current.audio = true;  // ★ 사용자 의도: 명시적 mute
     const producer = producersRef.current.get('audio');
     if (!producer) return;
     producer.pause();
@@ -572,6 +581,7 @@ export function useSFU({ wsRef, roomId }) {
   }, [wsSend]);
 
   const unmuteAudio = useCallback(() => {
+    pausedByUserRef.current.audio = false; // ★ 사용자 의도: 명시적 unmute
     const producer = producersRef.current.get('audio');
     if (!producer) return;
     producer.resume();
@@ -579,6 +589,7 @@ export function useSFU({ wsRef, roomId }) {
   }, [wsSend]);
 
   const muteVideo = useCallback(() => {
+    pausedByUserRef.current.video = true;  // ★ 사용자 의도: 명시적 mute
     const producer = producersRef.current.get('video');
     if (!producer) return;
     producer.pause();
@@ -586,11 +597,103 @@ export function useSFU({ wsRef, roomId }) {
   }, [wsSend]);
 
   const unmuteVideo = useCallback(() => {
+    pausedByUserRef.current.video = false; // ★ 사용자 의도: 명시적 unmute
     const producer = producersRef.current.get('video');
     if (!producer) return;
     producer.resume();
     wsSend({ type: 'sfu_producer_resume', producerId: producer.id, kind: 'video' });
   }, [wsSend]);
+
+  // ── [D70] 탭 전환 / 창 전환 시 오디오·비디오 트랙 복원 ★NEW★ ──
+  //
+  //  문제:
+  //    브라우저는 탭이 비활성화(hidden)되거나 다른 창으로 포커스가
+  //    이동할 때, MediaStream 오디오 트랙의 enabled 속성을 false로
+  //    강제 변경하거나 mediasoup producer를 자동으로 pause 상태로
+  //    만들어 소리 전송이 끊기는 현상이 발생한다.
+  //
+  //  해결:
+  //    (1) visibilitychange 이벤트: 탭이 다시 visible 될 때
+  //    (2) window focus 이벤트: 다른 창에서 돌아올 때
+  //    위 두 시점에서 localStream 트랙 enabled 강제 복원 +
+  //    mediasoup producer paused 상태이면 즉시 resume 처리.
+  //    단, 사용자가 명시적으로 끈 경우(pausedByUserRef)는 복원 안 함.
+  //
+  const restoreTracksOnVisible = useCallback(() => {
+    // (1) localStream 오디오·비디오 트랙 enabled 강제 복원
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getAudioTracks().forEach((t) => {
+        if (!pausedByUserRef.current.audio) {
+          if (!t.enabled) {
+            t.enabled = true;
+            D('70', `restored audioTrack.enabled=true id=${t.id.slice(0, 8)}`);
+          }
+        }
+      });
+      stream.getVideoTracks().forEach((t) => {
+        if (!pausedByUserRef.current.video) {
+          if (!t.enabled) {
+            t.enabled = true;
+            D('70', `restored videoTrack.enabled=true id=${t.id.slice(0, 8)}`);
+          }
+        }
+      });
+    }
+
+    // (2) mediasoup audio producer paused 복원
+    const audioProducer = producersRef.current.get('audio');
+    if (
+      audioProducer &&
+      !audioProducer.closed &&
+      audioProducer.paused &&
+      !pausedByUserRef.current.audio
+    ) {
+      audioProducer.resume();
+      wsSend({ type: 'sfu_producer_resume', producerId: audioProducer.id, kind: 'audio' });
+      D('70', `restored audio producer resumed id=${audioProducer.id.slice(0, 8)}`);
+    }
+
+    // (3) mediasoup video producer paused 복원
+    const videoProducer = producersRef.current.get('video');
+    if (
+      videoProducer &&
+      !videoProducer.closed &&
+      videoProducer.paused &&
+      !pausedByUserRef.current.video
+    ) {
+      videoProducer.resume();
+      wsSend({ type: 'sfu_producer_resume', producerId: videoProducer.id, kind: 'video' });
+      D('70', `restored video producer resumed id=${videoProducer.id.slice(0, 8)}`);
+    }
+  }, [wsSend]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // 탭이 다시 보일 때 (다른 탭에서 돌아올 때)
+    const handleVisibilityChange = () => {
+      D('70', `visibilitychange — hidden=${document.hidden}`);
+      if (!document.hidden) {
+        restoreTracksOnVisible();
+      }
+    };
+
+    // 다른 브라우저 창/앱에서 이 창으로 포커스가 돌아올 때
+    const handleWindowFocus = () => {
+      D('70', 'window focus — restoring tracks');
+      restoreTracksOnVisible();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    D('70', 'visibilitychange + window focus listeners registered');
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      D('70', 'visibilitychange + window focus listeners removed');
+    };
+  }, [restoreTracksOnVisible]);
 
   // ── [D50~D51] 이벤트 기반 SFU 메시지 처리 ────────────────────
   const handleSFUMessage = useCallback(async (data) => {
@@ -698,6 +801,7 @@ export function useSFU({ wsRef, roomId }) {
     recvTransportRef.current = null;
     deviceRef.current = null;
     pendingProducersRef.current = [];
+    pausedByUserRef.current = { audio: false, video: false }; // ★ [FIX] cleanup 시 플래그 초기화
     setRemoteStreams(new Map());
     setConnectionStatus('disconnected');
     D('20', 'cleanup done');
