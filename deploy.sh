@@ -8,6 +8,8 @@ set -e
 
 COMPOSE_FILE="docker-compose.prod.yml"
 BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
+DEPLOY_HISTORY_FILE="./.deploy_history"
+IMAGE_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 echo "🚀 Starting deployment process..."
 echo "================================================"
@@ -28,6 +30,27 @@ fi
 CURRENT_BRANCH=$(git branch --show-current)
 echo "📌 Current branch: $CURRENT_BRANCH"
 
+# ⚠️ feature 브랜치에서 배포 시 경고
+if [[ "$CURRENT_BRANCH" == feature/* ]]; then
+    echo ""
+    echo "⚠️  WARNING: You are deploying from a feature branch!"
+    echo "   Branch: $CURRENT_BRANCH"
+    echo "   Recommended: merge to 'main' or 'develop' before deploying to production."
+    echo ""
+    read -p "Deploy from feature branch anyway? (y/N): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Deployment cancelled"
+        echo "ℹ️  Tip: git checkout main && git merge $CURRENT_BRANCH && git push origin main"
+        exit 1
+    fi
+fi
+
+# main 브랜치가 아닌 경우 알림
+if [[ "$CURRENT_BRANCH" != "main" ]]; then
+    echo "ℹ️  Note: Deploying from non-main branch: $CURRENT_BRANCH"
+fi
+
 # 커밋되지 않은 변경사항 확인
 if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     echo "⚠️  Uncommitted changes detected!"
@@ -47,20 +70,24 @@ git fetch origin
 
 # 현재 커밋과 원격 커밋 비교
 LOCAL_COMMIT=$(git rev-parse HEAD)
-REMOTE_COMMIT=$(git rev-parse origin/$CURRENT_BRANCH)
+REMOTE_COMMIT=$(git rev-parse origin/$CURRENT_BRANCH 2>/dev/null || echo "")
 
-if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
+if [ -z "$REMOTE_COMMIT" ]; then
+    echo "ℹ️  No remote tracking branch found for $CURRENT_BRANCH"
+elif [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
     echo "✅ Already up to date with origin/$CURRENT_BRANCH"
 else
     echo "📦 New changes available"
     echo "   Local:  $LOCAL_COMMIT"
     echo "   Remote: $REMOTE_COMMIT"
     echo ""
-    
+
     # Pull 실행
     echo "⬇️  Pulling latest changes..."
     if git pull origin "$CURRENT_BRANCH"; then
         echo "✅ Successfully pulled latest changes"
+        # Pull 후 태그 재계산
+        IMAGE_TAG=$(git rev-parse --short HEAD)
     else
         echo "❌ Git pull failed!"
         echo "ℹ️  Please resolve conflicts manually and try again"
@@ -69,6 +96,7 @@ else
 fi
 
 echo "✅ Git update completed"
+echo "🏷️  Image tag: $IMAGE_TAG"
 echo ""
 
 # ================================================
@@ -97,7 +125,7 @@ for dir in "${required_dirs[@]}"; do
     fi
 done
 
-# Frontend Dockerfile에서 참조하는 파일 확인
+# Frontend Dockerfile 확인
 if [ -f "frontend/Dockerfile.prod" ]; then
     echo "✅ frontend/Dockerfile.prod found"
 else
@@ -142,7 +170,7 @@ if docker ps | grep -q webboard_db_prod; then
     echo "📦 Backing up database..."
     POSTGRES_USER=${POSTGRES_USER:-postgres}
     POSTGRES_DB=${POSTGRES_DB:-webboard_db}
-    
+
     if docker exec webboard_db_prod pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > "$BACKUP_DIR/database.sql" 2>/dev/null; then
         echo "✅ Database backup created"
     else
@@ -167,6 +195,7 @@ echo "📝 Saving deployment info..."
     echo "Deployment Time: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "Git Branch: $CURRENT_BRANCH"
     echo "Git Commit: $(git rev-parse HEAD)"
+    echo "Image Tag: $IMAGE_TAG"
     echo "Git Message: $(git log -1 --pretty=%B)"
 } > "$BACKUP_DIR/deploy_info.txt"
 
@@ -174,13 +203,13 @@ echo "✅ Backup completed: $BACKUP_DIR"
 echo ""
 
 # ================================================
-# 4️⃣ 이미지 빌드
+# 4️⃣ 이미지 빌드 (버전 태그 포함)
 # ================================================
 echo "🔨 Building Docker images..."
+echo "🏷️  Tagging as: $IMAGE_TAG (and latest)"
 echo "⚠️  This may take a few minutes..."
 echo ""
 
-echo "✅ mediasoup build complete"
 # mediasoup 이미지가 없을 때만 빌드
 if docker image inspect webboard-mediasoup:latest > /dev/null 2>&1; then
     echo "✅ mediasoup image already exists — skipping build"
@@ -192,26 +221,95 @@ fi
 
 echo ""
 
-# backend, frontend는 매번 새로 빌드
+# backend, frontend 빌드 후 버전 태그 부여
 echo "📦 Building backend and frontend (no cache)..."
-if ! docker compose -f $COMPOSE_FILE build --no-cache backend frontend; then
+
+# ⚠️ 레이스 컨디션 방지:
+# 기존 방식(latest로 빌드 → 재태깅)은 동시 배포 시 latest가 덮어씌워질 위험이 있음.
+# IMAGE_TAG 환경변수를 compose에 넘겨 빌드 단계에서 직접 버전 태그로 빌드하고,
+# 완료 후 latest도 별도로 태깅하여 두 태그를 원자적으로 관리.
+export IMAGE_TAG   # docker-compose.prod.yml 내 ${IMAGE_TAG} 변수에서 참조 가능
+
+if ! IMAGE_TAG=$IMAGE_TAG docker compose -f $COMPOSE_FILE build --no-cache backend frontend; then
     echo "❌ backend/frontend build failed!"
     exit 1
 fi
-echo "✅ Docker images built successfully!"
 
-# if docker compose -f $COMPOSE_FILE build --no-cache; then
-#     echo "✅ Docker images built successfully!"
-# else
-#     echo "❌ Docker build failed!"
-#     echo "ℹ️  Rolling back is not needed (old containers still running)"
-#     exit 1
-# fi
+# 버전 태그로 빌드된 이미지에 latest도 추가 태깅 (롤백 기준점 유지용)
+echo "🏷️  Tagging images: $IMAGE_TAG → latest"
+for SERVICE in backend frontend; do
+    # docker compose config 파이프라인 대신 환경변수로 이미지명 관리해 오파싱 방지
+    IMAGE_NAME=$(IMAGE_TAG=$IMAGE_TAG docker compose -f $COMPOSE_FILE config 2>/dev/null \
+        | awk "/^  ${SERVICE}:/{found=1} found && /image:/{print \$2; exit}")
+    if [ -n "$IMAGE_NAME" ]; then
+        # 버전 태그가 정상 생성됐는지 먼저 확인 후 latest 태깅
+        if docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" > /dev/null 2>&1; then
+            docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:latest"
+            echo "   ✅ ${IMAGE_NAME}:${IMAGE_TAG} → ${IMAGE_NAME}:latest"
+        else
+            # 버전 태그 이미지가 없으면 latest → 버전 태그 역방향 태깅 (fallback)
+            docker tag "${IMAGE_NAME}:latest" "${IMAGE_NAME}:${IMAGE_TAG}" 2>/dev/null && \
+                echo "   ✅ (fallback) Tagged ${IMAGE_NAME}:${IMAGE_TAG}" || \
+                echo "   ⚠️  Could not tag $SERVICE — check IMAGE_TAG in docker-compose.prod.yml"
+        fi
+    else
+        echo "   ⚠️  Could not resolve image name for $SERVICE"
+    fi
+done
 
+echo "✅ Docker images built and tagged successfully!"
 echo ""
 
 # ================================================
-# 5️⃣ 컨테이너 중지 및 제거
+# 5️⃣ 배포 이력 저장 (롤백용)
+# ================================================
+echo "📝 Saving deploy history for rollback..."
+
+PREV_TAG=""
+if [ -f "$DEPLOY_HISTORY_FILE" ]; then
+    PREV_TAG=$(head -1 "$DEPLOY_HISTORY_FILE" | awk '{print $1}')
+fi
+
+# 현재 배포를 이력 맨 앞에 추가 (최근 5개 유지)
+HISTORY_ENTRY="$IMAGE_TAG $CURRENT_BRANCH $(date '+%Y-%m-%d %H:%M:%S') $(git log -1 --pretty=%s)"
+if [ -f "$DEPLOY_HISTORY_FILE" ]; then
+    TEMP_FILE=$(mktemp)
+    echo "$HISTORY_ENTRY" > "$TEMP_FILE"
+    head -4 "$DEPLOY_HISTORY_FILE" >> "$TEMP_FILE"
+    mv "$TEMP_FILE" "$DEPLOY_HISTORY_FILE"
+else
+    echo "$HISTORY_ENTRY" > "$DEPLOY_HISTORY_FILE"
+fi
+
+echo "✅ Deploy history updated"
+if [ -n "$PREV_TAG" ]; then
+    echo "   Previous version: $PREV_TAG (rollback available)"
+fi
+echo ""
+
+# ================================================
+# 6️⃣ 컨테이너 중지 직전 — DB 최종 스냅샷 (롤백용)
+# ================================================
+# 배포 3단계에서 백업을 이미 만들었지만, 빌드하는 동안 새 데이터가 쌓였을 수 있음.
+# 컨테이너를 내리기 직전 시점의 스냅샷을 database_final.sql 로 별도 저장해
+# rollback.sh 가 이 파일을 기준으로 DB를 복구할 수 있도록 함.
+echo "💾 Creating final DB snapshot before cutover (for rollback)..."
+if docker ps --format '{{.Names}}' | grep -q "^webboard_db_prod$"; then
+    POSTGRES_USER=${POSTGRES_USER:-postgres}
+    POSTGRES_DB=${POSTGRES_DB:-webboard_db}
+    if docker exec webboard_db_prod pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" \
+            > "$BACKUP_DIR/database_final.sql" 2>/dev/null; then
+        echo "✅ Final DB snapshot saved: $BACKUP_DIR/database_final.sql"
+    else
+        echo "⚠️  Final DB snapshot failed — rollback.sh 에서 DB 복구를 이용할 수 없을 수 있습니다"
+    fi
+else
+    echo "ℹ️  DB container not running, skipping final snapshot"
+fi
+echo ""
+
+# ================================================
+# 6️⃣ 컨테이너 중지 및 제거
 # ================================================
 echo "🛑 Stopping old containers..."
 docker compose -f $COMPOSE_FILE down --timeout 30
@@ -219,7 +317,7 @@ echo "✅ Old containers stopped"
 echo ""
 
 # ================================================
-# 6️⃣ 새 컨테이너 시작
+# 7️⃣ 새 컨테이너 시작
 # ================================================
 echo "🚀 Starting new containers..."
 echo ""
@@ -228,17 +326,24 @@ if docker compose -f $COMPOSE_FILE up -d; then
     echo "✅ Containers started successfully!"
 else
     echo "❌ Failed to start containers!"
+    echo ""
+    echo "🔄 Attempting automatic rollback..."
+    if [ -n "$PREV_TAG" ]; then
+        echo "   Rolling back to: $PREV_TAG"
+        bash ./rollback.sh "$PREV_TAG" || echo "⚠️  Auto-rollback failed. Run: ./rollback.sh $PREV_TAG"
+    else
+        echo "   No previous version found for rollback."
+    fi
     exit 1
 fi
 echo ""
 
 # ================================================
-# 7️⃣ 헬스체크
+# 8️⃣ 헬스체크
 # ================================================
 echo "🏥 Waiting for services to be healthy..."
 echo ""
 
-# 서비스 시작 대기
 echo "⏳ Waiting for containers to initialize (30 seconds)..."
 sleep 30
 
@@ -249,9 +354,8 @@ BACKEND_HEALTHY=false
 
 echo "🔍 Checking backend health..."
 while [ $WAITED -lt $MAX_WAIT ]; do
-    # Docker 헬스체크 상태 확인
     BACKEND_STATUS=$(docker compose -f $COMPOSE_FILE ps backend --format "{{.Health}}" 2>/dev/null || echo "")
-    
+
     if [ "$BACKEND_STATUS" = "healthy" ]; then
         echo "✅ Backend is healthy!"
         BACKEND_HEALTHY=true
@@ -260,8 +364,7 @@ while [ $WAITED -lt $MAX_WAIT ]; do
         echo "❌ Backend is unhealthy!"
         break
     fi
-    
-    # HTTP 헬스체크 시도 - 여러 엔드포인트 확인
+
     if curl -f http://localhost:8000/api/health/ > /dev/null 2>&1; then
         echo "✅ Backend health endpoint is responding!"
         BACKEND_HEALTHY=true
@@ -275,11 +378,11 @@ while [ $WAITED -lt $MAX_WAIT ]; do
         BACKEND_HEALTHY=true
         break
     fi
-    
+
     if [ $((WAITED % 10)) -eq 0 ]; then
         echo "⏳ Waiting for backend... ($WAITED/$MAX_WAIT seconds)"
     fi
-    
+
     sleep 5
     WAITED=$((WAITED + 5))
 done
@@ -297,23 +400,28 @@ if [ "$BACKEND_HEALTHY" = false ]; then
     echo "   Port 8000: $(nc -zv localhost 8000 2>&1 || echo 'not reachable')"
     echo "   Port 8001: $(nc -zv localhost 8001 2>&1 || echo 'not reachable')"
     echo ""
-    echo "⚠️  Deployment may have issues. Check logs above."
-    echo ""
-    read -p "Continue anyway? (y/N): " -n 1 -r
+
+    if [ -n "$PREV_TAG" ]; then
+        echo "⚠️  Deployment failed. Auto-rollback option available."
+        read -p "Rollback to previous version ($PREV_TAG)? (Y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+            bash ./rollback.sh "$PREV_TAG"
+            exit 1
+        fi
+    fi
+
+    read -p "Continue without rollback? (y/N): " -n 1 -r
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo "❌ Deployment cancelled"
         echo ""
-        echo "💡 Troubleshooting tips:"
-        echo "  1. Check if health endpoint exists: docker compose -f $COMPOSE_FILE exec backend curl http://localhost:8000/api/health/"
-        echo "  2. View detailed logs: docker compose -f $COMPOSE_FILE logs backend"
-        echo "  3. Check container status: docker compose -f $COMPOSE_FILE ps"
+        echo "💡 Manual rollback: ./rollback.sh $PREV_TAG"
         exit 1
     fi
 fi
 
-
-# Nginx 헬스체크 바로 위에 추가
+# Mediasoup 헬스체크
 echo "🔍 Checking mediasoup..."
 if docker exec webboard_mediasoup wget -qO- http://localhost:3000/health > /dev/null 2>&1; then
     echo "✅ mediasoup is healthy!"
@@ -321,7 +429,7 @@ else
     echo "⚠️  mediasoup health check failed - check logs:"
     echo "    docker logs webboard_mediasoup"
 fi
- 
+
 # Nginx 헬스체크
 echo ""
 echo "🔍 Checking nginx..."
@@ -341,9 +449,8 @@ fi
 
 echo ""
 
-
 # ================================================
-# 8️⃣ 배포 후 작업
+# 9️⃣ 배포 후 작업
 # ================================================
 echo "🔧 Running post-deployment tasks..."
 
@@ -365,8 +472,16 @@ fi
 
 echo ""
 
+# 9. 데이터 로드 (JSON -> DB)
+echo "📥 Loading Jesus sayings data from JSON..."
+
+# 4개 복음서 데이터를 차례대로 로드 (이미 있으면 스킵함)
+docker compose -f $COMPOSE_FILE exec -T backend python manage.py load_gospel_sayings
+
+echo "✅ Data loading completed"
+
 # ================================================
-# 9️⃣ 배포 완료
+# 🔟 배포 완료
 # ================================================
 echo ""
 echo "================================================"
@@ -383,8 +498,19 @@ echo "  Admin:        http://$(hostname -I | awk '{print $1}')/admin"
 echo ""
 echo "📝 Deployment info:"
 echo "  Time:         $(date '+%Y-%m-%d %H:%M:%S')"
+echo "  Branch:       $CURRENT_BRANCH"
 echo "  Git Commit:   $(git rev-parse --short HEAD)"
+echo "  Image Tag:    $IMAGE_TAG"
 echo "  Backup:       $BACKUP_DIR"
+echo ""
+echo "🔄 Rollback command (if needed):"
+echo "  ./rollback.sh $IMAGE_TAG     ← rollback to this version later"
+if [ -n "$PREV_TAG" ]; then
+    echo "  ./rollback.sh $PREV_TAG  ← rollback to previous version"
+fi
+echo ""
+echo "📋 Deploy history:"
+cat "$DEPLOY_HISTORY_FILE" 2>/dev/null | head -5 | nl
 echo ""
 echo "📝 Useful commands:"
 echo "  View all logs:        docker compose -f $COMPOSE_FILE logs -f"

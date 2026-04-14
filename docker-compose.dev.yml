@@ -1,101 +1,176 @@
-# docker-compose.dev.yml (정정된 버전)
+# docker-compose.dev.yml
 
 services:
-  # PostgreSQL 데이터베이스 (변경 없음)
+  # ── PostgreSQL ────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: webboard_db_dev
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
-    env_file:
-      - ./.env
-    ports:
-      - "${POSTGRES_PORT}:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - webboard_network
+    ports:
+      - "5432:5432"   # 개발 환경: DB 직접 접근 허용
 
-  # ✅ Redis (변경 없음)
+  # ── Redis ─────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: webboard_redis_dev
-    command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data_dev:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+      start_period: 5s
     networks:
       - webboard_network
+    ports:
+      - "6379:6379"   # 개발 환경: Redis 직접 접근 허용
 
-  # Django 백엔드 (개발 서버)
+  # ── Django 백엔드 ──────────────────────────────────────────────
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: webboard_backend_dev
-    # 🚨 수정 1: command를 제거하여 entrypoint.sh 실행
-    # entrypoint.sh이 DB/Redis 대기, 마이그레이션, 서버 실행을 모두 처리해야 함
-    # command: >
-    #   sh -c "python manage.py migrate &&
-    #         python manage.py runserver 0.0.0.0:8000" 
-    env_file:
-      - ./backend/.env
+    volumes:
+      - ./backend:/app                      # 소스 핫리로드
+      - static_volume_dev:/app/staticfiles
+      - media_volume_dev:/app/media
+      - ./backend/logs:/app/logs
     environment:
-      - DJANGO_ENV=dev
+      - DJANGO_ENV=development
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-prod}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      - ADMIN_URL=${ADMIN_URL:-admin/}
+      # DB
+      - DB_ENGINE=${DB_ENGINE:-django.db.backends.postgresql}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=5432
+      # CORS / CSRF
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    volumes:
-      - ./backend:/app
-      - ./backend/.env:/app/.env:ro
-      - ./backend/staticfiles:/app/staticfiles
-      - media_volume_dev:/app/media
-    ports:
-      - "8000:8000"
+      # mediasoup
+      - MEDIASOUP_API_URL=http://mediasoup:3000
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mediasoup:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - webboard_network
+    ports:
+      - "8000:8000"   # HTTP / REST
+      - "8001:8001"   # WebSocket (Daphne / uvicorn)
 
-  # React 프론트엔드 (개발 서버)
+  # ── React 프론트엔드 (Vite dev server) ────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: webboard_frontend_dev
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev 
-    ports:
-      - "3000:3000"
+      - ./frontend:/app                     # 소스 핫리로드
+      - /app/node_modules                   # 컨테이너 내부 node_modules 보호
     environment:
-      # 🚨 수정 2: localhost 대신 Docker 서비스 이름 'backend' 사용
-      - VITE_API_URL=http://localhost:8000/api 
-      - VITE_WS_URL=ws://localhost:8000/ws
-    env_file:
-      - ./frontend/.env
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000/api}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8001/ws}
+      - VITE_TURN_URL=${VITE_TURN_URL:-turn:localhost:3478}
+      - VITE_TURN_SECRET=${VITE_TURN_SECRET:-dev-turn-secret}
+      - CHOKIDAR_USEPOLLING=true            # WSL / Docker Desktop 파일 감시
+    ports:
+      - "5173:5173"
     depends_on:
       - backend
+    restart: unless-stopped
     networks:
       - webboard_network
 
+  # ── mediasoup SFU ─────────────────────────────────────────────
+  mediasoup:
+    build:
+      context: ./mediasoup
+      dockerfile: Dockerfile
+    container_name: webboard_mediasoup_dev
+    environment:
+      - NODE_ENV=development
+      - MEDIASOUP_HTTP_PORT=3000
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP:-127.0.0.1}
+      - MEDIASOUP_RTP_MIN_PORT=${MEDIASOUP_RTP_MIN_PORT:-40000}
+      - MEDIASOUP_RTP_MAX_PORT=${MEDIASOUP_RTP_MAX_PORT:-40099}
+      - MEDIASOUP_NUM_WORKERS=${MEDIASOUP_NUM_WORKERS:-1}
+      - TRUSTED_ORIGINS=http://backend:8000
+    ports:
+      - "3000:3000"   # mediasoup HTTP API
+      - "${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40099}:${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40099}/udp"
+      - "${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40099}:${MEDIASOUP_RTP_MIN_PORT:-40000}-${MEDIASOUP_RTP_MAX_PORT:-40099}/tcp"
+    networks:
+      - webboard_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ── coturn TURN/STUN 서버 ─────────────────────────────────────
+  coturn:
+    image: coturn/coturn:latest
+    container_name: webboard_coturn_dev
+    network_mode: host
+    command: >
+      -n
+      --log-file=-
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET:-dev-turn-secret}
+      --realm=localhost
+      --external-ip=${MEDIASOUP_ANNOUNCED_IP:-127.0.0.1}
+      --listening-port=3478
+      --min-port=49160
+      --max-port=49200
+      --no-multicast-peers
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      --total-quota=100
+    restart: unless-stopped
+
 volumes:
   postgres_data_dev:
+    driver: local
   redis_data_dev:
-  # static_volume_dev: (사용하지 않음. backend volume에서 /app/staticfiles가 처리)
+    driver: local
+  static_volume_dev:
+    driver: local
   media_volume_dev:
+    driver: local
 
 networks:
   webboard_network:
