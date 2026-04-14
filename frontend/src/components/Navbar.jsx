@@ -104,7 +104,7 @@ function Navbar() {
 
             {/* 데스크톱 메뉴 */}
             <div className="hidden md:flex space-x-8 items-center font-bold font-dodum text-lg">
-              <Link to="/" className="hover:text-blue-600 font-medium">홈</Link>
+              <Link to="/" className="hover:text-blue-600 font-medium">주님의 음성</Link>
               <Link to="/sermons" className="hover:text-blue-600 font-medium">설교</Link>
               <Link to="/pastoral-letters" className="hover:text-blue-600 font-medium">목회서신</Link>
               <Link to="/blog" className="hover:text-blue-600 font-medium">블로그</Link>
@@ -156,7 +156,7 @@ function Navbar() {
         {/* 모바일 드롭다운 메뉴 */}
         {isOpen && (
           <div className="md:hidden bg-white shadow-md px-4 pb-4 space-y-1 transition-all font-dodum duration-300">
-            <Link to="/" className="block font-medium py-1" onClick={() => setIsOpen(false)}>홈</Link>
+            <Link to="/" className="block font-medium py-1" onClick={() => setIsOpen(false)}>주님의 음성</Link>
             <Link to="/sermons" className="block font-medium py-1" onClick={() => setIsOpen(false)}>설교</Link>
             <Link to="/pastoral-letters" className="block font-medium py-1" onClick={() => setIsOpen(false)}>목회서신</Link>
             <Link to="/blog" className="block font-medium py-1" onClick={() => setIsOpen(false)}>블로그</Link>

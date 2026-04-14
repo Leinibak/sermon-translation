@@ -24,6 +24,9 @@ urlpatterns = [
     # Bible Verses API
     path('api/bible-verses/', include('bible_verses.urls')),
 
+    # Jesus Sayings Verses API
+    path('api/sayings/',      include('bible_verses.sayings_urls')),
+
     # Pastoral Letters API
     path('api/pastoral-letters/', include('pastoral_letters.urls')),
 

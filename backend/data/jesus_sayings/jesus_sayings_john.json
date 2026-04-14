@@ -1,0 +1,2102 @@
+[
+  {
+    "book": "JHN",
+    "chapter": 1,
+    "verse_start": 51,
+    "verse_end": 51,
+    "size": "S",
+    "text_ko_krv": "진실로 진실로 너희에게 이르노니 하늘이 열리고 하나님의 사자들이 인자 위에 오르락 내리락 하는 것을 보리라",
+    "text_ko_new": "내가 진정으로 진정으로 너희에게 말한다. 하늘이 열리고, 하나님의 천사들이 인자 위에서 오르내리는 것을 너희가 볼 것이다.",
+    "text_en": "Very truly I tell you, you will see heaven open, and the angels of God ascending and descending on the Son of Man.",
+    "text_de": "Wahrlich, wahrlich, ich sage euch: Ihr werdet den Himmel geöffnet sehen und die Engel Gottes auf- und niedersteigen auf den Menschensohn.",
+    "context_ko": "나다나엘이 예수님을 '하나님의 아들, 이스라엘의 임금'으로 고백하자 하신 말씀입니다. 창세기 28:12의 야곱의 사닥다리를 인용하시며, 자신이 하늘과 땅을 잇는 새로운 벧엘(하나님의 집)이심을 선언하십니다. 요한복음의 첫 '아멘 아멘'(진실로 진실로) 말씀입니다.",
+    "context_en": "Jesus's first 'Truly, truly' (ἀμὴν ἀμὴν) saying in John, spoken to Nathanael after his confession. Jesus reinterprets Jacob's ladder (Gen 28:12) as fulfilled in himself — the new Bethel, the place where heaven and earth meet.",
+    "keywords": [
+      {
+        "word": "진실로 진실로",
+        "original": "ἀμὴν ἀμὴν",
+        "transliteration": "아멘 아멘",
+        "meaning": "요한복음에만 나타나는 이중 아멘(총 25회). 히브리어 아멘(אָמֵן, 신실하다)의 반복으로 특별한 권위의 선포를 나타냄"
+      },
+      {
+        "word": "인자",
+        "original": "τὸν υἱὸν τοῦ ἀνθρώπου",
+        "transliteration": "톤 휘온 투 안트로푸",
+        "meaning": "사람의 아들. 다니엘 7:13의 '인자 같은 이'를 배경으로 한 자기 지칭. 예수님이 가장 선호하신 자기 칭호"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "나다나엘을 제자로 부르심",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 5,
+    "themes": [
+      "identity",
+      "kingdom",
+      "faith"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 2,
+    "verse_start": 19,
+    "verse_end": 19,
+    "size": "S",
+    "text_ko_krv": "너희가 이 성전을 헐라 내가 사흘 동안에 일으키리라",
+    "text_ko_new": "이 성전을 헐어라. 내가 사흘 만에 다시 세우겠다.",
+    "text_en": "Destroy this temple, and I will raise it again in three days.",
+    "text_de": "Brecht diesen Tempel ab, und in drei Tagen werde ich ihn aufrichten.",
+    "context_ko": "유월절에 예수님이 성전에서 장사하는 자들을 내쫓으신 후, 유대인들이 표적을 요구하자 하신 말씀입니다. '이 성전'은 자신의 몸을 가리키며, 죽음과 부활을 미리 예고하십니다. 제자들은 부활 후에야 이 말씀의 의미를 깨달았습니다(요 2:22).",
+    "context_en": "Spoken after cleansing the temple at Passover. Jesus refers to his own body as the true temple — the ultimate meeting place between God and humanity — foretelling his death and resurrection.",
+    "keywords": [
+      {
+        "word": "성전",
+        "original": "ναὸν",
+        "transliteration": "나온",
+        "meaning": "신전의 성소 부분(ναός). 외곽 경내(ἱερόν, 히에론)와 구별되는 내부 성소. 예수님은 자신의 몸이 하나님의 진정한 거처임을 선언"
+      },
+      {
+        "word": "일으키리라",
+        "original": "ἐγερῶ",
+        "transliteration": "에게로",
+        "meaning": "일으키다, 세우다. 부활을 나타내는 핵심 동사(ἐγείρω). 수동태가 아닌 능동태로 — 예수님 스스로 부활하심을 강조"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "성전 정화 — 유대인들의 표적 요구",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 25,
+    "is_active": true,
+    "themes": [
+      "identity",
+      "resurrection",
+      "cross"
+    ],
+    "parallel_groups": [
+      "성전 정화"
+    ]
+  },
+  {
+    "book": "JHN",
+    "chapter": 3,
+    "verse_start": 3,
+    "verse_end": 5,
+    "size": "M",
+    "text_ko_krv": "예수께서 대답하여 이르시되 진실로 진실로 네게 이르노니 사람이 거듭나지 아니하면 하나님의 나라를 볼 수 없느니라 니고데모가 이르되 사람이 늙으면 어떻게 날 수 있사옵나이까 두 번째 모태에 들어갔다가 날 수 있사옵나이까 예수께서 대답하시되 진실로 진실로 네게 이르노니 사람이 물과 성령으로 나지 아니하면 하나님의 나라에 들어갈 수 없느니라",
+    "text_ko_new": "예수께서 그에게 대답하셨다. 내가 진정으로 진정으로 네게 말한다. 누구든지 다시 나지 않으면, 하나님 나라를 볼 수 없다. 니고데모가 예수께 말하였다. 사람이 늙었는데, 어떻게 날 수 있겠습니까? 다시 어머니 배 속에 들어갔다가 날 수 있겠습니까? 예수께서 대답하셨다. 내가 진정으로 진정으로 네게 말한다. 누구든지 물과 성령으로 나지 않으면, 하나님 나라에 들어갈 수 없다.",
+    "text_en": "Jesus replied, 'Very truly I tell you, no one can see the kingdom of God unless they are born again.' 'How can someone be born when they are old?' Nicodemus asked. 'Surely they cannot enter a second time into their mother's womb to be born!' Jesus answered, 'Very truly I tell you, no one can enter the kingdom of God unless they are born of water and Spirit.'",
+    "text_de": "Jesus antwortete und sprach zu ihm: Wahrlich, wahrlich, ich sage dir: Wenn jemand nicht von neuem geboren wird, kann er das Reich Gottes nicht sehen. Nikodemus spricht zu ihm: Wie kann ein Mensch geboren werden, wenn er alt ist? Kann er etwa zum zweiten Mal in den Leib seiner Mutter eingehen und geboren werden? Jesus antwortete: Wahrlich, wahrlich, ich sage dir: Wenn jemand nicht aus Wasser und Geist geboren wird, kann er nicht in das Reich Gottes eingehen.",
+    "context_ko": "바리새인이며 유대인의 관원인 니고데모가 밤에 예수님을 찾아온 대화입니다. '거듭남'(ἄνωθεν)은 '위로부터' 혹은 '다시'의 이중적 의미를 가집니다. 예수님은 자연적 출생이 아닌 성령으로의 출생을 통해서만 하나님 나라에 들어갈 수 있음을 선언하십니다.",
+    "context_en": "Nicodemus, a Pharisee and ruler of the Jews, comes to Jesus at night. The Greek ἄνωθεν means both 'again' and 'from above,' creating a deliberate double meaning. Jesus declares that new birth by the Spirit is the only entry point into God's kingdom.",
+    "keywords": [
+      {
+        "word": "거듭나지",
+        "original": "γεννηθῇ ἄνωθεν",
+        "transliteration": "겐네테 아노텐",
+        "meaning": "아노텐(ἄνωθεν)은 '위로부터'이면서 '다시'라는 이중 의미. 니고데모는 '다시'로 이해했으나 예수님은 '위로부터의 탄생'을 의미하심"
+      },
+      {
+        "word": "물과 성령으로",
+        "original": "ἐξ ὕδατος καὶ πνεύματος",
+        "transliteration": "엑스 휘다토스 카이 프뉴마토스",
+        "meaning": "물과 영으로부터. 세례와 성령 사역을 함께 가리키는 것으로 해석. 에스겔 36:25-27의 성취"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "니고데모와의 야간 대화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 5,
+    "themes": [
+      "kingdom",
+      "holy_spirit",
+      "faith",
+      "salvation"
+    ],
+    "parallel_groups": [
+      "거듭남 교훈"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 3,
+    "verse_start": 7,
+    "verse_end": 8,
+    "size": "S",
+    "text_ko_krv": "내가 네게 거듭나야 하겠다 하는 말을 놀랍게 여기지 말라 바람이 임의로 불매 네가 그 소리는 들어도 어디서 와서 어디로 가는지 알지 못하나니 성령으로 난 사람도 다 그러하니라",
+    "text_ko_new": "내가 너에게 '다시 태어나야 한다'고 한 것을 이상하게 여기지 마라. 바람은 마음대로 분다. 너는 그 소리를 들어도, 어디서 와서 어디로 가는지를 모른다. 성령으로 태어난 사람은 다 이와 같다.",
+    "text_en": "You should not be surprised at my saying, 'You must be born again.' The wind blows wherever it pleases. You hear its sound, but you cannot tell where it comes from or where it is going. So it is with everyone born of the Spirit.",
+    "text_de": "Wundere dich nicht, dass ich dir sagte: Ihr müsst von neuem geboren werden. Der Wind bläst, wo er will, und du hörst sein Sausen, weißt aber nicht, woher er kommt und wohin er geht. So ist es mit jedem, der aus dem Geist geboren ist.",
+    "context_ko": "니고데모가 거듭남의 개념을 이해하지 못하자 예수님이 성령의 역사를 바람에 비유하신 말씀입니다. 헬라어 '프뉴마(πνεῦμα)'는 바람과 영 모두를 의미하며, 예수님은 이 언어적 이중성을 활용하여 성령의 신비로운 주권적 역사를 설명하십니다.",
+    "context_en": "Jesus explains the mystery of the Spirit's work using a Greek wordplay: πνεῦμα means both 'wind' and 'spirit.' The Spirit, like the wind, operates sovereignly and invisibly — its effects are real but its ways are beyond human control.",
+    "keywords": [
+      {
+        "word": "바람/성령",
+        "original": "πνεῦμα",
+        "transliteration": "프뉴마",
+        "meaning": "바람이자 영(Spirit). 헬라어에서 동일한 단어로 예수님의 의도적 언어유희. 성령의 역사는 바람처럼 자유롭고 주권적임을 강조"
+      },
+      {
+        "word": "거듭나야",
+        "original": "γεννηθῆναι ἄνωθεν",
+        "transliteration": "겐네데나이 아노덴",
+        "meaning": "아노덴(ἄνωθεν)은 '다시'와 '위로부터' 두 가지 의미. 니고데모는 '다시'로 이해했지만 예수님은 '위로부터' — 하나님께서 주시는 새 생명을 의미"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "니고데모와의 야간 대화 — 성령으로 거듭남",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 45,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "faith",
+      "salvation"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 3,
+    "verse_start": 16,
+    "verse_end": 17,
+    "size": "S",
+    "text_ko_krv": "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니 이는 그를 믿는 자마다 멸망하지 않고 영생을 얻게 하려 하심이라 하나님이 그 아들을 세상에 보내신 것은 세상을 심판하려 하심이 아니요 그로 말미암아 세상이 구원을 받게 하려 하심이라",
+    "text_ko_new": "하나님이 세상을 이처럼 사랑하셔서, 외아들을 주셨으니, 이는 그를 믿는 사람마다 멸망하지 않고 영생을 얻게 하려는 것이다. 하나님이 아들을 세상에 보내신 것은, 세상을 심판하시려는 것이 아니라, 아들을 통하여 세상을 구원하시려는 것이다.",
+    "text_en": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life. For God did not send his Son into the world to condemn the world, but to save the world through him.",
+    "text_de": "Denn also hat Gott die Welt geliebt, dass er seinen eingeborenen Sohn gab, damit jeder, der an ihn glaubt, nicht verloren geht, sondern ewiges Leben hat. Denn Gott hat seinen Sohn nicht in die Welt gesandt, damit er die Welt richtet, sondern damit die Welt durch ihn gerettet wird.",
+    "context_ko": "니고데모와의 대화 중 복음의 핵심을 요약하신 말씀입니다. 요한복음 전체의 축소판이라 불리는 구절로, 하나님의 사랑(ἀγάπη), 독생자(μονογενής), 믿음(πιστεύω), 영생(ζωὴ αἰώνιος)이 압축되어 있습니다. 심판이 아닌 구원이 성육신의 목적임을 선언하십니다.",
+    "context_en": "Often called 'the Gospel in miniature,' this verse concentrates the entire message of John's Gospel: God's love expressed through the gift of his only Son, the offer of eternal life through faith, and the redemptive rather than judicial purpose of the Incarnation.",
+    "keywords": [
+      {
+        "word": "이처럼 사랑하사",
+        "original": "οὕτως ἠγάπησεν",
+        "transliteration": "후토스 에가페센",
+        "meaning": "이렇게/이토록 사랑하셨다. 아오리스트(과거완료) — 결정적 사건으로서의 사랑. 독생자를 주심이라는 구체적 행위로 드러난 사랑"
+      },
+      {
+        "word": "독생자",
+        "original": "μονογενῆ",
+        "transliteration": "모노게네",
+        "meaning": "유일한, 하나뿐인. 모노스(μόνος, 하나)와 게노스(γένος, 종류). 하나님의 아들 중 독보적 유일성"
+      },
+      {
+        "word": "영생",
+        "original": "ζωὴν αἰώνιον",
+        "transliteration": "조엔 아이오니온",
+        "meaning": "영원한 생명. 단순한 시간적 무한이 아니라 하나님의 생명의 질에 참여하는 것. 요한복음에서 현재적 소유로 강조됨"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "니고데모와의 야간 대화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 10,
+    "themes": [
+      "love",
+      "salvation",
+      "faith"
+    ],
+    "parallel_groups": [
+      "요 3:16 — 복음의 핵심"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 3,
+    "verse_start": 36,
+    "verse_end": 36,
+    "size": "S",
+    "text_ko_krv": "아들을 믿는 자에게는 영생이 있고 아들에게 순종하지 아니하는 자는 영생을 보지 못하고 도리어 하나님의 진노가 그 위에 머물러 있느니라",
+    "text_ko_new": "아들을 믿는 사람은 영생을 얻었고, 아들에게 순종하지 않는 사람은 영생을 보지 못할 뿐만 아니라 하나님의 진노가 그 사람 위에 머물러 있다.",
+    "text_en": "Whoever believes in the Son has eternal life, but whoever rejects the Son will not see life, for God's wrath remains on them.",
+    "text_de": "Wer an den Sohn glaubt, hat ewiges Leben; wer aber dem Sohn nicht glaubt, wird das Leben nicht sehen, sondern der Zorn Gottes bleibt auf ihm.",
+    "context_ko": "세례 요한이 예수님의 사역에 대해 증언하는 문맥에서 나오는 말씀으로, 학자들은 이를 요한 또는 저자의 해설로 보기도 합니다. 믿음과 불순종을 대비하며, 예수님에 대한 반응이 영원한 운명을 결정함을 선언합니다.",
+    "context_en": "A summary statement closing the Nicodemus discourse. Faith in the Son brings eternal life; rejection brings judgment. 'Remains' (μένει) indicates an ongoing, not merely future, condition — the wrath is already present.",
+    "keywords": [
+      {
+        "word": "영생",
+        "original": "ζωὴν αἰώνιον",
+        "transliteration": "조엔 아이오니온",
+        "meaning": "영원한 생명. 단순한 시간적 영속이 아닌 하나님의 생명에 참여하는 것(요 17:3). 요한복음의 핵심 주제어"
+      },
+      {
+        "word": "순종하지 아니하는",
+        "original": "ἀπειθῶν",
+        "transliteration": "아페이돈",
+        "meaning": "불복종하다, 불신하다. 단순 지적 불신앙이 아니라 의지적 거부를 뜻함. 믿음(πιστεύω)의 반대어"
+      }
+    ],
+    "audience": "mixed",
+    "occasion": "요한의 증언 — 믿음과 심판",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 50,
+    "is_active": true,
+    "themes": [
+      "salvation",
+      "judgment",
+      "faith"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 4,
+    "verse_start": 13,
+    "verse_end": 14,
+    "size": "S",
+    "text_ko_krv": "예수께서 대답하여 이르시되 이 물을 마시는 자마다 다시 목마르려니와 내가 주는 물을 마시는 자는 영원히 목마르지 아니하리니 내가 주는 물은 그 속에서 영생하도록 솟아나는 샘물이 되리라",
+    "text_ko_new": "예수께서 대답하셨다. 이 물을 마시는 사람은 다시 목마를 것이다. 그러나 내가 주는 물을 마시는 사람은 영원히 목마르지 않을 것이다. 내가 주는 물은 그 사람 속에서 영생에 이르도록 솟아나는 샘이 될 것이다.",
+    "text_en": "Jesus answered, 'Everyone who drinks this water will be thirsty again, but whoever drinks the water I give them will never thirst. Indeed, the water I give them will become in them a spring of water welling up to eternal life.'",
+    "text_de": "Jesus antwortete und sprach zu ihr: Jeder, der von diesem Wasser trinkt, wird wieder Durst bekommen; wer aber von dem Wasser trinkt, das ich ihm geben werde, den wird es in Ewigkeit nicht dürsten; sondern das Wasser, das ich ihm geben werde, wird in ihm eine Quelle werden, die in das ewige Leben sprudelt.",
+    "context_ko": "수가 성 우물가에서 사마리아 여인과의 대화입니다. 예수님이 물을 달라고 하신 후, 대화는 물리적 물에서 영적 생수로 전환됩니다. 성령을 '영생하도록 솟아나는 샘물'에 비유하시며(요 7:38-39 참조), 야곱의 우물보다 더 큰 것을 주실 수 있음을 선언하십니다.",
+    "context_en": "Spoken at Jacob's well to the Samaritan woman. Jesus pivots from physical water to spiritual water — the Holy Spirit — who becomes an internal spring of living water. This is also a implicit claim to be greater than Jacob who gave the well.",
+    "keywords": [
+      {
+        "word": "생수",
+        "original": "ὕδωρ ζῶν",
+        "transliteration": "휘도르 존",
+        "meaning": "살아있는 물. 흐르는 샘물(물리적 의미)이자 성령(영적 의미). 스가랴 14:8, 에스겔 47장의 생수를 성취"
+      },
+      {
+        "word": "솟아나는 샘물",
+        "original": "πηγὴ ὕδατος ἁλλομένου",
+        "transliteration": "페게 휘다토스 할로메누",
+        "meaning": "뛰어오르는 샘물. 할로마이(ἅλλομαι)는 도약하다, 분출하다. 내면에서 생동감 있게 솟구치는 이미지"
+      }
+    ],
+    "audience": "mixed",
+    "occasion": "수가 성 우물가 — 사마리아 여인과 대화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 15,
+    "themes": [
+      "salvation",
+      "holy_spirit",
+      "faith"
+    ],
+    "parallel_groups": [
+      "생수 비유"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 4,
+    "verse_start": 23,
+    "verse_end": 24,
+    "size": "S",
+    "text_ko_krv": "아버지께 참되게 예배하는 자들은 영과 진리로 예배할 때가 오나니 곧 이 때라 아버지께서는 자기에게 이렇게 예배하는 자들을 찾으시느니라 하나님은 영이시니 예배하는 자가 영과 진리로 예배할지니라",
+    "text_ko_new": "아버지께 참으로 예배를 드릴 사람들이 영과 진리로 예배를 드릴 때가 온다. 지금이 바로 그 때이다. 아버지께서는 이렇게 예배하는 사람들을 찾으신다. 하나님은 영이시다. 그러므로 하나님께 예배를 드리는 사람은 영과 진리로 예배드려야 한다.",
+    "text_en": "Yet a time is coming and has now come when the true worshipers will worship the Father in the Spirit and in truth, for they are the kind of worshipers the Father seeks. God is spirit, and his worshipers must worship in the Spirit and in truth.",
+    "text_de": "Aber die Stunde kommt und ist jetzt, in der die wahren Anbeter den Vater im Geist und in der Wahrheit anbeten werden; denn der Vater sucht solche als seine Anbeter. Gott ist Geist, und die ihn anbeten, müssen ihn im Geist und in der Wahrheit anbeten.",
+    "context_ko": "사마리아 여인이 예루살렘과 그리심 산 중 어디서 예배해야 하는지 묻자 하신 말씀입니다. 참된 예배는 장소의 문제가 아니라 영(성령)과 진리(예수님 자신, 요 14:6) 안에서 드리는 것임을 선언하십니다. 이는 성전 시대의 종말을 알리는 혁명적 선언입니다.",
+    "context_en": "In response to the Samaritan woman's question about worship locations, Jesus declares that true worship transcends geography. Worship 'in Spirit and truth' means by the power of the Holy Spirit and in accordance with the truth revealed in Jesus himself.",
+    "keywords": [
+      {
+        "word": "영과 진리로",
+        "original": "ἐν πνεύματι καὶ ἀληθείᾳ",
+        "transliteration": "엔 프뉴마티 카이 알레테이아",
+        "meaning": "성령 안에서, 그리고 진리 안에서. 성령(프뉴마)은 예배를 가능하게 하는 능력이고, 진리(알레테이아)는 예수님 자신(요 14:6)"
+      },
+      {
+        "word": "하나님은 영이시니",
+        "original": "πνεῦμα ὁ θεός",
+        "transliteration": "프뉴마 호 테오스",
+        "meaning": "하나님은 영이시다. 하나님의 비물질적 본성을 선언. 따라서 예배는 외적 형식이 아닌 영적 실재에서 이루어져야 함"
+      }
+    ],
+    "audience": "mixed",
+    "occasion": "수가 성 우물가 — 예배에 관하여",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 10,
+    "themes": [
+      "prayer",
+      "holy_spirit",
+      "identity"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 4,
+    "verse_start": 34,
+    "verse_end": 34,
+    "size": "S",
+    "text_ko_krv": "나의 양식은 나를 보내신 이의 뜻을 행하며 그의 일을 온전히 이루는 이것이니라",
+    "text_ko_new": "나의 음식은 나를 보내신 분의 뜻을 행하고, 그분의 일을 완성하는 것이다.",
+    "text_en": "My food is to do the will of him who sent me and to finish his work.",
+    "text_de": "Meine Speise ist es, den Willen dessen zu tun, der mich gesandt hat, und sein Werk zu vollbringen.",
+    "context_ko": "제자들이 음식을 드시라고 권하자, 예수님이 사마리아 여인과의 대화로 인해 영적으로 충만하심을 설명하신 말씀입니다. 자신의 사명 — 아버지의 뜻을 행하는 것 — 이 진정한 양식임을 선언하시며, 추수에 관한 비유로 이어집니다.",
+    "context_en": "After the Samaritan woman leaves, Jesus explains to puzzled disciples that he has 'food they know nothing about.' Doing the Father's will is the source of his strength — a window into his total devotion to mission.",
+    "keywords": [
+      {
+        "word": "양식",
+        "original": "βρῶσις",
+        "transliteration": "브로시스",
+        "meaning": "먹음, 음식. 물질적 음식을 넘어 영적 생명력의 근원을 가리킴. 예수님의 존재 자체가 사명 수행으로 지탱됨"
+      },
+      {
+        "word": "온전히 이루는",
+        "original": "τελειώσω",
+        "transliteration": "텔레이오소",
+        "meaning": "완성하다, 완전케 하다. 십자가의 '다 이루었다(τετέλεσται)'와 같은 어근. 사역의 완성이 처음부터 예수님의 목표였음을 암시"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "수가 성 우물가 — 제자들에게 하신 말씀",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 55,
+    "is_active": true,
+    "themes": [
+      "discipleship",
+      "identity",
+      "kingdom",
+      "cross"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 5,
+    "verse_start": 24,
+    "verse_end": 24,
+    "size": "S",
+    "text_ko_krv": "내가 진실로 진실로 너희에게 이르노니 내 말을 듣고 또 나 보내신 이를 믿는 자는 영생을 얻었고 심판에 이르지 아니하나니 사망에서 생명으로 옮겼느니라",
+    "text_ko_new": "내가 진정으로 진정으로 너희에게 말한다. 내 말을 듣고 나를 보내신 분을 믿는 사람은 영생을 가지고 있고 심판을 받지 않는다. 그는 죽음에서 생명으로 옮겨졌다.",
+    "text_en": "Very truly I tell you, whoever hears my word and believes him who sent me has eternal life and will not be judged but has crossed over from death to life.",
+    "text_de": "Wahrlich, wahrlich, ich sage euch: Wer mein Wort hört und dem glaubt, der mich gesandt hat, der hat ewiges Leben und kommt nicht ins Gericht, sondern ist aus dem Tod ins Leben übergegangen.",
+    "context_ko": "안식일에 38년 된 병자를 고치신 후 자신의 권위를 설명하시는 강화 중 하신 말씀입니다. 믿음의 순간 이미 영생이 시작됨을 완료형으로 선언하시며, 이미 실현된 종말론(realized eschatology)의 핵심을 보여주십니다.",
+    "context_en": "Part of Jesus's extended discourse defending his authority after healing on the Sabbath. 'Has eternal life' — present tense — is John's realized eschatology: eternal life begins now in the act of believing, not only at future resurrection.",
+    "keywords": [
+      {
+        "word": "옮겼느니라",
+        "original": "μεταβέβηκεν",
+        "transliteration": "메타베베켄",
+        "meaning": "완료형 — 이미 건너갔다. 믿음의 순간 과거에서 현재까지 지속되는 결정적 이동이 완성됨. 죽음의 영역에서 생명의 영역으로의 이미 이루어진 전환"
+      },
+      {
+        "word": "심판에 이르지 아니하나니",
+        "original": "εἰς κρίσιν οὐκ ἔρχεται",
+        "transliteration": "에이스 크리신 우크 에르케타이",
+        "meaning": "심판으로 오지 않는다. 크리시스(κρίσις)는 최후 심판. 믿는 자는 정죄의 심판에서 완전히 면제됨"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "베데스다 연못 — 안식일 치유 후 강화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 65,
+    "is_active": true,
+    "themes": [
+      "salvation",
+      "judgment",
+      "faith"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 5,
+    "verse_start": 39,
+    "verse_end": 40,
+    "size": "S",
+    "text_ko_krv": "너희가 성경에서 영생을 얻는 줄 생각하고 성경을 연구하거니와 이 성경이 곧 내게 대하여 증언하는 것이니라 그러나 너희가 영생을 얻기 위하여 내게 오기를 원하지 아니하는도다",
+    "text_ko_new": "너희는 성경 속에 영생이 있다고 생각하여 성경을 연구한다. 그런데 성경은 바로 나에 대하여 증언하는 것이다. 그러나 너희는 생명을 얻기 위하여 내게로 오려고 하지 않는다.",
+    "text_en": "You study the Scriptures diligently because you think that in them you have eternal life. These are the very Scriptures that testify about me, yet you refuse to come to me to have life.",
+    "text_de": "Ihr erforscht die Schriften, weil ihr meint, in ihnen ewiges Leben zu haben; und sie sind es, die von mir zeugen. Doch ihr wollt nicht zu mir kommen, damit ihr Leben habt.",
+    "context_ko": "유대 지도자들이 예수님을 핍박하는 상황에서 하신 말씀입니다. 성경을 열심히 연구하면서도 성경이 증언하는 예수님께 나아오지 않는 모순을 지적하십니다. 성경은 예수님을 가리키는 손가락이며 목적지 자체가 아님을 선언합니다.",
+    "context_en": "Jesus confronts the irony of Scripture scholars who miss the Scripture's subject. The Torah points to Jesus; studying it without coming to him is like studying a map while refusing to take the journey.",
+    "keywords": [
+      {
+        "word": "증언하는",
+        "original": "μαρτυροῦσαι",
+        "transliteration": "마르투루사이",
+        "meaning": "증언하다. 법정 용어로 요한복음의 핵심 개념(마르투리아, μαρτυρία). 성경 전체가 예수님의 정체에 대한 증인"
+      },
+      {
+        "word": "오기를 원하지 아니하는도다",
+        "original": "οὐ θέλετε ἐλθεῖν",
+        "transliteration": "우 텔레테 엘데인",
+        "meaning": "원하지 않는다 — 의지의 문제. 지식의 부족이 아닌 의지적 거부. 인간의 책임을 강조"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "베데스다 치유 후 — 성경 증언에 관한 강화",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 60,
+    "is_active": true,
+    "themes": [
+      "identity",
+      "faith",
+      "salvation"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 6,
+    "verse_start": 20,
+    "verse_end": 20,
+    "size": "S",
+    "text_ko_krv": "나니 두려워하지 말라",
+    "text_ko_new": "나다. 두려워하지 마라.",
+    "text_en": "It is I; don't be afraid.",
+    "text_de": "Ich bin es, fürchtet euch nicht!",
+    "context_ko": "오병이어 기적 후 밤에 제자들이 배로 바다를 건너는 중 풍랑을 만났을 때, 예수님이 물 위로 걸어오시며 하신 말씀입니다. '나니(ἐγώ εἰμι)'는 출애굽기 3:14의 하나님의 자기 선언 '나는 스스로 있는 자'와 동일한 표현으로, 신성을 드러내는 순간입니다.",
+    "context_en": "Spoken while walking on water during the disciples' night crossing. 'It is I' (ἐγώ εἰμι) echoes God's self-revelation in Exodus 3:14 — a subtle divine self-disclosure embedded in a reassurance.",
+    "keywords": [
+      {
+        "word": "나니",
+        "original": "ἐγώ εἰμι",
+        "transliteration": "에고 에이미",
+        "meaning": "나는 ~이다. 출애굽기 3:14 LXX의 하나님 자기 선언과 동일. 요한복음 전체에서 신성을 드러내는 핵심 표현(7가지 '나는 ~이다' 선언 외에도 반복)"
+      },
+      {
+        "word": "두려워하지 말라",
+        "original": "μὴ φοβεῖσθε",
+        "transliteration": "메 포베이스데",
+        "meaning": "두려워하지 말라. 구약에서 하나님이 나타나실 때 반복되는 신현(神顯) 공식어. 신적 임재 앞에서의 인간 두려움을 하나님이 직접 해소하심"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "바다 위를 걸으심 — 폭풍 속 제자들에게",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 65,
+    "is_active": true,
+    "themes": [
+      "i_am",
+      "identity",
+      "faith"
+    ],
+    "parallel_groups": [
+      "바다 위를 걸으심"
+    ]
+  },
+  {
+    "book": "JHN",
+    "chapter": 6,
+    "verse_start": 35,
+    "verse_end": 35,
+    "size": "S",
+    "text_ko_krv": "예수께서 이르시되 나는 생명의 떡이니 내게 오는 자는 결코 주리지 아니할 터이요 나를 믿는 자는 영원히 목마르지 아니하리라",
+    "text_ko_new": "예수께서 그들에게 말씀하셨다. 나는 생명의 빵이다. 내게 오는 사람은 결코 굶주리지 않을 것이요, 나를 믿는 사람은 결코 목마르지 않을 것이다.",
+    "text_en": "Then Jesus declared, 'I am the bread of life. Whoever comes to me will never go hungry, and whoever believes in me will never be thirsty.'",
+    "text_de": "Da sprach Jesus zu ihnen: Ich bin das Brot des Lebens. Wer zu mir kommt, wird nie mehr hungern, und wer an mich glaubt, wird nie mehr Dürsten.",
+    "context_ko": "오병이어 기적 다음날, 군중이 다시 예수님을 찾아온 후 이어진 생명의 떡 강화(6:26-59)의 핵심 선언입니다. 요한복음에 나오는 일곱 개의 '나는 ~이다'(에고 에이미) 말씀 중 첫 번째입니다. 광야의 만나를 넘어서는 참된 양식이신 예수님 자신을 계시하십니다.",
+    "context_en": "The first of seven 'I Am' (ἐγώ εἰμι) sayings in John, delivered in the Bread of Life discourse following the feeding of the five thousand. Jesus presents himself as the true manna — the bread that comes from heaven and gives life to the world.",
+    "keywords": [
+      {
+        "word": "나는 ~이다",
+        "original": "ἐγώ εἰμι",
+        "transliteration": "에고 에이미",
+        "meaning": "요한복음의 핵심 자기 계시 표현. 출애굽기 3:14('나는 스스로 있는 자')와 연결. 신성의 자기 선언"
+      },
+      {
+        "word": "생명의 떡",
+        "original": "ὁ ἄρτος τῆς ζωῆς",
+        "transliteration": "호 아르토스 테스 조에스",
+        "meaning": "생명을 주는 빵. 광야의 만나(신 8:3)를 성취하고 초월. 예수님 자신이 영적 생존의 근원"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "가버나움 회당 — 생명의 떡 강화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 20,
+    "themes": [
+      "i_am",
+      "identity",
+      "salvation",
+      "faith"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 생명의 떡"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 6,
+    "verse_start": 47,
+    "verse_end": 51,
+    "size": "M",
+    "text_ko_krv": "진실로 진실로 너희에게 이르노니 믿는 자는 영생을 가졌나니 내가 곧 생명의 떡이니라 너희 조상들은 광야에서 만나를 먹었어도 죽었거니와 이는 하늘에서 내려오는 떡이니 사람으로 하여금 먹고 죽지 아니하게 하는 것이니라 나는 하늘에서 내려온 살아 있는 떡이니 사람이 이 떡을 먹으면 영생하리라 내가 줄 떡은 곧 세상의 생명을 위한 내 살이니라",
+    "text_ko_new": "내가 진정으로 진정으로 너희에게 말한다. 믿는 사람은 영생을 가지고 있다. 나는 생명의 빵이다. 너희의 조상들은 광야에서 만나를 먹었지만 죽었다. 그러나 하늘에서 내려오는 빵은, 사람이 그것을 먹으면 죽지 않는 그런 빵이다. 나는 하늘에서 내려온 살아 있는 빵이다. 이 빵을 먹는 사람은 영원히 살 것이다. 내가 줄 빵은 곧 내 살이니, 세상에 생명을 주기 위한 것이다.",
+    "text_en": "Very truly I tell you, the one who believes has eternal life. I am the bread of life. Your ancestors ate the manna in the wilderness, yet they died. But here is the bread that comes down from heaven, which anyone may eat and not die. I am the living bread that came down from heaven. Whoever eats this bread will live forever. This bread is my flesh, which I will give for the life of the world.",
+    "text_de": "Wahrlich, wahrlich, ich sage euch: Wer glaubt, hat ewiges Leben. Ich bin das Brot des Lebens. Eure Väter haben das Manna in der Wüste gegessen und sind gestorben. Dies ist das Brot, das vom Himmel herniederkommt, damit jemand davon esse und nicht sterbe. Ich bin das lebendige Brot, das vom Himmel herabgekommen ist. Wer von diesem Brot isst, wird in Ewigkeit leben. Das Brot aber, das ich geben werde, ist mein Fleisch für das Leben der Welt.",
+    "context_ko": "오병이어 기적 다음날 가버나움 회당에서 하신 생명의 떡 강화의 핵심입니다. 광야의 만나와 자신을 대비하며, 만나는 육신의 허기를 잠시 채웠지만 자신은 영원한 생명을 주는 참된 양식임을 선언하십니다. '내 살'은 성찬을 예고하며 성육신과 희생을 함께 가리킵니다.",
+    "context_en": "The climax of the Bread of Life discourse. Jesus contrasts manna — temporary, physical — with himself as the living bread that grants eternal life. 'My flesh for the life of the world' anticipates the Eucharist and points explicitly to the incarnation and cross.",
+    "keywords": [
+      {
+        "word": "살아 있는 떡",
+        "original": "ἄρτος ζῶν",
+        "transliteration": "아르토스 존",
+        "meaning": "살아 있는 빵. 단순한 음식이 아닌 생명 자체를 주는 떡. '살아 있는(ζῶν)'은 분사형으로 계속적·능동적 생명력을 강조"
+      },
+      {
+        "word": "내 살",
+        "original": "ἡ σάρξ μου",
+        "transliteration": "헤 사르크스 무",
+        "meaning": "내 살, 내 육체. 성육신한 예수님의 인성 강조. 성찬 제정을 예고하며 희생적 죽음을 암시. 영지주의를 반박하는 실제 성육신 선언"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "가버나움 회당 — 생명의 떡 강화 (심화)",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 70,
+    "is_active": true,
+    "themes": [
+      "i_am",
+      "salvation",
+      "identity",
+      "cross"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 6,
+    "verse_start": 63,
+    "verse_end": 63,
+    "size": "S",
+    "text_ko_krv": "살리는 것은 영이니 육은 무익하니라 내가 너희에게 이른 말은 영이요 생명이라",
+    "text_ko_new": "살리는 것은 영이다. 육은 아무 유익이 없다. 내가 너희에게 한 말은 영이요 생명이다.",
+    "text_en": "The Spirit gives life; the flesh counts for nothing. The words I have spoken to you — they are full of the Spirit and life.",
+    "text_de": "Der Geist ist es, der lebendig macht; das Fleisch nützt nichts. Die Worte, die ich zu euch geredet habe, sind Geist und sind Leben.",
+    "context_ko": "생명의 떡 강화가 끝난 후 많은 제자들이 이 말씀이 어렵다며 떠나가자 하신 말씀입니다. 자신의 살을 먹으라는 말씀은 육체적·문자적으로 해석해서는 안 되며, 성령 안에서 영적으로 이해해야 함을 설명하십니다.",
+    "context_en": "Many disciples leave after the hard teaching on eating Jesus's flesh. Jesus clarifies: the words must be understood spiritually. 'Flesh' here refers to human effort and literal interpretation — the Spirit alone gives life through the word.",
+    "keywords": [
+      {
+        "word": "영",
+        "original": "πνεῦμα",
+        "transliteration": "프뉴마",
+        "meaning": "성령. 생명을 창조하고 유지하는 하나님의 영. 인간의 이해 너머에서 역사하며 말씀을 살아있게 만드는 주체"
+      },
+      {
+        "word": "영이요 생명이라",
+        "original": "πνεῦμά ἐστιν καὶ ζωή ἐστιν",
+        "transliteration": "프뉴마 에스틴 카이 조에 에스틴",
+        "meaning": "예수님의 말씀이 성령과 동일시됨. 말씀은 단순한 정보가 아니라 성령이 임하는 매개체이며 생명 자체"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "생명의 떡 강화 후 — 많은 제자들이 떠남",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 75,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "faith",
+      "discipleship"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 7,
+    "verse_start": 37,
+    "verse_end": 38,
+    "size": "S",
+    "text_ko_krv": "누구든지 목마르거든 내게로 와서 마시라 나를 믿는 자는 성경에 이름과 같이 그 배에서 생수의 강이 흘러나오리라",
+    "text_ko_new": "누구든지 목마른 사람은 나에게로 와서 마셔라. 나를 믿는 사람은 성경이 말한 것과 같이, 그 배에서 생수의 강이 흘러나올 것이다.",
+    "text_en": "Let anyone who is thirsty come to me and drink. Whoever believes in me, as Scripture has said, rivers of living water will flow from within them.",
+    "text_de": "Wenn jemand dürstet, der komme zu mir und trinke! Wer an mich glaubt, wie die Schrift gesagt hat: Ströme von lebendigem Wasser werden aus seinem Leib fließen.",
+    "context_ko": "초막절 마지막 날, 제사장들이 실로암 물을 가져다 제단에 붓는 의식이 진행되는 중에 하신 말씀입니다. 초막절은 광야의 물 공급을 기념하고 미래의 성령 강림을 기대하는 절기였습니다. 예수님은 자신이 그 성령의 근원임을 선포하십니다(요 7:39).",
+    "context_en": "Proclaimed on the climactic last day of Tabernacles, during the water-pouring ceremony. Jesus reinterprets the festival: the true living water is the Spirit, poured out through himself. John explicitly explains that 'living water' refers to the Spirit (7:39).",
+    "keywords": [
+      {
+        "word": "생수의 강",
+        "original": "ποταμοὶ ὕδατος ζῶντος",
+        "transliteration": "포타모이 휘다토스 존토스",
+        "meaning": "흐르는 물, 살아있는 물의 강. 단수 '샘'이 아닌 복수 '강들'. 성령의 풍성하고 넘치는 역사를 의미. 에스겔 47장의 성전에서 흐르는 강을 배경으로 함"
+      },
+      {
+        "word": "배에서",
+        "original": "ἐκ τῆς κοιλίας αὐτοῦ",
+        "transliteration": "에크 테스 코일리아스 아우투",
+        "meaning": "그 배(속)에서. 가장 깊은 내면을 가리킴. 성령의 역사가 믿는 자의 내면 가장 깊은 곳에서 시작하여 밖으로 흘러나옴을 강조"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "초막절 마지막 날 — 성령 강림 예고",
+    "season": "pentecost",
+    "slide_cycle": 1,
+    "slide_order": 70,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "salvation",
+      "faith"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 8,
+    "verse_start": 7,
+    "verse_end": 7,
+    "size": "S",
+    "text_ko_krv": "너희 중에 죄 없는 자가 먼저 돌로 치라",
+    "text_ko_new": "너희 가운데 죄 없는 사람이 먼저 이 여자에게 돌을 던져라.",
+    "text_en": "Let any one of you who is without sin be the first to throw a stone at her.",
+    "text_de": "Wer von euch ohne Sünde ist, der werfe zuerst einen Stein auf sie.",
+    "context_ko": "서기관들과 바리새인들이 간음하다 잡힌 여인을 끌고 와 예수님을 시험하는 상황에서 하신 말씀입니다. 율법(모세)과 은혜(예수님) 사이의 딜레마를 지혜롭게 해소하시며, 고발자들의 위선을 드러내십니다. 정죄가 아닌 회복을 향한 예수님의 자세를 보여줍니다.",
+    "context_en": "Spoken when religious leaders attempt to trap Jesus with an adulteress. His response dismantles their trap: turning judgment back on the accusers. The scene reveals Jesus's consistent posture — not abolishing law but redirecting its force toward grace.",
+    "keywords": [
+      {
+        "word": "죄 없는 자",
+        "original": "ἀναμάρτητος",
+        "transliteration": "아나마르테토스",
+        "meaning": "신약에서 여기에만 등장하는 단어. 완전히 죄 없는 자. 모든 인간이 정죄자의 자리에 설 수 없음을 단 한 단어로 선언"
+      },
+      {
+        "word": "먼저 돌로 치라",
+        "original": "πρῶτος ἐπ᾽ αὐτὴν βαλέτω λίθον",
+        "transliteration": "프로토스 에프 아우텐 발레토 리돈",
+        "meaning": "먼저 던지라. 신명기 17:7의 증인이 먼저 돌을 던지는 규례를 인용. 고발자들이 도덕적 증인 자격이 없음을 간결하게 폭로"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "간음하다 잡힌 여인 — 율법과 은혜",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 75,
+    "is_active": true,
+    "themes": [
+      "forgiveness",
+      "judgment",
+      "love"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 8,
+    "verse_start": 12,
+    "verse_end": 12,
+    "size": "S",
+    "text_ko_krv": "예수께서 또 말씀하여 이르시되 나는 세상의 빛이니 나를 따르는 자는 어둠에 다니지 아니하고 생명의 빛을 얻으리라",
+    "text_ko_new": "예수께서 다시 그들에게 말씀하셨다. 나는 세상의 빛이다. 나를 따르는 사람은 어둠 속에 다니지 아니하고, 생명의 빛을 얻을 것이다.",
+    "text_en": "When Jesus spoke again to the people, he said, 'I am the light of the world. Whoever follows me will never walk in darkness, but will have the light of life.'",
+    "text_de": "Da redete Jesus wieder zu ihnen und sprach: Ich bin das Licht der Welt. Wer mir nachfolgt, wird nicht in der Finsternis wandeln, sondern wird das Licht des Lebens haben.",
+    "context_ko": "초막절 기간, 성전의 촛대 예식(불 점화) 배경에서 하신 말씀입니다. 성전 여인의 뜰에 켜진 네 개의 큰 등불은 이스라엘을 인도하신 구름기둥과 불기둥을 기념하는 것이었는데, 예수님은 자신이 그 빛의 성취자임을 선언하십니다.",
+    "context_en": "Spoken during the Feast of Tabernacles, likely against the backdrop of the great lamp-lighting ceremony in the Court of Women. The four golden menorahs symbolized the pillar of fire in the wilderness; Jesus declares himself as the fulfillment of that light.",
+    "keywords": [
+      {
+        "word": "세상의 빛",
+        "original": "τὸ φῶς τοῦ κόσμου",
+        "transliteration": "토 포스 투 코스무",
+        "meaning": "우주적 빛. 이사야 9:2('큰 빛')과 42:6('이방의 빛')의 성취. 개인적 빛이 아닌 온 세상을 비추는 빛"
+      },
+      {
+        "word": "생명의 빛",
+        "original": "τὸ φῶς τῆς ζωῆς",
+        "transliteration": "토 포스 테스 조에스",
+        "meaning": "생명을 주는 빛. 빛과 생명의 결합. 요한복음 서문(1:4 '그 안에 생명이 있었으니 이 생명은 사람들의 빛이라')을 메아리침"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "초막절 — 성전 여인의 뜰",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 25,
+    "themes": [
+      "i_am",
+      "identity",
+      "salvation",
+      "faith"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 세상의 빛"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 8,
+    "verse_start": 31,
+    "verse_end": 32,
+    "size": "S",
+    "text_ko_krv": "그러므로 예수께서 자기를 믿은 유대인들에게 이르시되 너희가 내 말에 거하면 참으로 내 제자가 되고 진리를 알지니 진리가 너희를 자유롭게 하리라",
+    "text_ko_new": "예수께서 자기를 믿은 유대 사람들에게 말씀하셨다. 너희가 내 말에 머물러 있으면, 너희는 참으로 나의 제자이다. 그리고 너희는 진리를 알게 될 것이요, 진리가 너희를 자유롭게 할 것이다.",
+    "text_en": "To the Jews who had believed him, Jesus said, 'If you hold to my teaching, you are really my disciples. Then you will know the truth, and the truth will set you free.'",
+    "text_de": "Da sprach Jesus zu den Juden, die ihm geglaubt hatten: Wenn ihr in meinem Wort bleibt, seid ihr wirklich meine Jünger; und ihr werdet die Wahrheit erkennen, und die Wahrheit wird euch frei machen.",
+    "context_ko": "자신을 믿는다고 주장하는 유대인들에게 참된 제자도의 조건을 설명하신 말씀입니다. 말씀에 '거하다'(μένω)는 요한복음의 핵심 개념으로, 지속적이고 안정적인 관계를 의미합니다. 진리는 명제가 아닌 인격이신 예수님 자신이며(요 14:6), 그 진리가 해방을 가져다 줍니다.",
+    "context_en": "Jesus speaks to those who believe in him, defining true discipleship as abiding in his word. Truth (ἀλήθεια) in John is not merely propositional but personal — Jesus himself (14:6). This freedom is liberation from sin's slavery (v. 34), not political freedom.",
+    "keywords": [
+      {
+        "word": "거하면",
+        "original": "μένητε",
+        "transliteration": "메네테",
+        "meaning": "머물다, 거하다. 메노(μένω)는 요한복음의 핵심 단어(40회 이상). 지속적이고 의존적인 관계"
+      },
+      {
+        "word": "진리",
+        "original": "ἀλήθεια",
+        "transliteration": "알레테이아",
+        "meaning": "진리, 실재. 요한복음에서는 예수님 자신(14:6). 숨겨진 것을 드러내는 것, 하나님의 실재를 계시하는 것"
+      },
+      {
+        "word": "자유롭게 하리라",
+        "original": "ἐλευθερώσει",
+        "transliteration": "엘류테로세이",
+        "meaning": "미래형 — 자유롭게 할 것이다. 죄의 종됨(v.34)으로부터의 해방. 정치적 자유가 아닌 존재론적 자유"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "초막절 후 — 성전에서의 교훈",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 30,
+    "themes": [
+      "discipleship",
+      "faith",
+      "salvation",
+      "identity"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 8,
+    "verse_start": 58,
+    "verse_end": 58,
+    "size": "S",
+    "text_ko_krv": "진실로 진실로 너희에게 이르노니 아브라함이 나기 전부터 내가 있느니라",
+    "text_ko_new": "내가 진정으로 진정으로 너희에게 말한다. 아브라함이 태어나기 전부터 내가 있다.",
+    "text_en": "Very truly I tell you, before Abraham was born, I am!",
+    "text_de": "Wahrlich, wahrlich, ich sage euch: Ehe Abraham wurde, bin ich!",
+    "context_ko": "유대인들과의 논쟁 끝에 자신의 선재성(先在性)을 선언하신 말씀입니다. '있었다(was)'가 아닌 '있느니라(I AM)'라는 현재형을 사용하심으로써 출애굽기 3:14의 하나님의 이름 '나는 스스로 있는 자'를 직접 인용하십니다. 이에 유대인들은 신성모독으로 여겨 돌을 들었습니다.",
+    "context_en": "The climax of Jesus's debate with the Jews about his identity. Using 'I AM' (ἐγώ εἰμι) — present, not past — Jesus claims the divine name of Exodus 3:14, asserting eternal pre-existence. The listeners immediately understood: they took up stones.",
+    "keywords": [
+      {
+        "word": "내가 있느니라",
+        "original": "ἐγώ εἰμι",
+        "transliteration": "에고 에이미",
+        "meaning": "나는 있다(현재형). '있었다(ἐγὼ ἤμην)'가 아닌 영원한 현재. 출애굽기 3:14 LXX의 하나님 자기 선언과 동일. 요한복음에서 가장 직접적인 신성 주장"
+      },
+      {
+        "word": "아브라함이 나기 전부터",
+        "original": "πρὶν Ἀβραὰμ γενέσθαι",
+        "transliteration": "프린 아브라암 게네스다이",
+        "meaning": "아브라함이 생성되기 전. 아브라함에게는 과거 시제(γενέσθαι, 생성되다)를 사용하고, 예수님께는 현재 시제를 사용 — 피조물과 창조주의 존재론적 차이를 문법으로 표현"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "초막절 후 — 아브라함과 예수님의 정체 논쟁",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 80,
+    "is_active": true,
+    "themes": [
+      "i_am",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 9,
+    "verse_start": 5,
+    "verse_end": 5,
+    "size": "S",
+    "text_ko_krv": "내가 세상에 있는 동안에는 세상의 빛이로라",
+    "text_ko_new": "내가 세상에 있는 동안, 나는 세상의 빛이다.",
+    "text_en": "While I am in the world, I am the light of the world.",
+    "text_de": "Solange ich in der Welt bin, bin ich das Licht der Welt.",
+    "context_ko": "날 때부터 눈먼 사람을 치유하시기 직전에 하신 말씀으로, 요한복음 8:12의 '나는 세상의 빛이라'를 반복하십니다. '내가 세상에 있는 동안'이라는 제한구는 성육신의 시간성과 사역의 긴박함을 강조합니다. 육체의 눈멂이 영적 눈멂의 상징으로 사용됩니다.",
+    "context_en": "Spoken just before healing a man born blind — the miracle becomes the enacted parable of this saying. Jesus's presence in the world is the window of light; the healing demonstrates that he is indeed the world's light, opening blind eyes physically and spiritually.",
+    "keywords": [
+      {
+        "word": "세상의 빛",
+        "original": "τὸ φῶς τοῦ κόσμου",
+        "transliteration": "토 포스 투 코스무",
+        "meaning": "세상의 빛. 8:12와 동일 표현. 요한복음 프롤로그(1:4-9)의 빛 모티프를 행동으로 구현하는 선언. 이사야 9:2, 42:6의 '이방의 빛' 성취"
+      },
+      {
+        "word": "세상에 있는 동안",
+        "original": "ὅταν ἐν τῷ κόσμῳ ὦ",
+        "transliteration": "호탄 엔 토 코스모 오",
+        "meaning": "내가 세상에 있을 때. 성육신의 시간적 제한성. 사역의 시간이 제한되어 있음을 인식하신 예수님의 긴박감"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "날 때부터 눈먼 사람 치유 — 사역의 긴박함",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 80,
+    "is_active": true,
+    "themes": [
+      "i_am",
+      "identity",
+      "healing"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 10,
+    "verse_start": 10,
+    "verse_end": 11,
+    "size": "M",
+    "text_ko_krv": "도둑이 오는 것은 도둑질하고 죽이고 멸망시키려는 것뿐이요 내가 온 것은 양으로 생명을 얻게 하고 더 풍성히 얻게 하려는 것이라 나는 선한 목자라 선한 목자는 양들을 위하여 목숨을 버리거니와",
+    "text_ko_new": "도둑은 다만 훔치고 죽이고 멸망시키려고 온다. 나는 양들이 생명을 얻고 더 풍성히 얻게 하려고 왔다. 나는 선한 목자이다. 선한 목자는 양들을 위하여 자기 목숨을 내놓는다.",
+    "text_en": "The thief comes only to steal and kill and destroy; I have come that they may have life, and have it to the full. I am the good shepherd. The good shepherd lays down his life for the sheep.",
+    "text_de": "Der Dieb kommt nur, um zu stehlen und zu schlachten und umzubringen; ich bin gekommen, damit sie das Leben haben und es in Fülle haben. Ich bin der gute Hirte. Der gute Hirte lässt sein Leben für die Schafe.",
+    "context_ko": "유대인들과의 논쟁 중 선한 목자 비유(10:1-18)에서 핵심 선언입니다. 예수님은 자신을 문(10:9)이자 동시에 선한 목자로 제시하십니다. 에스겔 34장에서 하나님이 나쁜 목자들을 심판하고 친히 목자가 되겠다고 약속하신 것의 성취입니다.",
+    "context_en": "Part of the Good Shepherd discourse (10:1-18). Jesus presents himself as both the gate (v. 9) and the good shepherd. Ezekiel 34 promised God himself would become shepherd over Israel; Jesus announces that fulfillment. The 'abundant life' is qualitative, not merely quantitative.",
+    "keywords": [
+      {
+        "word": "풍성히",
+        "original": "περισσὸν",
+        "transliteration": "페리손",
+        "meaning": "넘치도록, 풍성하게. 단순히 살아있는 것이 아니라 하나님 나라의 충만함을 누리는 것"
+      },
+      {
+        "word": "선한 목자",
+        "original": "ὁ ποιμὴν ὁ καλός",
+        "transliteration": "호 포이멘 호 칼로스",
+        "meaning": "칼로스(καλός)는 '선한'이면서 '아름다운'. 도덕적 탁월성과 심미적 아름다움을 함께 가진 목자. 에스겔 34장의 하나님의 약속을 성취"
+      },
+      {
+        "word": "목숨을 버리거니와",
+        "original": "τὴν ψυχὴν αὐτοῦ τίθησιν",
+        "transliteration": "텐 프쉬켄 아우투 티테신",
+        "meaning": "자신의 생명을 내려놓는다. 티테미(τίθημι)는 놓다, 내려놓다. 강제로 빼앗기는 것이 아니라 자발적으로 드리는 것"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "수전절 전 — 선한 목자 강화",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 35,
+    "themes": [
+      "i_am",
+      "identity",
+      "salvation",
+      "love",
+      "cross"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 선한 목자"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 10,
+    "verse_start": 27,
+    "verse_end": 30,
+    "size": "M",
+    "text_ko_krv": "내 양은 내 음성을 들으며 나는 그들을 알며 그들은 나를 따르느니라 내가 그들에게 영생을 주노니 영원히 멸망하지 아니할 것이요 또 그들을 내 손에서 빼앗을 자가 없느니라 그들을 주신 내 아버지는 만물보다 크시매 아무도 아버지 손에서 빼앗을 수 없느니라 나와 아버지는 하나이니라",
+    "text_ko_new": "내 양은 내 목소리를 듣는다. 나는 그들을 알고, 그들은 나를 따른다. 나는 그들에게 영생을 준다. 그들은 영원히 멸망하지 않을 것이요, 아무도 그들을 내 손에서 빼앗아 가지 못할 것이다. 그들을 나에게 주신 내 아버지는 무엇보다도 크시다. 아무도 아버지의 손에서 빼앗아 가지 못한다. 나와 아버지는 하나이다.",
+    "text_en": "My sheep listen to my voice; I know them, and they follow me. I give them eternal life, and they shall never perish; no one will snatch them out of my hand. My Father, who has given them to me, is greater than all; no one can snatch them out of my Father's hand. I and the Father are one.",
+    "text_de": "Meine Schafe hören meine Stimme, und ich kenne sie, und sie folgen mir. Und ich gebe ihnen ewiges Leben, und sie werden in Ewigkeit nicht umkommen, und niemand wird sie aus meiner Hand reißen. Mein Vater, der sie mir gegeben hat, ist größer als alle, und niemand kann sie aus der Hand meines Vaters reißen. Ich und der Vater sind eins.",
+    "context_ko": "수전절(하누카)에 성전 솔로몬 행각에서 유대인들이 메시아 여부를 묻자 하신 말씀입니다. 선한 목자 강화의 결론으로, 구원의 확실성(아무도 빼앗을 수 없음)과 삼위일체의 근거('나와 아버지는 하나이니라')를 동시에 선언하십니다. 이 말씀 후 유대인들이 신성모독으로 여겨 돌을 들었습니다.",
+    "context_en": "The climax of the Good Shepherd discourse at Hanukkah. Jesus declares two stunning truths simultaneously: the absolute security of believers ('no one can snatch'), and his unity with the Father ('I and the Father are one') — the most explicit Trinitarian claim in John, provoking an immediate attempt to stone him.",
+    "keywords": [
+      {
+        "word": "나와 아버지는 하나이니라",
+        "original": "ἐγὼ καὶ ὁ πατὴρ ἕν ἐσμεν",
+        "transliteration": "에고 카이 호 파테르 헨 에스멘",
+        "meaning": "헨(ἕν)은 중성형 '하나' — 인격적 동일(one person)이 아닌 본질적 일체(one thing/essence). 삼위일체 신학의 기초. 동사는 복수형(ἐσμεν)으로 두 위격의 구분을 동시에 표현"
+      },
+      {
+        "word": "빼앗을 자가 없느니라",
+        "original": "οὐχ ἁρπάσει",
+        "transliteration": "우크 하르파세이",
+        "meaning": "강탈하다, 폭력적으로 빼앗다. 외부의 어떤 적대적 세력도 하나님의 손에서 성도를 탈취할 수 없음. 구원의 견인(堅忍)을 강하게 표현"
+      }
+    ],
+    "audience": "pharisees",
+    "occasion": "수전절 — 성전 솔로몬 행각에서의 선언",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 85,
+    "is_active": true,
+    "themes": [
+      "i_am",
+      "salvation",
+      "identity",
+      "discipleship"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 11,
+    "verse_start": 4,
+    "verse_end": 4,
+    "size": "S",
+    "text_ko_krv": "이 병은 죽을 병이 아니라 하나님의 영광을 위함이요 하나님의 아들이 이로 말미암아 영광을 받게 하려 함이라",
+    "text_ko_new": "이 병은 죽을 병이 아니다. 이것은 하나님의 영광을 위한 것이며, 하나님의 아들이 이 병으로 영광을 받게 될 것이다.",
+    "text_en": "This sickness will not end in death. No, it is for God's glory so that God's Son may be glorified through it.",
+    "text_de": "Diese Krankheit ist nicht zum Tod, sondern zur Verherrlichung Gottes, damit der Sohn Gottes durch sie verherrlicht werde.",
+    "context_ko": "나사로가 병들었다는 소식을 들으셨을 때 하신 말씀입니다. 나사로는 실제로 죽었지만, 죽음이 최종 결말이 아님을 미리 선언하십니다. 고통과 죽음이 하나님의 영광을 위한 더 큰 이야기의 일부임을 보여주는 요한복음적 신학의 핵심입니다.",
+    "context_en": "Jesus's initial response when told of Lazarus's illness. The illness 'will not end in death' — not meaning Lazarus won't die, but that death is not the final word. Every suffering in John's gospel is reframed within God's redemptive purposes.",
+    "keywords": [
+      {
+        "word": "영광",
+        "original": "δόξα",
+        "transliteration": "독사",
+        "meaning": "영광, 광채. 요한복음의 핵심 신학 개념(1:14). 죽음과 부활이 역설적으로 하나님의 영광을 드러내는 사건임을 미리 선언"
+      },
+      {
+        "word": "영광을 받게 하려 함이라",
+        "original": "δοξασθῇ",
+        "transliteration": "독사스데",
+        "meaning": "수동형 접속법 — 영광을 받게 되도록. 예수님의 영광은 자기 현시가 아니라 아버지로부터 받는 것. 부활과 십자가를 통한 영화(榮化)를 가리킴"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "나사로의 병 — 베다니로 가기 전",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 85,
+    "is_active": true,
+    "themes": [
+      "healing",
+      "identity",
+      "resurrection"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 11,
+    "verse_start": 25,
+    "verse_end": 26,
+    "size": "S",
+    "text_ko_krv": "예수께서 이르시되 나는 부활이요 생명이니 나를 믿는 자는 죽어도 살겠고 무릇 살아서 나를 믿는 자는 영원히 죽지 아니하리니 이것을 네가 믿느냐",
+    "text_ko_new": "예수께서 그에게 말씀하셨다. 나는 부활이요 생명이다. 나를 믿는 사람은 죽어도 살겠고, 살아서 나를 믿는 사람은 영원히 죽지 않을 것이다. 네가 이것을 믿느냐?",
+    "text_en": "Jesus said to her, 'I am the resurrection and the life. The one who believes in me will live, even though they die; and whoever lives by believing in me will never die. Do you believe this?'",
+    "text_de": "Jesus sprach zu ihr: Ich bin die Auferstehung und das Leben. Wer an mich glaubt, wird leben, auch wenn er gestorben ist; und jeder, der lebt und an mich glaubt, wird in Ewigkeit nicht sterben. Glaubst du das?",
+    "context_ko": "나사로가 죽은 지 나흘 후, 예수님이 무덤으로 가시기 전 마르다에게 하신 말씀입니다. 부활을 미래 사건으로만 이해한 마르다(11:24)에게, 예수님은 자신이 부활 자체이심을 선언하십니다. 부활은 예수님과의 관계 안에서 이미 현재적으로 경험되는 실재입니다.",
+    "context_en": "Spoken to Martha before raising Lazarus. When Martha confesses belief in a future resurrection, Jesus redirects: resurrection is not merely a future event but a present person. He is resurrection — to believe in him is to have crossed from death to life already.",
+    "keywords": [
+      {
+        "word": "나는 부활이요 생명이니",
+        "original": "ἐγώ εἰμι ἡ ἀνάστασις καὶ ἡ ζωή",
+        "transliteration": "에고 에이미 헤 아나스타시스 카이 헤 조에",
+        "meaning": "에고 에이미의 다섯 번째 표현. 부활(ἀνάστασις)과 생명(ζωή) 모두가 예수님의 인격 안에 있음. 미래가 아닌 현재"
+      },
+      {
+        "word": "네가 믿느냐",
+        "original": "πιστεύεις τοῦτο",
+        "transliteration": "피스튜에이스 투토",
+        "meaning": "현재형 — 지금 믿고 있느냐? 선언 다음에 개인적 신앙의 결단을 요청하는 질문"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "나사로의 무덤 앞 — 마르다와의 대화",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 40,
+    "themes": [
+      "i_am",
+      "resurrection",
+      "faith",
+      "identity"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 부활과 생명"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 11,
+    "verse_start": 43,
+    "verse_end": 44,
+    "size": "S",
+    "text_ko_krv": "나사로야 나오라",
+    "text_ko_new": "나사로야, 나오너라!",
+    "text_en": "Lazarus, come out!",
+    "text_de": "Lazarus, komm heraus!",
+    "context_ko": "나사로가 죽은 지 나흘 만에 예수님이 무덤 앞에서 크게 소리 지르신 말씀입니다. 단 세 단어(헬라어)의 명령으로 죽은 자를 살리심으로써 자신이 부활이요 생명임을 행동으로 증명하십니다. 이 기적은 예수님의 죽음을 결정짓는 전환점이 됩니다(요 11:53).",
+    "context_en": "Three words (in Greek: Λάζαρε, δεῦρο ἔξω) that shatter death. Jesus had just declared himself the resurrection and life; now he demonstrates it. Ironically, this life-giving miracle seals his own death sentence — the Sanhedrin immediately plots to kill him.",
+    "keywords": [
+      {
+        "word": "나사로야 나오라",
+        "original": "Λάζαρε, δεῦρο ἔξω",
+        "transliteration": "라자레, 듀로 엑소",
+        "meaning": "라자로야, 이리 나오라. 창조주의 권위로 죽음을 명령으로 뒤집으심. '신의 음성이 죽은 자를 살린다'는 종말론적 실현. 요한 5:28-29의 '무덤에서 나오리라'의 선행 성취"
+      },
+      {
+        "word": "크게 소리 지르사",
+        "original": "ἐκραύγασεν φωνῇ μεγάλῃ",
+        "transliteration": "에크라우가센 포네 메갈레",
+        "meaning": "큰 소리로 외치다. 단순한 말이 아닌 권위 있는 선포. 창조의 말씀(1:3)과 종말의 명령이 하나의 목소리 안에 담김"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "나사로의 무덤 앞 — 부활의 기적",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 90,
+    "is_active": true,
+    "themes": [
+      "resurrection",
+      "healing",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 12,
+    "verse_start": 24,
+    "verse_end": 25,
+    "size": "S",
+    "text_ko_krv": "내가 진실로 진실로 너희에게 이르노니 한 알의 밀이 땅에 떨어져 죽지 아니하면 한 알 그대로 있고 죽으면 많은 열매를 맺느니라 자기의 생명을 사랑하는 자는 잃어버릴 것이요 이 세상에서 자기의 생명을 미워하는 자는 영생하도록 보전하리라",
+    "text_ko_new": "내가 진정으로 진정으로 너희에게 말한다. 밀알 하나가 땅에 떨어져 죽지 않으면 한 알 그대로 있고, 죽으면 많은 열매를 맺는다. 자기 목숨을 사랑하는 사람은 목숨을 잃을 것이요, 이 세상에서 자기 목숨을 미워하는 사람은 영원한 생명에 이르도록 목숨을 보전할 것이다.",
+    "text_en": "Very truly I tell you, unless a kernel of wheat falls to the ground and dies, it remains only a single seed. But if it dies, it produces many seeds. Anyone who loves their life will lose it, while anyone who hates their life in this world will keep it for eternal life.",
+    "text_de": "Wahrlich, wahrlich, ich sage euch: Wenn das Weizenkorn nicht in die Erde fällt und stirbt, bleibt es allein; wenn es aber stirbt, bringt es viel Frucht. Wer sein Leben liebt, verliert es; und wer sein Leben in dieser Welt hasst, wird es bewahren zum ewigen Leben.",
+    "context_ko": "헬라인들이 예수님을 만나고자 하는 사건 직후, 자신의 죽음과 영광을 앞두고 하신 말씀입니다. 밀알의 비유로 자신의 십자가 죽음과 그로 인한 풍성한 열매를 예고하시며, 동시에 제자들에게 자기 부인의 삶을 촉구하십니다.",
+    "context_en": "Spoken as Greeks seek Jesus, signaling the universal scope of his mission. The grain of wheat parable simultaneously describes his own death as the source of universal fruitfulness and lays down the pattern for discipleship: dying to self is the path to life.",
+    "keywords": [
+      {
+        "word": "한 알의 밀",
+        "original": "ὁ κόκκος τοῦ σίτου",
+        "transliteration": "호 코코스 투 시투",
+        "meaning": "밀의 낟알 하나. 단순한 자연 비유가 아닌 예수님 자신의 자화상. 죽음과 부활의 역설 — 자기 상실이 생명의 증폭으로 이어짐"
+      },
+      {
+        "word": "미워하는",
+        "original": "μισῶν",
+        "transliteration": "미손",
+        "meaning": "미워하다. 셈어적 대조어법 — 절대적 증오가 아닌 상대적 우선순위. 누가 14:26과 같은 용법으로 하나님 사랑에 비해 자기 생명을 덜 소중히 여기는 것을 의미"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "헬라인들의 방문 — 수난 예고",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 95,
+    "is_active": true,
+    "themes": [
+      "cross",
+      "discipleship",
+      "resurrection"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 12,
+    "verse_start": 32,
+    "verse_end": 32,
+    "size": "S",
+    "text_ko_krv": "내가 땅에서 들리면 모든 사람을 내게로 이끌겠노라",
+    "text_ko_new": "내가 땅에서 들려 올려지면, 모든 사람을 내게로 이끌 것이다.",
+    "text_en": "And I, when I am lifted up from the earth, will draw all people to myself.",
+    "text_de": "Und ich, wenn ich von der Erde erhöht sein werde, werde alle zu mir ziehen.",
+    "context_ko": "십자가 죽음을 예고하시며 하신 말씀입니다. '들리면(들려 올려지면)'은 십자가에 달리심과 동시에 높이 올려지심을 뜻하는 요한복음의 이중적 표현(3:14, 8:28)입니다. 십자가가 수치가 아닌 왕의 즉위식임을 선언하시며, 구원의 범위가 모든 민족에게 미침을 강조하십니다.",
+    "context_en": "Jesus's third and final 'lifting up' saying (cf. 3:14, 8:28). 'Lifted up' is John's signature double-meaning: crucified AND exalted simultaneously. The cross is not defeat but the moment of cosmic enthronement that draws all humanity.",
+    "keywords": [
+      {
+        "word": "들리면",
+        "original": "ὑψωθῶ",
+        "transliteration": "휩소도",
+        "meaning": "높이 올려지다. 십자가에 들려 올려짐(물리적)과 영광 중에 높임을 받음(신학적)의 이중 의미. 요한복음의 역설적 영광 신학의 핵심"
+      },
+      {
+        "word": "이끌겠노라",
+        "original": "ἑλκύσω",
+        "transliteration": "헬퀴소",
+        "meaning": "당기다, 이끌다. 저항할 수 없는 인력(引力)을 나타냄. 십자가의 자기희생이 인간을 하나님께로 끌어당기는 우주적 인력이 됨"
+      }
+    ],
+    "audience": "crowd",
+    "occasion": "수난 예고 — 십자가의 영광",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 100,
+    "is_active": true,
+    "themes": [
+      "cross",
+      "salvation",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 13,
+    "verse_start": 14,
+    "verse_end": 15,
+    "size": "S",
+    "text_ko_krv": "내가 주와 또는 선생이 되어 너희 발을 씻었으니 너희도 서로 발을 씻어 주는 것이 옳으니라 내가 너희에게 행한 것 같이 너희도 행하게 하려 하여 본을 보였노라",
+    "text_ko_new": "주이며 선생인 내가 너희의 발을 씻어 주었으니, 너희도 서로 발을 씻어주어야 한다. 내가 너희에게 한 것처럼, 너희도 하라고 내가 본을 보인 것이다.",
+    "text_en": "Now that I, your Lord and Teacher, have washed your feet, you also should wash one another's feet. I have set you an example that you should do as I have done for you.",
+    "text_de": "Wenn nun ich, der Herr und der Meister, euch die Füße gewaschen habe, so seid auch ihr schuldig, einander die Füße zu waschen. Denn ich habe euch ein Beispiel gegeben, damit auch ihr tut, wie ich euch getan habe.",
+    "context_ko": "최후의 만찬 자리에서 제자들의 발을 씻기신 후 하신 말씀입니다. 주님이신 예수님이 종의 자리를 취하신 이 행위는 다가올 십자가 죽음을 예표하며, 섬김의 리더십이 하나님 나라의 원리임을 직접 보이십니다. '본(ὑπόδειγμα)'은 모방을 위한 패턴을 의미합니다.",
+    "context_en": "After washing the disciples' feet, Jesus explains the act: not a ritual but a model (ὑπόδειγμα — a pattern to copy). The Teacher stooping to wash feet subverts every human hierarchy and sets servant leadership as the defining mark of the community.",
+    "keywords": [
+      {
+        "word": "본을 보였노라",
+        "original": "ὑπόδειγμα γὰρ ἔδωκα ὑμῖν",
+        "transliteration": "휘포데이그마 가르 에도카 휘민",
+        "meaning": "본(ὑπόδειγμα)은 모방을 위한 실물 교훈, 패턴. 이론이 아닌 행동으로 가르치는 예수님의 교육방식. 리더십의 새 패러다임 선포"
+      },
+      {
+        "word": "발을 씻어 주는 것",
+        "original": "νίπτειν τοὺς πόδας",
+        "transliteration": "닙테인 투스 포다스",
+        "meaning": "발 씻김. 당시 가장 낮은 종이 하는 일. 주인이 제자의 발을 씻는 것은 사회적 통념을 완전히 뒤집는 충격적 섬김. 십자가 자기 희생의 미리 보기"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 세족식 후 교훈",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 105,
+    "is_active": true,
+    "themes": [
+      "love",
+      "discipleship",
+      "kingdom",
+      "cross"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 13,
+    "verse_start": 34,
+    "verse_end": 35,
+    "size": "S",
+    "text_ko_krv": "새 계명을 너희에게 주노니 서로 사랑하라 내가 너희를 사랑한 것 같이 너희도 서로 사랑하라 너희가 서로 사랑하면 이로써 모든 사람이 너희가 내 제자인 줄 알리라",
+    "text_ko_new": "내가 너희에게 새 계명을 준다. 서로 사랑하여라. 내가 너희를 사랑한 것과 같이, 너희도 서로 사랑하여라. 너희가 서로 사랑하면, 모든 사람이 그것으로써 너희가 내 제자인 줄을 알게 될 것이다.",
+    "text_en": "A new command I give you: Love one another. As I have loved you, so you must love one another. By this everyone will know that you are my disciples, if you love one another.",
+    "text_de": "Ein neues Gebot gebe ich euch, dass ihr einander liebt, wie ich euch geliebt habe, damit ihr auch einander liebt. Daran werden alle erkennen, dass ihr meine Jünger seid, wenn ihr Liebe untereinander habt.",
+    "context_ko": "최후의 만찬 자리에서 유다가 나간 후, 제자들에게 하신 고별 강화(13-17장)의 첫 핵심 말씀입니다. '새 계명'은 레위기 19:18의 이웃 사랑과 다르게, 기준이 '내가 너희를 사랑한 것같이'입니다. 예수님의 십자가 사랑이 제자들 사랑의 척도이자 능력이 됩니다.",
+    "context_en": "Spoken in the Upper Room after Judas's departure. The newness of this commandment lies not in its content (love) but in its standard: 'as I have loved you.' Jesus's own sacrificial love becomes both the model and the empowerment for disciples' love for one another.",
+    "keywords": [
+      {
+        "word": "새 계명",
+        "original": "ἐντολὴν καινήν",
+        "transliteration": "엔톨렌 카이넨",
+        "meaning": "새로운(καινός — 질적으로 새로운) 명령. 새로운 이유는 기준이 '내가 너희를 사랑한 것같이'이기 때문"
+      },
+      {
+        "word": "서로 사랑하라",
+        "original": "ἀγαπᾶτε ἀλλήλους",
+        "transliteration": "아가파테 알렐루스",
+        "meaning": "현재 명령형 — 계속 서로를 사랑하라. 아가페(ἀγάπη)는 자기희생적 사랑. 알렐루스(ἀλλήλους)는 상호적 관계를 강조"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 고별 강화",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 45,
+    "themes": [
+      "love",
+      "discipleship",
+      "identity"
+    ],
+    "parallel_groups": [
+      "새 계명"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 14,
+    "verse_start": 1,
+    "verse_end": 3,
+    "size": "M",
+    "text_ko_krv": "너희는 마음에 근심하지 말라 하나님을 믿으니 또 나를 믿으라 내 아버지 집에 거할 곳이 많도다 그렇지 않으면 너희에게 일렀으리라 내가 너희를 위하여 거처를 예비하러 가노니 가서 너희를 위하여 거처를 예비하면 내가 다시 와서 너희를 내게로 영접하여 나 있는 곳에 너희도 있게 하리라",
+    "text_ko_new": "너희는 마음에 근심하지 말아라. 하나님을 믿고, 또 나를 믿어라. 내 아버지 집에는 있을 곳이 많다. 그렇지 않다면, 내가 너희에게 있을 곳을 마련하러 간다고 말하였겠느냐? 나는 너희가 있을 곳을 마련하러 간다. 내가 가서 너희가 있을 곳을 마련하면, 내가 다시 와서 너희를 나에게로 데려갈 것이다. 그리하여 내가 있는 곳에 너희도 함께 있게 될 것이다.",
+    "text_en": "Do not let your hearts be troubled. You believe in God; believe also in me. My Father's house has many rooms; if that were not so, would I have told you that I am going there to prepare a place for you? And if I go and prepare a place for you, I will come back and take you to be with me that you also may be where I am.",
+    "text_de": "Euer Herz erschrecke nicht! Glaubt an Gott und glaubt an mich! In dem Haus meines Vaters sind viele Wohnungen; wenn es nicht so wäre, hätte ich es euch gesagt; denn ich gehe hin, um euch eine Stätte zu bereiten. Und wenn ich hingehe und euch eine Stätte bereite, komme ich wieder und werde euch zu mir nehmen, damit ihr auch seid, wo ich bin.",
+    "context_ko": "최후의 만찬에서 자신의 떠남을 예고하신 후, 두려워하는 제자들에게 주신 위로의 말씀입니다. '아버지 집의 거처'는 하늘의 집을 가리키며, 예수님이 먼저 가셔서 자리를 예비하고 다시 오실 것을 약속하십니다. 이는 재림의 약속이기도 합니다.",
+    "context_en": "Jesus comforts his troubled disciples with a promise of return and reunion. 'My Father's house' refers to the heavenly dwelling where Jesus goes to prepare a place — a promise that functions also as the first clear statement of the Second Coming in John.",
+    "keywords": [
+      {
+        "word": "근심하지 말라",
+        "original": "μὴ ταρασσέσθω",
+        "transliteration": "메 타라쎄스토",
+        "meaning": "흔들리지 말라, 동요하지 말라. 타라쏘(ταράσσω)는 물이 흔들리는 것. 외적 상황에 의해 내면이 교란되지 말라"
+      },
+      {
+        "word": "거처",
+        "original": "μονή",
+        "transliteration": "모네",
+        "meaning": "거할 곳, 처소. 메노(μένω, 거하다)에서 파생. 영구적인 거주 공간. 14:23에서 삼위일체 하나님이 제자 안에 거하시는 것과 같은 단어"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 고별 강화",
+    "season": "easter",
+    "slide_cycle": 2,
+    "slide_order": 15,
+    "themes": [
+      "faith",
+      "resurrection",
+      "kingdom",
+      "identity"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 14,
+    "verse_start": 6,
+    "verse_end": 7,
+    "size": "S",
+    "text_ko_krv": "예수께서 이르시되 내가 곧 길이요 진리요 생명이니 나로 말미암지 않고는 아버지께로 올 자가 없느니라 너희가 나를 알았더라면 내 아버지도 알았으리로다 이제부터는 너희가 그를 알았고 또 보았느니라",
+    "text_ko_new": "예수께서 그에게 말씀하셨다. 나는 길이요, 진리요, 생명이다. 나를 통하지 않고서는, 아무도 아버지께로 갈 수 없다. 너희가 나를 알았으면, 내 아버지도 알았을 것이다. 이제 너희는 그를 알고 있고, 또 그를 보았다.",
+    "text_en": "Jesus answered, 'I am the way and the truth and the life. No one comes to the Father except through me. If you really know me, you will know my Father as well. From now on, you do know him and have seen him.'",
+    "text_de": "Jesus spricht zu ihm: Ich bin der Weg und die Wahrheit und das Leben; niemand kommt zum Vater als nur durch mich. Wenn ihr mich erkannt hättet, hättet ihr auch meinen Vater erkannt; und von jetzt an kennt ihr ihn und habt ihn gesehen.",
+    "context_ko": "도마가 '어디로 가시는지 모른다'고 하자 하신 말씀입니다. 요한복음 에고 에이미 중 세 가지를 동시에 선언하신 유일한 경우입니다. 길(Way)은 아버지께 이르는 방법, 진리(Truth)는 하나님의 실재의 계시, 생명(Life)은 영원한 생명의 근원으로서 예수님 자신입니다.",
+    "context_en": "Spoken in response to Thomas's admission that the disciples don't know where Jesus is going. The three-fold self-description — Way, Truth, Life — encapsulates Jesus's role as mediator (Way), revealer (Truth), and giver of eternal life (Life). This is the sixth 'I Am' saying in John.",
+    "keywords": [
+      {
+        "word": "길이요 진리요 생명이니",
+        "original": "ἡ ὁδὸς καὶ ἡ ἀλήθεια καὶ ἡ ζωή",
+        "transliteration": "헤 호도스 카이 헤 알레테이아 카이 헤 조에",
+        "meaning": "세 명사 모두 정관사(ἡ)가 붙어 특정성을 강조. 하나의 길, 하나의 진리, 하나의 생명으로서의 배타적 주장"
+      },
+      {
+        "word": "나로 말미암지 않고는",
+        "original": "εἰ μὴ δι' ἐμοῦ",
+        "transliteration": "에이 메 디 에무",
+        "meaning": "오직 나를 통하여. 배타적 중보의 선언. 디아(διά)는 '~를 통하여' — 예수님이 아버지께 이르는 유일한 통로"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 도마의 질문",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 50,
+    "themes": [
+      "i_am",
+      "identity",
+      "salvation",
+      "faith"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 길 진리 생명"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 14,
+    "verse_start": 15,
+    "verse_end": 17,
+    "size": "M",
+    "text_ko_krv": "너희가 나를 사랑하면 나의 계명을 지키리라 내가 아버지께 구하겠으니 그가 또 다른 보혜사를 너희에게 주사 영원토록 너희와 함께 있게 하리니 그는 진리의 영이라 세상은 능히 그를 받지 못하나니 이는 그를 보지도 못하고 알지도 못함이라 그러나 너희는 그를 아나니 그는 너희와 함께 거하심이요 또 너희 속에 계시겠음이라",
+    "text_ko_new": "너희가 나를 사랑하면, 내 계명을 지킬 것이다. 내가 아버지께 구하겠으니, 아버지께서 또 다른 보혜사를 너희에게 보내셔서 영원히 너희와 함께 있게 하실 것이다. 그분은 진리의 영이시다. 세상은 그분을 받아들일 수 없으니, 세상은 그분을 보지 못하고 알지 못하기 때문이다. 그러나 너희는 그분을 안다. 왜냐하면 그분은 너희와 함께 계시고, 또 너희 안에 계실 것이기 때문이다.",
+    "text_en": "If you love me, keep my commands. And I will ask the Father, and he will give you another advocate to help you and be with you forever — the Spirit of truth. The world cannot accept him, because it neither sees him nor knows him. But you know him, for he lives with you and will be in you.",
+    "text_de": "Wenn ihr mich liebt, haltet meine Gebote. Und ich werde den Vater bitten, und er wird euch einen anderen Beistand geben, dass er bei euch bleibt in Ewigkeit, den Geist der Wahrheit, den die Welt nicht empfangen kann, weil sie ihn nicht sieht und nicht kennt. Ihr kennt ihn, denn er bleibt bei euch und wird in euch sein.",
+    "context_ko": "최후의 만찬에서 자신의 떠남을 앞두고 제자들을 위로하시며 성령을 약속하신 말씀입니다. '또 다른 보혜사'는 예수님 자신이 첫 번째 보혜사이심을 암시하며(요일 2:1), 성령이 예수님의 사역을 연장하고 내주하심을 선언합니다.",
+    "context_en": "The first Paraclete saying. Jesus promises 'another Paraclete' — implying he himself has been the first (1 John 2:1). The Spirit will not merely be 'with' the disciples externally (as Jesus was) but 'in' them — a new level of divine indwelling.",
+    "keywords": [
+      {
+        "word": "보혜사",
+        "original": "παράκλητος",
+        "transliteration": "파라클레토스",
+        "meaning": "곁에서 돕는 자, 변호인, 위로자. 법정 용어로 변호인. 요한복음에만 5회 등장(14:16, 14:26, 15:26, 16:7). 예수님의 사역을 연장하고 대변하는 성령의 역할"
+      },
+      {
+        "word": "진리의 영",
+        "original": "τὸ πνεῦμα τῆς ἀληθείας",
+        "transliteration": "토 프뉴마 테스 알레데이아스",
+        "meaning": "진리의 성령. 예수님이 '진리(14:6)'이시므로, 진리의 영은 예수님을 증언하고 적용하는 영. 세상이 거부하는 것을 제자들 안에 내주하심"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 성령 약속 (첫 번째)",
+    "season": "pentecost",
+    "slide_cycle": 1,
+    "slide_order": 110,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "love",
+      "discipleship"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 14,
+    "verse_start": 27,
+    "verse_end": 27,
+    "size": "S",
+    "text_ko_krv": "평안을 너희에게 끼치노니 곧 나의 평안을 너희에게 주노라 내가 너희에게 주는 것은 세상이 주는 것과 같지 아니하니라 너희는 마음에 근심하지도 말고 두려워하지도 말라",
+    "text_ko_new": "나는 너희에게 평화를 남겨 준다. 나의 평화를 너희에게 준다. 내가 너희에게 주는 것은 세상이 주는 것과 같지 않다. 너희는 마음에 근심하지도 말고 두려워하지도 말아라.",
+    "text_en": "Peace I leave with you; my peace I give you. I do not give to you as the world gives. Do not let your hearts be troubled and do not be afraid.",
+    "text_de": "Den Frieden lasse ich euch, meinen Frieden gebe ich euch; nicht wie die Welt gibt, gebe ich euch. Euer Herz erschrecke nicht und fürchte sich nicht!",
+    "context_ko": "성령 보혜사를 약속하신 후, 떠나실 예수님이 제자들에게 주시는 유업으로서의 평안입니다. 세상의 평안은 외적 상황의 안정에 근거하지만, 예수님의 평안은 내적이고 인격적입니다. 히브리어 샬롬(שָׁלוֹם)의 충만함을 선물로 주십니다.",
+    "context_en": "Jesus's parting gift to his disciples before his departure. 'My peace' is qualitatively different from the peace the world offers — not the absence of conflict, but the presence of Christ himself. It is a peace that transcends circumstances.",
+    "keywords": [
+      {
+        "word": "평안",
+        "original": "εἰρήνη",
+        "transliteration": "에이레네",
+        "meaning": "평화, 평안. 히브리어 샬롬(שָׁלוֹם)의 번역. 단순한 분쟁 부재가 아닌 하나님과의 관계에서 오는 전인적 안녕"
+      },
+      {
+        "word": "주노라",
+        "original": "δίδωμι",
+        "transliteration": "디도미",
+        "meaning": "현재형 — 지금 준다. 이미 주어지고 있는 선물. 예수님의 현재적 공급"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 고별 강화",
+    "season": "easter",
+    "slide_cycle": 2,
+    "slide_order": 20,
+    "themes": [
+      "faith",
+      "holy_spirit",
+      "love",
+      "identity"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 15,
+    "verse_start": 1,
+    "verse_end": 5,
+    "size": "M",
+    "text_ko_krv": "나는 참포도나무요 내 아버지는 농부라 무릇 내게 붙어 있어 열매를 맺지 아니하는 가지는 아버지께서 그것을 제거해 버리시고 무릇 열매를 맺는 가지는 더 열매를 맺게 하려 하여 그것을 깨끗하게 하시느니라... 나는 포도나무요 너희는 가지라 그가 내 안에, 내가 그 안에 거하면 사람이 열매를 많이 맺나니 나를 떠나서는 너희가 아무것도 할 수 없음이라",
+    "text_ko_new": "나는 참 포도나무요, 내 아버지는 농부이시다. 내게 붙어 있으면서 열매를 맺지 못하는 가지는, 아버지께서 다 잘라 버리시고, 열매를 맺는 가지는 더 많은 열매를 맺게 하시려고, 다듬으신다... 나는 포도나무요, 너희는 가지이다. 사람이 내 안에 머물러 있고 내가 그 안에 머물러 있으면, 그는 많은 열매를 맺는다. 너희는 나를 떠나서는 아무것도 할 수 없다.",
+    "text_en": "I am the true vine, and my Father is the gardener. He cuts off every branch in me that bears no fruit, while every branch that does bear fruit he prunes so that it will be even more fruitful... I am the vine; you are the branches. If you remain in me and I in you, you will bear much fruit; apart from me you can do nothing.",
+    "text_de": "Ich bin der wahre Weinstock, und mein Vater ist der Weingärtner. Jede Rebe an mir, die keine Frucht trägt, die nimmt er weg; und jede, die Frucht trägt, die reinigt er, damit sie mehr Frucht trägt... Ich bin der Weinstock, ihr seid die Reben. Wer in mir bleibt und ich in ihm, der trägt viel Frucht; denn ohne mich könnt ihr nichts tun.",
+    "context_ko": "최후의 만찬 후 겟세마네로 가는 길(또는 다락방)에서 하신 포도나무 비유입니다. 구약에서 이스라엘이 하나님의 포도나무로 불렸으나(시 80편, 사 5장, 렘 2장) 실패했는데, 예수님은 자신이 '참 포도나무'(진정한 이스라엘)임을 선언하십니다.",
+    "context_en": "The final 'I Am' saying in John, the True Vine discourse, is set against the OT background where Israel was called God's vine (Ps 80; Isa 5; Jer 2) but failed. Jesus declares himself as the true Israel, and his disciples as branches wholly dependent on his life.",
+    "keywords": [
+      {
+        "word": "참 포도나무",
+        "original": "ἡ ἄμπελος ἡ ἀληθινή",
+        "transliteration": "헤 암펠로스 헤 알레티네",
+        "meaning": "진정한, 참된 포도나무. 알레티노스(ἀληθινός)는 원형, 실재. 이스라엘이라는 모형을 성취하는 예수님"
+      },
+      {
+        "word": "거하면",
+        "original": "μένητε",
+        "transliteration": "메네테",
+        "meaning": "머물다, 붙어있다. 15장에서 메노(μένω)가 10회 반복됨. 유기적 생명 연합을 강조"
+      },
+      {
+        "word": "아무것도 할 수 없음이라",
+        "original": "χωρὶς ἐμοῦ οὐ δύνασθε ποιεῖν οὐδέν",
+        "transliteration": "코리스 에무 우 뒤나스테 포이에인 우덴",
+        "meaning": "나 없이는 아무것도 할 수 없다. 절대적 의존 선언. 영적 열매는 인간의 노력이 아닌 예수님과의 연합에서 나옴"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 후 — 포도나무 비유",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 55,
+    "themes": [
+      "i_am",
+      "identity",
+      "discipleship",
+      "love",
+      "faith"
+    ],
+    "parallel_groups": [
+      "에고 에이미 — 참 포도나무"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 15,
+    "verse_start": 12,
+    "verse_end": 13,
+    "size": "S",
+    "text_ko_krv": "내 계명은 곧 내가 너희를 사랑한 것 같이 너희도 서로 사랑하라 하는 이것이니라 사람이 친구를 위하여 자기 목숨을 버리면 이보다 더 큰 사랑이 없나니",
+    "text_ko_new": "내 계명은 이것이다. 내가 너희를 사랑한 것과 같이, 너희도 서로 사랑하여라. 친구를 위하여 자기 목숨을 내놓는 것보다 더 큰 사랑은 없다.",
+    "text_en": "My command is this: Love each other as I have loved you. Greater love has no one than this: to lay down one's life for one's friends.",
+    "text_de": "Das ist mein Gebot, dass ihr einander liebt, wie ich euch geliebt habe. Niemand hat größere Liebe als die, dass er sein Leben hingibt für seine Freunde.",
+    "context_ko": "포도나무 비유에 이어, 열매 맺음의 핵심이 서로 사랑하는 것임을 선언하십니다. 요 13:34의 새 계명을 반복하면서, 이제 자신의 죽음이 가까운 상황에서 가장 큰 사랑의 예를 보여주십니다. 예수님의 십자가 죽음이 이 말씀의 즉각적인 실증이 됩니다.",
+    "context_en": "Reiterating the new commandment from 13:34, Jesus now frames it in the context of his imminent death. The 'greatest love' he describes — laying down one's life for friends — he himself is about to demonstrate on the cross.",
+    "keywords": [
+      {
+        "word": "더 큰 사랑",
+        "original": "μείζονα ταύτης ἀγάπην",
+        "transliteration": "메이조나 타우테스 아가펜",
+        "meaning": "이것보다 더 큰 사랑. 비교급 최상위 표현. 자기희생이 사랑의 최고 형태임을 선언"
+      },
+      {
+        "word": "친구를 위하여",
+        "original": "ὑπὲρ τῶν φίλων αὐτοῦ",
+        "transliteration": "휘페르 톤 필론 아우투",
+        "meaning": "자기 친구들을 위하여. 필로스(φίλος, 친구)와 아가파오(사랑하다)의 결합. 예수님이 제자들을 종이 아닌 친구로 부르심(15:15)"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 후 — 사랑 명령",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 30,
+    "themes": [
+      "love",
+      "cross",
+      "discipleship"
+    ],
+    "parallel_groups": [
+      "새 계명"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 15,
+    "verse_start": 16,
+    "verse_end": 16,
+    "size": "S",
+    "text_ko_krv": "너희가 나를 택한 것이 아니요 내가 너희를 택하여 세웠나니 이는 너희로 가서 열매를 맺게 하고 또 너희 열매가 항상 있게 하여 내 이름으로 아버지께 무엇을 구하든지 다 받게 하려 함이라",
+    "text_ko_new": "너희가 나를 택한 것이 아니라 내가 너희를 택하여 세웠다. 그것은 너희가 가서 열매를 맺고, 그 열매가 언제나 남아 있게 하려는 것이다. 그래서 너희가 내 이름으로 아버지께 무엇을 구하든지 아버지께서 너희에게 주실 것이다.",
+    "text_en": "You did not choose me, but I chose you and appointed you so that you might go and bear fruit — fruit that will last — and so that whatever you ask in my name the Father will give you.",
+    "text_de": "Nicht ihr habt mich erwählt, sondern ich habe euch erwählt und euch dazu bestimmt, dass ihr hingeht und Frucht bringt, und eure Frucht bleibt, damit der Vater euch alles gebe, was ihr in meinem Namen bittet.",
+    "context_ko": "포도나무 비유의 결론 부분에서 제자들에게 하신 말씀입니다. 구원과 사명의 기원이 인간의 선택이 아닌 예수님의 선택과 임명에 있음을 확언하시며, 그 목적이 '영구적인 열매'임을 강조하십니다. 기도 응답의 약속도 이 사명과 연결됩니다.",
+    "context_en": "The initiative of grace: discipleship begins with Jesus's election, not human choice. 'Appointed' (ἔθηκα) echoes the vineyard imagery — Jesus has planted the disciples in position to bear fruit. The promise of answered prayer is tied to fruitful mission.",
+    "keywords": [
+      {
+        "word": "택하여 세웠나니",
+        "original": "ἐξελεξάμην ... ἔθηκα",
+        "transliteration": "엑셀렉사멘 ... 에데카",
+        "meaning": "선택하다 + 임명하다/세우다. 두 동사의 결합 — 관계적 선택과 사명적 임명. 제자의 정체성이 내 결단이 아닌 예수님의 은혜로운 선택에 기반함"
+      },
+      {
+        "word": "항상 있게",
+        "original": "μένῃ",
+        "transliteration": "메네",
+        "meaning": "머물다, 지속하다. 요한복음의 핵심 동사(μένω). 일시적 성과가 아닌 영속적 열매. 하나님 나라의 관점에서 평가되는 사역의 결과"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "포도나무 비유 — 선택과 열매",
+    "season": "ordinary",
+    "slide_cycle": 2,
+    "slide_order": 90,
+    "is_active": true,
+    "themes": [
+      "discipleship",
+      "love",
+      "kingdom",
+      "prayer"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 15,
+    "verse_start": 26,
+    "verse_end": 27,
+    "size": "S",
+    "text_ko_krv": "내가 아버지께로부터 너희에게 보낼 보혜사 곧 아버지께로부터 나오시는 진리의 성령이 오실 때에 그가 나를 증언하실 것이요 너희도 처음부터 나와 함께 있었으므로 증언하느니라",
+    "text_ko_new": "내가 아버지께로부터 너희에게 보낼 보혜사, 곧 아버지께로부터 나오시는 진리의 영이 오실 때, 그분이 나에 대하여 증언하실 것이다. 너희도 처음부터 나와 함께 있었으므로, 증언할 것이다.",
+    "text_en": "When the Advocate comes, whom I will send to you from the Father — the Spirit of truth who goes out from the Father — he will testify about me. And you also must testify, for you have been with me from the beginning.",
+    "text_de": "Wenn aber der Beistand gekommen sein wird, den ich euch vom Vater senden werde, der Geist der Wahrheit, der vom Vater ausgeht, so wird er von mir Zeugnis ablegen. Aber auch ihr legt Zeugnis ab, weil ihr von Anfang an bei mir seid.",
+    "context_ko": "핍박과 순교를 예고하신 후, 성령과 제자들의 이중 증언을 약속하신 말씀입니다. 성령의 발출(發出, processio)에 관한 삼위일체 신학의 근거가 되는 구절로, '아버지께로부터 나오시는'이라는 표현은 동방(필리오케 논쟁)과 서방 교회 신학의 논쟁점이 되었습니다.",
+    "context_en": "The third Paraclete saying, spoken in the shadow of persecution. The Spirit testifies — and the disciples testify — both bearing witness to Christ. The phrase 'proceeds from the Father' became the center of the filioque controversy between Eastern and Western Christianity.",
+    "keywords": [
+      {
+        "word": "나오시는",
+        "original": "ἐκπορεύεται",
+        "transliteration": "에크포류에타이",
+        "meaning": "나오다, 발출하다. 현재형 — 영원한 현재의 발출. 성령의 영원한 존재 방식을 가리키는 신학적 핵심어. 필리오케 논쟁의 핵심 구절"
+      },
+      {
+        "word": "증언하실 것이요",
+        "original": "ἐκεῖνος μαρτυρήσει",
+        "transliteration": "에케이노스 마르튀레세이",
+        "meaning": "그분이 증언할 것이다. 에케이노스(ἐκεῖνος)는 먼 지시대명사로 성령의 인격성 강조. 성령이 단순한 힘이 아닌 인격적 증인임을 문법으로 표현"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "포도나무 비유 — 성령 약속과 증언의 사명",
+    "season": "pentecost",
+    "slide_cycle": 2,
+    "slide_order": 95,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "discipleship",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 16,
+    "verse_start": 7,
+    "verse_end": 8,
+    "size": "S",
+    "text_ko_krv": "그러나 내가 너희에게 실상을 말하노니 내가 떠나가는 것이 너희에게 유익이라 내가 떠나가지 아니하면 보혜사가 너희에게로 오시지 아니할 것이요 가면 내가 그를 너희에게로 보내리니 그가 와서 죄에 대하여 의에 대하여 심판에 대하여 세상을 책망하시리라",
+    "text_ko_new": "그러나 나는 너희에게 진실을 말한다. 내가 떠나가는 것이 너희에게 유익하다. 내가 떠나가지 않으면, 보혜사가 너희에게 오시지 않을 것이다. 그러나 내가 가면, 내가 그분을 너희에게 보내겠다. 그분이 오시면, 죄와 의와 심판에 대하여 세상이 잘못되었음을 드러내실 것이다.",
+    "text_en": "But very truly I tell you, it is for your good that I am going away. Unless I go away, the Advocate will not come to you; but if I go, I will send him to you. When he comes, he will prove the world to be in the wrong about sin and righteousness and judgment.",
+    "text_de": "Aber ich sage euch die Wahrheit: Es ist gut für euch, dass ich weggehe. Denn wenn ich nicht weggehe, wird der Beistand nicht zu euch kommen; wenn ich aber gehe, werde ich ihn zu euch senden. Und wenn er kommt, wird er die Welt überführen wegen der Sünde und wegen der Gerechtigkeit und wegen des Gerichts.",
+    "context_ko": "예수님의 떠나심이 비극이 아니라 더 좋은 것 — 성령의 오심 — 을 위한 필수 조건임을 설명하신 말씀입니다. 성령은 예수님처럼 특정 장소에 계시지 않고 보편적으로 임하시며, 세상의 죄와 의와 심판에 대한 근본적인 잘못된 인식을 드러내십니다.",
+    "context_en": "Jesus reframes his departure as gain for the disciples. The Spirit cannot come until Jesus goes — the cross must precede Pentecost. The Spirit's work of 'conviction' (ἐλέγχω) is forensic: exposing the world's fundamental misunderstanding of sin, righteousness, and judgment.",
+    "keywords": [
+      {
+        "word": "유익이라",
+        "original": "συμφέρει",
+        "transliteration": "쉼페레이",
+        "meaning": "유익하다, 도움이 된다. 예수님의 죽음과 부재가 오히려 더 큰 축복의 조건임을 역설적으로 선언. 하나님의 경제(economy)에서 상실이 유익이 됨"
+      },
+      {
+        "word": "책망하시리라",
+        "original": "ἐλέγξει",
+        "transliteration": "엘렉세이",
+        "meaning": "드러내다, 논박하다, 책망하다. 법정에서 증거로 잘못을 증명하는 것. 성령이 변호사가 아닌 검사처럼 세상의 오류를 폭로하는 역할"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "최후의 만찬 — 성령 약속 (네 번째)",
+    "season": "pentecost",
+    "slide_cycle": 1,
+    "slide_order": 115,
+    "is_active": true,
+    "themes": [
+      "holy_spirit",
+      "cross",
+      "judgment"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 16,
+    "verse_start": 33,
+    "verse_end": 33,
+    "size": "S",
+    "text_ko_krv": "이것을 너희에게 이르는 것은 너희로 내 안에서 평안을 누리게 하려 함이라 세상에서는 너희가 환난을 당하나 담대하라 내가 세상을 이기었노라",
+    "text_ko_new": "내가 이것을 너희에게 말한 것은, 너희가 내 안에서 평화를 누리게 하려는 것이다. 세상에서는 너희가 환난을 당할 것이다. 그러나 용기를 내어라. 내가 세상을 이겼다.",
+    "text_en": "I have told you these things, so that in me you may have peace. In this world you will have trouble. But take heart! I have overcome the world.",
+    "text_de": "Dies habe ich zu euch geredet, damit ihr in mir Frieden habt. In der Welt habt ihr Trübsal; aber seid guten Mutes, ich habe die Welt überwunden!",
+    "context_ko": "고별 강화를 마치시며 하신 선언입니다. '세상에서는 환난을 당하나'는 예언이며 약속이고, '내가 세상을 이기었노라'는 미래의 일을 완료형으로 선언하시는 승리의 선포입니다. 십자가를 앞두고 이미 승리자로 말씀하시는 예수님의 확신을 보여줍니다.",
+    "context_en": "The closing statement of the entire Farewell Discourse. 'I have overcome the world' — perfect tense, a done deal — is spoken before the cross, before the resurrection. Jesus speaks from the certainty of heaven's perspective: the victory is already secured.",
+    "keywords": [
+      {
+        "word": "내가 세상을 이기었노라",
+        "original": "ἐγὼ νενίκηκα τὸν κόσμον",
+        "transliteration": "에고 네니케카 톤 코스몬",
+        "meaning": "완료형 — 이미 이겼다. 십자가 이전에 선언된 완전한 승리. 요한계시록의 '이기는 자' 모티프의 근원. 고난 중의 성도들에게 주어진 우주적 승리 선언"
+      },
+      {
+        "word": "담대하라",
+        "original": "θαρσεῖτε",
+        "transliteration": "다르세이테",
+        "meaning": "용기를 가져라, 두려워하지 마라. 명령형. 단순 위로가 아닌 그리스도의 승리에 근거한 명령. 환난이 없어진다는 약속이 아니라 환난 안에서의 평안 약속"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "고별 강화 결론 — 세상 이김의 선언",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 120,
+    "is_active": true,
+    "themes": [
+      "cross",
+      "resurrection",
+      "faith"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 17,
+    "verse_start": 1,
+    "verse_end": 3,
+    "size": "M",
+    "text_ko_krv": "예수께서 이 말씀을 하시고 눈을 들어 하늘을 우러러 이르시되 아버지여 때가 이르렀사오니 아들을 영화롭게 하사 아들로 아버지를 영화롭게 하게 하옵소서 아버지께서 아들에게 주신 모든 자에게 영생을 주게 하시려고 만민을 다스리는 권세를 아들에게 주셨음이니이다 영생은 곧 유일하신 참 하나님과 그가 보내신 자 예수 그리스도를 아는 것이니이다",
+    "text_ko_new": "예수께서 이 말씀을 마치신 다음에, 눈을 들어 하늘을 우러러 말씀하셨다. '아버지, 때가 왔습니다. 아버지의 아들을 영화롭게 해주십시오. 그래서 아들이 아버지를 영화롭게 하게 해주십시오. 아버지께서 아들에게 주신 모든 사람에게 아들이 영생을 주게 하시려고, 아버지께서는 아들에게 만민을 다스리는 권세를 주셨습니다. 영생은 곧 오직 한 분이신 참 하나님을 알고, 또 아버지께서 보내신 예수 그리스도를 아는 것입니다.'",
+    "text_en": "After Jesus said this, he looked toward heaven and prayed: 'Father, the hour has come. Glorify your Son, that your Son may glorify you. For you granted him authority over all people that he might give eternal life to all those you have given him. Now this is eternal life: that they know you, the only true God, and Jesus Christ, whom you have sent.'",
+    "text_de": "Dies sprach Jesus und hob seine Augen auf zum Himmel und sprach: Vater, die Stunde ist gekommen. Verherrliche deinen Sohn, damit dein Sohn dich verherrliche, wie du ihm Macht gegeben hast über alles Fleisch, damit er allen, die du ihm gegeben hast, ewiges Leben gebe. Das ist aber das ewige Leben, dass sie dich, den allein wahren Gott, und den du gesandt hast, Jesus Christus, erkennen.",
+    "context_ko": "대제사장적 기도의 서두로, 예수님이 자신을 위해 기도하신 부분입니다. '때가 이르렀사오니'는 십자가를 앞둔 결정적 순간의 인식입니다. 영생을 '하나님을 아는 것'으로 정의하시는 이 구절은 요한복음 신학의 정수로, 앎(γινώσκω)이 관계적 친밀감을 의미합니다.",
+    "context_en": "The opening of the High Priestly Prayer — Jesus prays for himself. 'The hour has come' is the moment the entire gospel has been moving toward. The definition of eternal life as 'knowing God' is relational, not intellectual — γινώσκω implies intimate, personal knowledge.",
+    "keywords": [
+      {
+        "word": "아는 것",
+        "original": "γινώσκωσιν",
+        "transliteration": "기노스코신",
+        "meaning": "알다. 지적 인식이 아닌 관계적·경험적 앎. 히브리어 야다(יָדַע)의 용법과 같이 친밀한 관계를 통한 앎. 영생이 미래의 상태가 아닌 현재의 관계임을 선언"
+      },
+      {
+        "word": "때가 이르렀사오니",
+        "original": "ἐλήλυθεν ἡ ὥρα",
+        "transliteration": "엘렐뤼덴 헤 호라",
+        "meaning": "완료형 — 때가 왔다. 요한복음 전체에서 기다려온 '때(ὥρα)'의 도래. 십자가와 영화(榮化)의 시간이 드디어 현재가 됨"
+      }
+    ],
+    "audience": "prayer",
+    "occasion": "겟세마네 전 — 대제사장적 기도 (자신을 위한 기도)",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 100,
+    "is_active": true,
+    "themes": [
+      "prayer",
+      "identity",
+      "salvation",
+      "cross"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 17,
+    "verse_start": 6,
+    "verse_end": 8,
+    "size": "M",
+    "text_ko_krv": "세상 중에서 내게 주신 사람들에게 내가 아버지의 이름을 나타내었나이다 그들은 아버지의 것이었는데 내게 주셨으며 그들은 아버지의 말씀을 지키었나이다 지금은 그들이 아버지께서 내게 주신 것이 다 아버지께로부터 온 것인 줄 알았사오니 아버지께서 내게 주신 말씀들을 내가 그들에게 주었더니 그들이 받고 내가 아버지께로부터 나온 것을 참으로 알았사오며 아버지께서 나를 보내신 것도 믿었사옵나이다",
+    "text_ko_new": "아버지께서 세상 가운데서 내게 주신 사람들에게 나는 아버지의 이름을 나타내었습니다. 그들은 아버지의 것인데 아버지께서 내게 주셨고, 그들은 아버지의 말씀을 지켰습니다. 아버지께서 내게 주신 모든 것이 아버지에게서 왔다는 것을 이제 그들은 알고 있습니다. 아버지께서 내게 주신 말씀들을 내가 그들에게 전하였고, 그들은 그것을 받았습니다. 그들은 내가 아버지께로부터 나온 것을 진정으로 알고, 아버지께서 나를 보내셨다는 것을 믿었습니다.",
+    "text_en": "I have revealed you to those whom you gave me out of the world. They were yours; you gave them to me and they have obeyed your word. Now they know that everything you have given me comes from you. For I gave them the words you gave me and they accepted them. They knew with certainty that I came from you, and they believed that you sent me.",
+    "text_de": "Ich habe deinen Namen den Menschen geoffenbart, die du mir aus der Welt gegeben hast. Sie waren dein, und du hast sie mir gegeben, und sie haben dein Wort bewahrt. Nun haben sie erkannt, dass alles, was du mir gegeben hast, von dir ist. Denn die Worte, die du mir gegeben hast, habe ich ihnen gegeben, und sie haben sie angenommen und wahrhaftig erkannt, dass ich von dir ausgegangen bin, und sie haben geglaubt, dass du mich gesandt hast.",
+    "context_ko": "대제사장적 기도에서 제자들을 위해 기도하시는 부분의 시작입니다. 예수님의 사역을 '아버지의 이름을 나타내는 것'으로 요약하시며, 제자들이 말씀을 받고 믿었음을 하늘 아버지께 보고하십니다. 사역의 결산을 기도로 드리시는 예수님의 모습을 보여줍니다.",
+    "context_en": "Jesus's report to the Father about his completed work before the cross. He has 'revealed the name' — the character and nature of God — to the disciples. Their reception and belief becomes his offering to the Father. The mission is accomplished even before Calvary.",
+    "keywords": [
+      {
+        "word": "이름을 나타내었나이다",
+        "original": "ἐφανέρωσά σου τὸ ὄνομα",
+        "transliteration": "에파네로사 수 토 오노마",
+        "meaning": "완료 — 완전히 드러냈다. 이름(ὄνομα)은 하나님의 본질과 성품. 예수님의 전체 사역을 '하나님의 본성을 계시하는 것'으로 요약. 성육신의 목적 선언"
+      },
+      {
+        "word": "지키었나이다",
+        "original": "τετήρηκαν",
+        "transliteration": "테테레칸",
+        "meaning": "완료형 — 지켜왔다. 말씀을 지키는 것이 제자임의 증거. 예수님이 제자들을 옹호하여 아버지께 보고하시는 변호의 언어"
+      }
+    ],
+    "audience": "prayer",
+    "occasion": "대제사장적 기도 — 제자들을 위한 기도 (1부)",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 105,
+    "is_active": true,
+    "themes": [
+      "prayer",
+      "discipleship",
+      "identity",
+      "faith"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 17,
+    "verse_start": 20,
+    "verse_end": 23,
+    "size": "M",
+    "text_ko_krv": "내가 비옵는 것은 이 사람들만 위함이 아니요 또 그들의 말로 말미암아 나를 믿는 사람들도 위함이니 아버지여, 아버지께서 내 안에, 내가 아버지 안에 있는 것 같이 그들도 다 하나가 되어 우리 안에 있게 하사 세상으로 아버지께서 나를 보내신 것을 믿게 하옵소서 내게 주신 영광을 내가 그들에게 주었사오니 이는 우리가 하나가 된 것 같이 그들도 하나가 되게 하려 함이니이다",
+    "text_ko_new": "나는 이 사람들만을 위하여 비는 것이 아니라, 이들의 말을 듣고 나를 믿을 사람들을 위해서도 빕니다. 아버지, 아버지께서 내 안에 계시고 내가 아버지 안에 있는 것과 같이, 그들도 하나가 되게 하여 주십시오. 그래서 아버지께서 나를 보내셨다는 것을 세상이 믿게 해 주십시오. 나는 아버지께서 내게 주신 영광을 그들에게 주었습니다. 이것은 우리가 하나인 것과 같이 그들도 하나가 되게 하려는 것입니다.",
+    "text_en": "My prayer is not for them alone. I pray also for those who will believe in me through their message, that all of them may be one, Father, just as you are in me and I am in you. May they also be in us so that the world may believe that you have sent me. I have given them the glory that you gave me, that they may be one as we are one.",
+    "text_de": "Ich bitte aber nicht nur für diese allein, sondern auch für die, welche durch ihr Wort an mich glauben werden, damit sie alle eins seien, wie du, Vater, in mir bist und ich in dir; dass auch sie in uns eins seien, damit die Welt glaube, dass du mich gesandt hast.",
+    "context_ko": "대제사장적 기도(요 17장)에서 현재와 미래의 모든 믿는 자들을 위해 드리신 기도입니다. 하나됨(ἕν)의 근거는 삼위일체의 하나됨이며, 목적은 세상이 예수님의 파송을 믿게 하는 것입니다. 교회의 연합은 선교적 증거입니다.",
+    "context_en": "The climax of the High Priestly Prayer (John 17), Jesus intercedes for all future believers. The unity he prays for is grounded in Trinitarian unity and serves a missional purpose: the world will believe when they see the church's unity.",
+    "keywords": [
+      {
+        "word": "하나가 되어",
+        "original": "ἵνα ὦσιν ἕν",
+        "transliteration": "히나 오신 헨",
+        "meaning": "하나가 되기 위하여. 헨(ἕν)은 중성 단수 — 인격의 합일이 아닌 의지와 목적의 일치. 삼위일체적 하나됨이 모델"
+      },
+      {
+        "word": "세상으로 믿게 하옵소서",
+        "original": "ἵνα ὁ κόσμος πιστεύῃ",
+        "transliteration": "히나 호 코스모스 피스튜에",
+        "meaning": "세상이 믿을 수 있도록. 교회의 연합은 증거론적 목적을 가짐. 분열한 교회는 복음을 훼손"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "겟세마네 전 — 대제사장적 기도",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 35,
+    "themes": [
+      "prayer",
+      "discipleship",
+      "love",
+      "faith"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 18,
+    "verse_start": 36,
+    "verse_end": 37,
+    "size": "M",
+    "text_ko_krv": "예수께서 대답하시되 내 나라는 이 세상에 속한 것이 아니니라 만일 내 나라가 이 세상에 속한 것이었더라면 내 종들이 싸워 나로 유대인들에게 넘겨지지 않게 하였으리라 이제 내 나라는 여기에 속한 것이 아니니라 빌라도가 이르되 그러면 네가 왕이 아니냐 예수께서 대답하시되 네 말과 같이 내가 왕이니라 내가 이를 위하여 태어났으며 이를 위하여 세상에 왔나니 곧 진리에 대하여 증언하려 함이로라 무릇 진리에 속한 자는 내 음성을 듣느니라",
+    "text_ko_new": "예수께서 대답하셨다. '내 나라는 이 세상에 속한 것이 아닙니다. 만일 내 나라가 이 세상에 속한 것이라면, 내 부하들이 싸워서 내가 유대 사람들에게 넘어가지 않게 하였을 것입니다. 그러나 내 나라는 이 세상에 속한 것이 아닙니다.' 그러자 빌라도가 '그러면 당신은 왕이오?' 하고 물었다. 예수께서 대답하셨다. '내가 왕이라고 당신이 말하는군요. 나는 진리를 증언하려고 태어났으며, 그 때문에 세상에 왔습니다. 진리에 속한 사람은 모두 내 목소리를 듣습니다.'",
+    "text_en": "Jesus said, 'My kingdom is not of this world. If it were, my servants would fight to prevent my arrest by the Jewish leaders. But now my kingdom is from another place.' 'You are a king, then!' said Pilate. Jesus answered, 'You say that I am a king. In fact, the reason I was born and came into the world is to testify to the truth. Everyone on the side of truth listens to me.'",
+    "text_de": "Jesus antwortete: Mein Reich ist nicht von dieser Welt. Wenn mein Reich von dieser Welt wäre, hätten meine Diener gekämpft, damit ich den Juden nicht überliefert würde. Nun aber ist mein Reich nicht von hier. Da sprach Pilatus zu ihm: Also bist du doch ein König? Jesus antwortete: Du sagst es, ich bin ein König. Ich bin dazu geboren und dazu in die Welt gekommen, dass ich der Wahrheit Zeugnis gebe. Jeder, der aus der Wahrheit ist, hört meine Stimme.",
+    "context_ko": "빌라도의 심문 장면에서 하신 말씀입니다. '내 나라'의 실재를 인정하시되, 그 성격이 세상의 정치 권력과 근본적으로 다름을 설명하십니다. 진리에 관한 마지막 선언은 '진리가 무엇이냐'고 돌아서는 빌라도와 대비되며, 예수님이 진리 자체(14:6)이심을 재확인합니다.",
+    "context_en": "Before Pilate, Jesus both affirms his kingship and radically redefines it. His kingdom is real but not from this world's order. His mission: to testify to truth. Pilate's dismissive 'What is truth?' immediately follows — two worlds colliding in one exchange.",
+    "keywords": [
+      {
+        "word": "내 나라는 이 세상에 속한 것이 아니니라",
+        "original": "ἡ βασιλεία ἡ ἐμὴ οὐκ ἔστιν ἐκ τοῦ κόσμου τούτου",
+        "transliteration": "헤 바실레이아 헤 에메 우크 에스틴 에크 투 코스무 투투",
+        "meaning": "이 세상에서(ἐκ) 나온 것이 아니다 — 기원의 부정. 세상에 존재하지 않는다는 의미가 아님. 하나님 나라는 세상 안에 있지만 세상의 권력 논리로 작동하지 않음"
+      },
+      {
+        "word": "진리에 속한 자",
+        "original": "ὁ ὢν ἐκ τῆς ἀληθείας",
+        "transliteration": "호 온 에크 테스 알레데이아스",
+        "meaning": "진리로부터(ἐκ) 나온 자. 진리가 존재의 기원인 사람. 예수님의 음성을 듣는 것이 진리에 속했음의 증거. 양과 목자 비유(10:27)의 반향"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "빌라도의 심문 — 예수님의 나라와 진리",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 125,
+    "is_active": true,
+    "themes": [
+      "identity",
+      "kingdom",
+      "cross"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 19,
+    "verse_start": 26,
+    "verse_end": 27,
+    "size": "S",
+    "text_ko_krv": "예수께서 자기의 어머니와 사랑하시는 제자가 곁에 서 있는 것을 보시고 자기 어머니께 말씀하시되 여자여 보소서 아들이니이다 하시고 또 그 제자에게 이르시되 보라 네 어머니라 하신대 그 때부터 그 제자가 자기 집에 모시니라",
+    "text_ko_new": "예수께서는 자기 어머니와 그가 사랑하시는 제자가 곁에 서 있는 것을 보시고, 어머니에게 '어머니, 이 사람이 어머니의 아들입니다' 하고 말씀하셨다. 또 그 제자에게는 '보아라, 이분이 네 어머니이다' 하고 말씀하셨다. 그 때부터 그 제자는 그분을 자기 집으로 모셨다.",
+    "text_en": "When Jesus saw his mother there, and the disciple whom he loved standing nearby, he said to her, 'Woman, here is your son,' and to the disciple, 'Here is your mother.' From that time on, this disciple took her into his own home.",
+    "text_de": "Als nun Jesus seine Mutter sah und den Jünger dabei stehen, den er liebte, spricht er zu seiner Mutter: Frau, siehe, dein Sohn! Dann spricht er zu dem Jünger: Siehe, deine Mutter! Und von jener Stunde an nahm sie der Jünger in sein Haus.",
+    "context_ko": "십자가 위에서 극도의 고통 중에도 어머니를 사랑하는 제자에게 부탁하신 말씀입니다. 죽어가면서도 타인을 돌보시는 예수님의 사랑을 보여줍니다. '여자여(γύναι)'는 창세기 3:15의 '여인의 후손'을 암시하며, 새로운 가족 공동체 — 교회 — 의 탄생을 상징합니다.",
+    "context_en": "From the cross, in agony, Jesus creates a new family. 'Woman' (γύναι) echoes the Cana scene and recalls the 'woman' of Genesis 3:15. The beloved disciple and Mary become the first 'children of God' (1:12) — the new community born from the cross.",
+    "keywords": [
+      {
+        "word": "여자여",
+        "original": "γύναι",
+        "transliteration": "귀나이",
+        "meaning": "여인이여. 존칭이지만 '어머니'가 아닌 이 호칭은 카나 사건(2:4)에서도 동일. 창세기 3:15의 '여인의 후손'을 암시하며 구속사적 의미를 담음"
+      },
+      {
+        "word": "자기 집에 모시니라",
+        "original": "εἰς τὰ ἴδια",
+        "transliteration": "에이스 타 이디아",
+        "meaning": "자기의 것들로(into his own). 요한복음 1:11의 '자기 땅에 오매 자기 백성이 영접하지 아니하였으나'와 대조. 사랑받는 제자는 영접(λαμβάνω)한 자의 모델"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "십자가 위 — 어머니를 제자에게 부탁하심",
+    "season": "lent",
+    "slide_cycle": 2,
+    "slide_order": 110,
+    "is_active": true,
+    "themes": [
+      "love",
+      "cross",
+      "discipleship"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 19,
+    "verse_start": 30,
+    "verse_end": 30,
+    "size": "S",
+    "text_ko_krv": "다 이루었다",
+    "text_ko_new": "다 이루었다.",
+    "text_en": "It is finished.",
+    "text_de": "Es ist vollbracht!",
+    "context_ko": "예수님이 십자가 위에서 하신 마지막 말씀입니다. '다 이루었다(τετέλεσται)'는 완료형 수동태로, 하나님의 구원 계획이 완전히 성취되었음을 선언합니다. 당시 상거래에서 '빚을 다 갚았다'는 의미로도 사용된 이 표현은 우리의 죄 값이 완전히 지불되었음을 의미합니다.",
+    "context_en": "The final word from the cross in John's gospel. 'Tetelestai' — 'It is finished/completed' — is a perfect passive: the work is done, with permanent effect. Used in commerce to mark a debt 'paid in full.' Jesus dies not as a victim but as one who has accomplished everything.",
+    "keywords": [
+      {
+        "word": "다 이루었다",
+        "original": "τετέλεσται",
+        "transliteration": "테텔레스타이",
+        "meaning": "완료형 수동태 — 완전히 이루어졌다. 헬라 세계에서 영수증에 적는 '완납(完納)' 표시. 죄의 빚이 완전히 지불됨. 4:34의 '온전히 이루는'(τελειώσω)과 동일 어근 — 예수님이 처음부터 목표하신 사명의 완성"
+      },
+      {
+        "word": "머리를 숙이시고",
+        "original": "κλίνας τὴν κεφαλήν",
+        "transliteration": "클리나스 텐 케팔렌",
+        "meaning": "머리를 기울이시고. 단순한 죽음의 묘사가 아닌 자발적 내려놓음. 요한복음에서 예수님은 빼앗기는 것이 아닌 스스로 생명을 내어주심(10:18)"
+      }
+    ],
+    "audience": "mixed",
+    "occasion": "십자가 위 — 마지막 말씀",
+    "season": "lent",
+    "slide_cycle": 1,
+    "slide_order": 130,
+    "is_active": true,
+    "themes": [
+      "cross",
+      "salvation",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 20,
+    "verse_start": 15,
+    "verse_end": 16,
+    "size": "S",
+    "text_ko_krv": "여자여 어찌하여 울며 누구를 찾느냐 ... 마리아야",
+    "text_ko_new": "여자여, 왜 울고 있느냐? 누구를 찾느냐? ... 마리아야!",
+    "text_en": "Woman, why are you crying? Who is it you are looking for? ... Mary.",
+    "text_de": "Frau, was weinst du? Wen suchst du? ... Maria!",
+    "context_ko": "막달라 마리아가 빈 무덤 앞에서 울고 있을 때 부활하신 예수님이 찾아가신 장면입니다. 마리아는 처음에 동산지기로 알았지만, '마리아야!'라는 이름을 부르심에 즉시 알아봅니다. 선한 목자가 양의 이름을 부른다는 10:3의 성취이며, 부활의 첫 증인이 여성임을 강조합니다.",
+    "context_en": "Mary mistakes the risen Jesus for a gardener — until he speaks her name. The Good Shepherd calls his sheep by name (10:3): at the sound of her name, she recognizes him. The first resurrection witness is a woman, overturning every social convention of the day.",
+    "keywords": [
+      {
+        "word": "마리아야",
+        "original": "Μαριάμ",
+        "transliteration": "마리암",
+        "meaning": "히브리식 이름 호칭. 헬라어 이름(Μαρία)이 아닌 히브리어/아람어 이름으로 부르심. 친밀하고 개인적인 관계의 회복. 10:3 '양의 이름을 각각 불러'의 성취"
+      },
+      {
+        "word": "누구를 찾느냐",
+        "original": "τίνα ζητεῖς",
+        "transliteration": "티나 제테이스",
+        "meaning": "누구를 찾느냐. 요한복음의 첫 질문(1:38 '무엇을 구하느냐')과 동일한 구조의 반향. 무덤을 찾던 마리아가 살아있는 분을 만나는 역설"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "부활 첫날 아침 — 막달라 마리아에게 나타나심",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 135,
+    "is_active": true,
+    "themes": [
+      "resurrection",
+      "identity",
+      "love"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 20,
+    "verse_start": 17,
+    "verse_end": 17,
+    "size": "S",
+    "text_ko_krv": "나를 붙들지 말라 내가 아직 아버지께로 올라가지 아니하였노라 너는 내 형제들에게 가서 이르되 내가 내 아버지 곧 너희 아버지 내 하나님 곧 너희 하나님께로 올라간다 하라",
+    "text_ko_new": "나를 붙들지 마라. 나는 아직 아버지께로 올라가지 않았다. 내 형제들에게 가서, 내가 내 아버지 곧 너희의 아버지, 내 하나님 곧 너희의 하나님께로 올라간다고 전하여라.",
+    "text_en": "Do not hold on to me, for I have not yet ascended to the Father. Go instead to my brothers and tell them, 'I am ascending to my Father and your Father, to my God and your God.'",
+    "text_de": "Halte mich nicht fest, denn ich bin noch nicht zu meinem Vater aufgefahren. Geh aber zu meinen Brüdern und sage ihnen: Ich fahre auf zu meinem Vater und eurem Vater und zu meinem Gott und eurem Gott.",
+    "context_ko": "부활 후 마리아가 예수님을 알아보고 잡으려 하자 하신 말씀입니다. '내 형제들'이라는 표현은 부활 후 처음 제자들을 가리키는 새로운 호칭으로, 예수님의 죽음과 부활을 통해 이루어진 새로운 관계 — 하나님이 이제 '우리 아버지' — 를 선언합니다.",
+    "context_en": "The resurrection transforms the relationship: 'my brothers' — Jesus's first post-resurrection address to the disciples. 'My Father and your Father' — not identical, but the same Father now shared. The cross has made God 'our Father' in a new, participatory sense.",
+    "keywords": [
+      {
+        "word": "내 형제들",
+        "original": "τοὺς ἀδελφούς μου",
+        "transliteration": "투스 아델푸스 무",
+        "meaning": "나의 형제들. 부활 이후 예수님이 제자들을 처음으로 형제라 부르심. 십자가를 통해 하나님의 가족으로 입양된 새로운 관계의 선언. 히브리서 2:11의 '형제라 부르기를 부끄러워하지 아니하시며'와 연결"
+      },
+      {
+        "word": "너희 아버지",
+        "original": "πατέρα ὑμῶν",
+        "transliteration": "파테라 휘몬",
+        "meaning": "너희의 아버지. 예수님의 아버지(μου)와 제자들의 아버지(ὑμῶν)를 구분하면서도 연결. 부활을 통해 믿는 자들이 하나님의 자녀가 되었음(1:12)의 성취"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "부활 첫날 아침 — 승천 예고와 새로운 관계 선언",
+    "season": "easter",
+    "slide_cycle": 2,
+    "slide_order": 115,
+    "is_active": true,
+    "themes": [
+      "resurrection",
+      "identity",
+      "discipleship",
+      "kingdom"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 20,
+    "verse_start": 21,
+    "verse_end": 22,
+    "size": "S",
+    "text_ko_krv": "예수께서 또 이르시되 너희에게 평강이 있을지어다 아버지께서 나를 보내신 것 같이 나도 너희를 보내노라 이 말씀을 하시고 그들을 향하사 숨을 내쉬며 이르시되 성령을 받으라",
+    "text_ko_new": "예수께서 다시 그들에게 말씀하셨다. 너희에게 평화가 있기를! 아버지께서 나를 보내신 것과 같이, 나도 너희를 보내다. 이 말씀을 하신 다음, 그들에게 숨을 불어넣으시며 말씀하셨다. 성령을 받아라.",
+    "text_en": "Again Jesus said, 'Peace be with you! As the Father has sent me, I am sending you.' And with that he breathed on them and said, 'Receive the Holy Spirit.'",
+    "text_de": "Da sprach Jesus wiederum zu ihnen: Friede sei mit euch! Wie der Vater mich gesandt hat, so sende auch ich euch. Und als er das gesagt hatte, hauchte er sie an und spricht zu ihnen: Empfangt den Heiligen Geist!",
+    "context_ko": "부활하신 첫날 저녁, 두려워하며 모인 제자들에게 나타나신 예수님이 요한복음의 대위임령을 주시며 성령을 부어주시는 장면입니다. '숨을 불어넣으심'은 창세기 2:7('생기를 불어넣으시니')과 에스겔 37장('마른 뼈에 생기를')을 연상시키며, 새 창조를 상징합니다.",
+    "context_en": "The Johannine Great Commission on Easter evening. Jesus breathes on his disciples, echoing Genesis 2:7 (God breathing life into Adam) and Ezekiel 37 (breath into dry bones) — signaling a new creation. The sending parallels the Father's sending of the Son.",
+    "keywords": [
+      {
+        "word": "보내노라",
+        "original": "πέμπω",
+        "transliteration": "펨포",
+        "meaning": "보내다. 파송(使命)의 동사. 성부의 성자 파송과 동일한 방식의 파송. 파송의 연쇄"
+      },
+      {
+        "word": "숨을 내쉬며",
+        "original": "ἐνεφύσησεν",
+        "transliteration": "에네퓌세센",
+        "meaning": "불어넣으셨다. 창 2:7 LXX와 동일한 동사. 새 창조, 새 생명의 시작을 상징"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "부활 첫날 저녁 — 제자들에게 나타나심",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 60,
+    "themes": [
+      "resurrection",
+      "holy_spirit",
+      "discipleship"
+    ],
+    "parallel_groups": [
+      "대위임령"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "JHN",
+    "chapter": 20,
+    "verse_start": 26,
+    "verse_end": 27,
+    "size": "S",
+    "text_ko_krv": "너희에게 평강이 있을지어다 ... 네 손가락을 이리 내밀어 내 손을 보고 네 손을 내밀어 내 옆구리에 넣어 보라 그리하여 믿음 없는 자가 되지 말고 믿는 자가 되라",
+    "text_ko_new": "너희에게 평화가 있어라! ... 네 손가락을 이리 내밀어서 내 손을 보아라. 또 네 손을 내밀어서 내 옆구리에 넣어 보아라. 그래서 의심을 버리고 믿어라.",
+    "text_en": "Peace be with you! ... Put your finger here; see my hands. Reach out your hand and put it into my side. Stop doubting and believe.",
+    "text_de": "Friede sei mit euch! ... Reiche deinen Finger her und sieh meine Hände, und reiche deine Hand her und lege sie in meine Seite, und sei nicht ungläubig, sondern gläubig!",
+    "context_ko": "도마가 없었던 자리에서 부활하신 예수님이 나타나신 후, 일주일 뒤 도마에게 직접 나타나신 장면입니다. 예수님은 도마의 조건적 요구를 정확히 알고 충족시켜 주시며, 그를 향해 '믿는 자가 되라'고 명령하십니다. 부활체의 물질성과 신성을 동시에 보여주는 장면입니다.",
+    "context_en": "Jesus meets Thomas exactly where he is — offering the very proof Thomas demanded. But the invitation 'Put your hand into my side' may not have been literally taken (Thomas's response suggests sight was enough). The command 'stop doubting' is present tense: stop being an unbeliever.",
+    "keywords": [
+      {
+        "word": "믿음 없는 자가 되지 말고 믿는 자가 되라",
+        "original": "μὴ γίνου ἄπιστος ἀλλὰ πιστός",
+        "transliteration": "메 기누 아피스토스 알라 피스토스",
+        "meaning": "현재 명령형 금지 + 현재 명령형 촉구. 계속해서 불신자가 되는 것을 멈추고, 계속해서 믿는 자가 되어라. 믿음은 일회적 결정이 아닌 지속적 방향 선택"
+      },
+      {
+        "word": "나의 주님, 나의 하나님",
+        "original": "ὁ κύριός μου καὶ ὁ θεός μου",
+        "transliteration": "호 퀴리오스 무 카이 호 데오스 무",
+        "meaning": "요한복음의 최고 신앙 고백. 주(主)와 하나님(θεός)을 동시에 예수님께 사용. 1:1의 '말씀이 하나님이시라'를 인격적으로 고백하는 클라이맥스"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "부활 후 두 번째 나타나심 — 도마에게",
+    "season": "easter",
+    "slide_cycle": 2,
+    "slide_order": 120,
+    "is_active": true,
+    "themes": [
+      "resurrection",
+      "faith",
+      "identity"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 20,
+    "verse_start": 29,
+    "verse_end": 29,
+    "size": "S",
+    "text_ko_krv": "너는 나를 본 고로 믿느냐 보지 못하고 믿는 자들은 복되도다",
+    "text_ko_new": "너는 나를 보았기 때문에 믿느냐? 보지 않고도 믿는 사람들은 복이 있다.",
+    "text_en": "Because you have seen me, you have believed; blessed are those who have not seen and yet have believed.",
+    "text_de": "Weil du mich gesehen hast, Thomas, hast du geglaubt. Selig sind, die nicht gesehen haben und doch geglaubt haben!",
+    "context_ko": "도마의 신앙 고백 직후 하신 말씀으로, 요한복음의 저술 목적(20:30-31)과 직결됩니다. 눈으로 보고 믿은 도마보다 보지 않고 믿는 자들을 복되다 하심으로써, 이 복음서를 읽는 모든 독자들을 축복하십니다. 신앙의 근거는 시각적 증거가 아니라 증언과 말씀임을 선언합니다.",
+    "context_en": "The seventh and final beatitude in John, directed beyond the story to future readers. This saying is the interpretive key to the entire gospel: 'You have not seen... yet you believe' — this is the reader's position, and it is blessed. The book itself is the medium of resurrection encounter.",
+    "keywords": [
+      {
+        "word": "복되도다",
+        "original": "μακάριοι",
+        "transliteration": "마카리오이",
+        "meaning": "복 있는 자들. 산상수훈의 팔복(마 5:3-11)과 같은 단어. 요한복음의 유일한 팔복 형식. 보지 않고 믿는 자들이 산상수훈의 복 있는 자들처럼 하나님 나라의 상속자"
+      },
+      {
+        "word": "보지 못하고 믿는",
+        "original": "μὴ ἰδόντες καὶ πιστεύσαντες",
+        "transliteration": "메 이돈테스 카이 피스튜산테스",
+        "meaning": "보지 않고 + 믿은. 현재 독자들을 향한 요한의 의도적 포함. 2000년 후 독자들도 이 복의 수신자. 믿음의 방식이 시각에서 증언으로 이동"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "도마의 신앙 고백 후 — 보지 않고 믿는 복",
+    "season": "easter",
+    "slide_cycle": 1,
+    "slide_order": 140,
+    "is_active": true,
+    "themes": [
+      "faith",
+      "resurrection",
+      "discipleship"
+    ],
+    "parallel_groups": []
+  },
+  {
+    "book": "JHN",
+    "chapter": 21,
+    "verse_start": 15,
+    "verse_end": 17,
+    "size": "M",
+    "text_ko_krv": "그들이 조반 먹은 후에 예수께서 시몬 베드로에게 이르시되 요한의 아들 시몬아 네가 이 사람들보다 나를 더 사랑하느냐 하시니 이르되 주님 그러하나이다 내가 주님을 사랑하는 줄 주님께서 아시나이다 이르시되 내 어린 양을 먹이라 하시고 또 두 번째 이르시되 요한의 아들 시몬아 네가 나를 사랑하느냐 하시니... 세 번째 이르시되 요한의 아들 시몬아 네가 나를 사랑하느냐 하시니 주께서 세 번째 네가 나를 사랑하느냐 하시므로 베드로가 근심하여 이르되 주님 모든 것을 아시오매 내가 주님을 사랑하는 줄을 주님께서 아시나이다 예수께서 이르시되 내 양을 먹이라",
+    "text_ko_new": "그들이 아침식사를 마친 뒤에, 예수께서 시몬 베드로에게 물으셨다. 요한의 아들 시몬아, 네가 이 사람들보다 나를 더 사랑하느냐? 베드로가 대답하였다. 예, 주님, 주님께서는 내가 주님을 사랑한다는 것을 아십니다. 예수께서 그에게 말씀하셨다. 내 어린 양을 먹여라... 예수께서 세 번째로 물으셨다. 요한의 아들 시몬아, 나를 사랑하느냐? 베드로는 예수께서 세 번이나 '나를 사랑하느냐?'고 물으시므로 근심이 되어 말하였다. 주님, 주님께서는 모든 것을 아십니다. 주님께서는 내가 주님을 사랑한다는 것을 아십니다. 예수께서 그에게 말씀하셨다. 내 양을 먹여라.",
+    "text_en": "When they had finished eating, Jesus said to Simon Peter, 'Simon son of John, do you love me more than these?' 'Yes, Lord,' he said, 'you know that I love you.' Jesus said, 'Feed my lambs.'... The third time he said to him, 'Simon son of John, do you love me?' Peter was hurt because Jesus asked him the third time, 'Do you love me?' He said, 'Lord, you know all things; you know that I love you.' Jesus said, 'Feed my sheep.'",
+    "text_de": "Als sie nun das Frühstück eingenommen hatten, spricht Jesus zu Simon Petrus: Simon, Sohn des Jonas, liebst du mich mehr als diese? Er spricht zu ihm: Ja, Herr, du weißt, dass ich dich lieb habe. Er spricht zu ihm: Weide meine Lämmer!... Spricht er zum dritten Mal zu ihm: Simon, Sohn des Jonas, hast du mich lieb? Petrus wurde traurig, weil er zum dritten Mal zu ihm sprach: Hast du mich lieb? Und er sprach zu ihm: Herr, du weißt alle Dinge; du weißt, dass ich dich lieb habe. Jesus spricht zu ihm: Weide meine Schafe!",
+    "context_ko": "갈릴리 바닷가에서 부활하신 예수님이 베드로를 세 번의 질문으로 회복시키십니다. 세 번의 부인(18:17,25,27)에 상응하는 세 번의 사랑 확인입니다. 예수님은 사랑의 고백에 '먹이라'는 목양 사명으로 응답하시며 베드로를 완전히 회복시키고 재파송하십니다.",
+    "context_en": "Jesus restores Peter beside the Sea of Galilee with three questions mirroring his three denials. The alternation between ἀγαπάω and φιλέω may carry nuance or simply be stylistic variation. Each declaration of love is met with a call to shepherding ministry.",
+    "keywords": [
+      {
+        "word": "나를 사랑하느냐",
+        "original": "ἀγαπᾷς με / φιλεῖς με",
+        "transliteration": "아가파스 메 / 필레이스 메",
+        "meaning": "처음 두 번은 아가파오(ἀγαπάω, 헌신적 사랑), 세 번째는 필레오(φιλέω, 우정적 사랑). 예수님이 베드로의 수준으로 내려오심"
+      },
+      {
+        "word": "먹이라",
+        "original": "βόσκε / ποίμαινε",
+        "transliteration": "보스케 / 포이마이네",
+        "meaning": "목초지에서 먹이다(βόσκω) / 목자로 돌보다(ποιμαίνω). 베드로에게 주어진 목양 사명. 사랑의 실천은 돌봄으로 표현됨"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "갈릴리 바닷가 — 베드로의 회복",
+    "season": "easter",
+    "slide_cycle": 2,
+    "slide_order": 40,
+    "themes": [
+      "love",
+      "discipleship",
+      "resurrection"
+    ],
+    "parallel_groups": [],
+    "is_active": true
+  }
+]

@@ -1,14 +1,60 @@
-FROM node:20-slim
+# ================================================
+# Frontend Dockerfile.dev – Vite HMR dev server
+# ================================================
+FROM node:20-alpine
 
 WORKDIR /app
 
-# 시스템 의존성
-RUN apt-get update && apt-get install -y curl git
+# 1️⃣ 의존성 설치 (@mediapipe/selfie_segmentation 포함)
+COPY package*.json ./
+RUN npm ci
 
-COPY package.json package-lock.json* ./
-RUN npm install
+# 2️⃣ MediaPipe wasm/모델 파일을 public/mediapipe/ 로 복사
+#    prod 빌드와 동일한 경로 구조 유지 → 개발/배포 동작 일관성 보장
+RUN mkdir -p public/mediapipe && \
+    \
+    # ── 공통 JS 로더 ──────────────────────────────────────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.js \
+       public/mediapipe/ && \
+    \
+    # ── SIMD 버전 (Chrome 91+, 최신 Safari/Firefox) ────────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.js \
+       public/mediapipe/ && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_simd_wasm_bin.wasm \
+       public/mediapipe/ && \
+    \
+    # ── non-SIMD fallback 버전 ──────────────────────────────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_wasm_bin.js \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_wasm_bin.wasm \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
+    # ── 모델 파일 ───────────────────────────────────────────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation.binarypb \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_landscape.tflite \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_general.tflite \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
+    # ── packed assets 로더 ──────────────────────────────────────── \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_packed_assets_loader.js \
+       public/mediapipe/ 2>/dev/null || true && \
+    cp node_modules/@mediapipe/selfie_segmentation/selfie_segmentation_solution_packed_assets.data \
+       public/mediapipe/ 2>/dev/null || true && \
+    \
+    echo "✅ MediaPipe 파일 목록:" && \
+    ls -la public/mediapipe/
 
+# 3️⃣ 소스 복사
+#    볼륨 마운트(./frontend:/app)가 덮어쓰므로 런타임에는 호스트 소스가 우선됨.
+#    이미지 빌드 시점 캐시 레이어로만 활용.
 COPY . .
 
-EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# 4️⃣ Vite dev server 포트
+EXPOSE 5173
+
+# 5️⃣ Vite HMR 서버 실행
+#    --host 0.0.0.0  : 컨테이너 외부(호스트 브라우저)에서 접근 가능
+#    --port 5173     : docker-compose ports 매핑과 일치
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
