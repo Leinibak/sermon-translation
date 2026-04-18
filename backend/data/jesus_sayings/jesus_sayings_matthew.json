@@ -1,37 +1,173 @@
 [
   {
     "book": "MAT",
+    "chapter": 3,
+    "verse_start": 15,
+    "verse_end": 15,
+    "size": "S",
+    "text_ko_krv": "이제 허락하라 우리가 이와 같이 하여 모든 의를 이루는 것이 합당하니라",
+    "text_ko_new": "지금은 그대로 하십시오. 우리가 이렇게 하여 모든 의를 이루는 것이 옳습니다.",
+    "text_en": "Let it be so now; it is proper for us to do this to fulfill all righteousness.",
+    "text_de": "Lass es jetzt geschehen! Denn so ziemt es uns, alle Gerechtigkeit zu erfüllen.",
+    "context_ko": "요한이 세례 주기를 거부하자 예수님이 하신 말씀입니다. '모든 의를 이루다'는 표현은 마태복음의 핵심 주제인 율법의 성취와 연결됩니다. 예수님은 죄인으로서가 아니라 하나님의 백성과 완전히 연대하시기 위해 세례를 받으십니다.",
+    "context_en": "Jesus's first recorded words in Matthew, spoken to John the Baptist. 'Fulfill all righteousness' (πληρῶσαι πᾶσαν δικαιοσύνην) is a programmatic statement — fulfillment of God's will is central to Matthew's theology (cf. Matt 5:17).",
+    "keywords": [
+      {
+        "word": "모든 의를 이루다",
+        "original": "πληρῶσαι πᾶσαν δικαιοσύνην",
+        "transliteration": "플레로사이 파산 디카이오쉬넨",
+        "meaning": "하나님의 뜻을 완전히 성취하다. 마태복음의 핵심 신학어. 5:17의 '율법을 폐하러 온 것이 아니라 완전케 하려 함이라'와 직접 연결됨"
+      },
+      {
+        "word": "의(義)",
+        "original": "δικαιοσύνη",
+        "transliteration": "디카이오쉬네",
+        "meaning": "하나님의 요구에 부합하는 올바른 상태. 마태복음에서만 7회 사용. 단순한 도덕적 선함이 아니라 하나님과의 올바른 관계"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "요한에게 세례 받으심",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 1,
+    "themes": [
+      "identity",
+      "salvation",
+      "kingdom"
+    ],
+    "parallel_groups": [
+      "막 1:9",
+      "눅 3:21"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
     "chapter": 4,
     "verse_start": 4,
     "verse_end": 4,
     "size": "S",
     "text_ko_krv": "사람이 떡으로만 살 것이 아니요 하나님의 입으로부터 나오는 모든 말씀으로 살 것이라",
-    "text_ko_new": "사람은 빵으로만 살 것이 아니라, 하나님의 입에서 나오는 모든 말씀으로 살 것이다.",
+    "text_ko_new": "사람이 빵으로만 살 것이 아니라, 하나님의 입에서 나오는 모든 말씀으로 살 것이다.",
     "text_en": "Man shall not live on bread alone, but on every word that comes from the mouth of God.",
-    "text_de": "Der Mensch lebt nicht vom Brot allein, sondern von jedem Wort, das durch den Mund Gottes ausgeht.",
-    "context_ko": "예수님이 40일 금식 후 광야에서 사탄의 첫 번째 시험을 받으실 때 하신 말씀입니다. 사탄이 돌을 떡으로 만들라고 유혹하자, 예수님은 신명기 8:3을 인용하시며 하나님의 말씀이 육신의 양식보다 우선함을 선언하십니다. 이스라엘이 광야에서 만나를 통해 배웠어야 할 교훈을 예수님이 몸소 실천하십니다.",
-    "context_en": "Spoken during Jesus's first temptation in the wilderness after 40 days of fasting. Quoting Deuteronomy 8:3, Jesus affirms that God's word is the true sustenance of human life.",
+    "text_de": "Der Mensch lebt nicht vom Brot allein, sondern von jedem Wort, das aus dem Mund Gottes kommt.",
+    "context_ko": "사탄이 40일 금식 후 돌로 떡을 만들라 유혹할 때 예수님이 신명기 8:3을 인용하신 말씀입니다. 이스라엘이 광야에서 실패한 시험을 예수님은 하나님의 말씀으로 이기십니다. 육체적 필요보다 하나님의 말씀이 생명의 근원임을 선언합니다.",
+    "context_en": "First temptation response, quoting Deut 8:3. Where Israel failed in the wilderness, Jesus succeeds. The citation reverses Israel's murmuring about bread — God's word, not physical provision, is the source of life.",
     "keywords": [
       {
-        "word": "말씀",
-        "original": "ῥῆμα",
-        "transliteration": "레마",
-        "meaning": "발화된 말, 선포된 음성. 기록된 말씀(λόγος, 로고스)과 달리 지금 이 순간 선포되는 살아있는 음성을 강조"
+        "word": "떡으로만",
+        "original": "ἐπ᾽ ἄρτῳ μόνῳ",
+        "transliteration": "에프 아르토 모노",
+        "meaning": "빵으로만. 물질적·신체적 필요만을 의미. 영적 양식인 하나님의 말씀과 대조됨"
       },
       {
-        "word": "살 것이라",
-        "original": "ζήσεται",
-        "transliteration": "제세타이",
-        "meaning": "미래형 — 살 것이다. 단순한 생존이 아닌 하나님의 생명(ζωή)으로 사는 것"
+        "word": "하나님의 입으로부터 나오는 모든 말씀",
+        "original": "παντὶ ῥήματι ἐκπορευομένῳ διὰ στόματος θεοῦ",
+        "transliteration": "판티 레마티 엑포류오메노 디아 스토마토스 테우",
+        "meaning": "하나님의 입에서 나오는 모든 말씀. 레마(ῥῆμα)는 살아있고 현재적인 말씀을 강조. 단순한 성경 텍스트가 아닌 살아 역사하는 하나님의 음성"
       }
     ],
-    "audience": "mixed",
+    "audience": "individual",
     "occasion": "광야 시험 — 첫 번째 유혹",
-    "season": "lent",
+    "season": "ordinary",
     "slide_cycle": 1,
-    "slide_order": 20,
-    "themes": ["faith", "discipleship"],
-    "parallel_groups": []
+    "slide_order": 2,
+    "themes": [
+      "temptation",
+      "faith",
+      "identity",
+      "kingdom"
+    ],
+    "parallel_groups": [
+      "눅 4:4",
+      "신 8:3"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 4,
+    "verse_start": 7,
+    "verse_end": 7,
+    "size": "S",
+    "text_ko_krv": "주 너의 하나님을 시험하지 말라",
+    "text_ko_new": "주 너의 하나님을 시험하지 말아라.",
+    "text_en": "Do not put the Lord your God to the test.",
+    "text_de": "Du sollst den Herrn, deinen Gott, nicht versuchen.",
+    "context_ko": "사탄이 성전 꼭대기에서 뛰어내리면 천사가 지켜줄 것이라며 시 91:11-12를 인용해 유혹할 때, 예수님이 신명기 6:16으로 응답하신 말씀입니다. 말씀을 무기로 대항하는 사탄에게 더 근본적인 말씀으로 대응하십니다. 하나님을 이용하려는 신앙을 거부하십니다.",
+    "context_en": "Second temptation response, quoting Deut 6:16. Satan weaponizes scripture; Jesus counters with a more foundational principle. Testing God means demanding that God prove himself on our terms — a subtle form of unbelief.",
+    "keywords": [
+      {
+        "word": "시험하지 말라",
+        "original": "οὐκ ἐκπειράσεις",
+        "transliteration": "우크 에크페이라세이스",
+        "meaning": "시험하다, 떠보다. 하나님의 신실함을 검증하려는 불신앙적 태도. 이스라엘이 므리바에서 물을 요구한 행위(신 6:16 배경)와 연결"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "광야 시험 — 두 번째 유혹",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 3,
+    "themes": [
+      "temptation",
+      "faith",
+      "identity"
+    ],
+    "parallel_groups": [
+      "눅 4:12",
+      "신 6:16"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 4,
+    "verse_start": 10,
+    "verse_end": 10,
+    "size": "S",
+    "text_ko_krv": "사탄아 물러가라 기록되었으되 주 너의 하나님께 경배하고 다만 그를 섬기라 하였느니라",
+    "text_ko_new": "사탄아, 물러가라! 성경에 기록하기를 '주 너의 하나님께 경배하고 그분만을 섬겨라' 하였다.",
+    "text_en": "Away from me, Satan! For it is written: 'Worship the Lord your God, and serve him only.'",
+    "text_de": "Weg mit dir, Satan! Denn es steht geschrieben: Du sollst den Herrn, deinen Gott, anbeten und ihm allein dienen.",
+    "context_ko": "세상의 모든 나라를 주겠다는 사탄의 마지막 유혹에 대한 결정적 거부입니다. 신명기 6:13을 인용하시며 예배와 섬김의 배타적 대상이 오직 하나님이심을 선언합니다. 이것은 예수님의 왕권이 굴복이 아닌 십자가를 통해 이루어질 것임을 암시합니다.",
+    "context_en": "The decisive rejection of the third temptation (Deut 6:13). The command 'Away!' (Ὕπαγε) is authoritative — Jesus dismisses Satan. Worship (προσκυνήσεις) and service (λατρεύσεις) belong to God alone; no shortcut to the kingdom is acceptable.",
+    "keywords": [
+      {
+        "word": "물러가라",
+        "original": "Ὕπαγε",
+        "transliteration": "휘파게",
+        "meaning": "가라, 떠나라. 명령형. 권위 있는 해산 명령. 마 16:23에서 베드로에게도 동일하게 사용됨"
+      },
+      {
+        "word": "경배하고",
+        "original": "προσκυνήσεις",
+        "transliteration": "프로스쿠네세이스",
+        "meaning": "엎드려 절하다, 경배하다. 몸 전체를 낮추는 전인격적 예배 행위. 존재의 중심이 하나님을 향하는 것"
+      },
+      {
+        "word": "섬기라",
+        "original": "λατρεύσεις",
+        "transliteration": "라트류세이스",
+        "meaning": "종교적 섬김, 예배적 봉사. 단순 봉사가 아닌 신성에 대한 경배적 헌신. 오직 하나님께만 드릴 수 있는 섬김"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "광야 시험 — 세 번째 유혹",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 4,
+    "themes": [
+      "temptation",
+      "identity",
+      "kingdom",
+      "faith"
+    ],
+    "parallel_groups": [
+      "눅 4:8",
+      "신 6:13"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",
@@ -42,30 +178,87 @@
     "text_ko_krv": "회개하라 천국이 가까이 왔느니라",
     "text_ko_new": "회개하여라. 하늘 나라가 가까이 왔다.",
     "text_en": "Repent, for the kingdom of heaven has come near.",
-    "text_de": "Tut Buße, denn das Himmelreich ist nahe gekommen!",
-    "context_ko": "세례 요한이 투옥된 후, 예수님이 갈릴리 가버나움에서 공생애 사역을 시작하시며 선포하신 첫 메시지입니다. 이사야 9:1-2의 성취로서, 흑암에 앉은 백성이 큰 빛을 보게 되었음을 선언하십니다. 세례 요한의 메시지(마 3:2)와 동일한 내용이지만, 예수님 안에서 하나님 나라의 실질적 도래가 시작됩니다.",
-    "context_en": "Jesus's first public proclamation at the beginning of his Galilean ministry, after John's imprisonment. The kingdom of heaven (βασιλεία τῶν οὐρανῶν) has drawn near — not merely approaching, but breaking in through Jesus himself.",
+    "text_de": "Kehrt um! Denn das Himmelreich ist nahe herbeigekommen.",
+    "context_ko": "예수님 공생애 사역의 첫 공식 선포 말씀입니다. 세례 요한의 선포(3:2)와 동일한 내용으로 시작하시며, 하나님 나라의 도래를 선언하십니다. 이 짧은 선포가 마태복음 전체 가르침의 요약입니다.",
+    "context_en": "The opening proclamation of Jesus's public ministry — identical to John's message (3:2), signaling continuity and fulfillment. The kingdom (βασιλεία τῶν οὐρανῶν) is Matthew's preferred term, avoiding the direct use of 'God' (Jewish sensitivity). 'Has come near' (ἤγγικεν) — perfect tense, indicating arrival with ongoing effects.",
     "keywords": [
       {
         "word": "회개하라",
         "original": "μετανοεῖτε",
         "transliteration": "메타노에이테",
-        "meaning": "현재 명령형 — 계속 마음을 돌이키라. 메타(μετά, 이후) + 노에오(νοέω, 생각하다). 사고방식과 방향의 근본적 전환"
+        "meaning": "마음을 돌이키다, 방향을 바꾸다. 단순한 감정적 후회가 아닌 삶의 방향 전환. 현재 명령형으로 지속적 행위를 요구함"
       },
       {
-        "word": "천국이 가까이 왔느니라",
-        "original": "ἤγγικεν ἡ βασιλεία τῶν οὐρανῶν",
-        "transliteration": "엥기켄 헤 바실레이아 톤 우라논",
-        "meaning": "완료형 — 이미 가까이 왔다. 도래한 상태가 현재까지 지속됨. 하나님의 통치가 예수님의 인격 안에서 현재화됨"
+        "word": "천국(하늘 나라)",
+        "original": "βασιλεία τῶν οὐρανῶν",
+        "transliteration": "바실레이아 톤 우라논",
+        "meaning": "하늘들의 나라. 마태복음에만 32회 사용. 하나님의 통치와 주권이 실현되는 영역. 미래적이면서 동시에 현재 도래한 실재"
+      },
+      {
+        "word": "가까이 왔느니라",
+        "original": "ἤγγικεν",
+        "transliteration": "엥기켄",
+        "meaning": "완료형. 이미 와 있다는 현재적 실재. 단순 미래 예고가 아닌 현재 도래한 상태를 표현"
       }
     ],
     "audience": "crowd",
-    "occasion": "갈릴리 사역 시작 — 첫 선포",
+    "occasion": "갈릴리 사역 시작 — 첫 공식 선포",
     "season": "ordinary",
-    "slide_cycle": 2,
-    "slide_order": 10,
-    "themes": ["kingdom", "repentance"],
-    "parallel_groups": ["천국 선포"]
+    "slide_cycle": 1,
+    "slide_order": 5,
+    "themes": [
+      "kingdom",
+      "repentance",
+      "salvation"
+    ],
+    "parallel_groups": [
+      "막 1:15",
+      "마 3:2"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 4,
+    "verse_start": 19,
+    "verse_end": 19,
+    "size": "S",
+    "text_ko_krv": "나를 따라오라 내가 너희를 사람을 낚는 어부가 되게 하리라",
+    "text_ko_new": "나를 따라오너라. 내가 너희를 사람 낚는 어부가 되게 하겠다.",
+    "text_en": "Come, follow me, and I will send you out to fish for people.",
+    "text_de": "Folgt mir nach! Ich werde euch zu Menschenfischern machen.",
+    "context_ko": "갈릴리 호숫가에서 베드로와 안드레를 부르시는 장면입니다. '나를 따르라'는 당시 랍비 제자도의 방식을 따르지만, 예수님은 학생이 스승을 선택하는 관례를 뒤집어 직접 제자를 선택하십니다. '사람을 낚는 어부'는 직업적 정체성의 완전한 재정의입니다.",
+    "context_en": "The call of Simon and Andrew. Unlike Jewish discipleship where students chose their rabbi, Jesus takes initiative ('Follow me' — δεῦτε ὀπίσω μου). 'Fishers of people' (ἁλεεῖς ἀνθρώπων) repurposes their vocation as a metaphor for gathering people into the kingdom.",
+    "keywords": [
+      {
+        "word": "나를 따라오라",
+        "original": "δεῦτε ὀπίσω μου",
+        "transliteration": "듀테 오피소 무",
+        "meaning": "오라, 내 뒤를 따르라. 단순한 물리적 동행이 아닌 삶 전체를 내어맡기는 제자도의 초청. 주권적 부르심"
+      },
+      {
+        "word": "사람을 낚는 어부",
+        "original": "ἁλεεῖς ἀνθρώπων",
+        "transliteration": "할리에이스 안트로폰",
+        "meaning": "사람 어부들. 렘 16:16의 선지자적 이미지를 재사용. 그러나 심판이 아닌 구원으로 방향이 전환됨. 직업적 정체성이 선교적 정체성으로 재해석됨"
+      }
+    ],
+    "audience": "individual",
+    "occasion": "베드로와 안드레를 제자로 부르심",
+    "season": "ordinary",
+    "slide_cycle": 1,
+    "slide_order": 6,
+    "themes": [
+      "discipleship",
+      "kingdom",
+      "mission"
+    ],
+    "parallel_groups": [
+      "막 1:17",
+      "눅 5:10",
+      "요 1:43"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",
@@ -73,153 +266,487 @@
     "verse_start": 3,
     "verse_end": 12,
     "size": "L",
-    "text_ko_krv": "심령이 가난한 자는 복이 있나니 천국이 그들의 것임이요 애통하는 자는 복이 있나니 그들이 위로를 받을 것임이요 온유한 자는 복이 있나니 그들이 땅을 기업으로 받을 것임이요 의에 주리고 목마른 자는 복이 있나니 그들이 배부를 것임이요 긍휼히 여기는 자는 복이 있나니 그들이 긍휼히 여김을 받을 것임이요 마음이 청결한 자는 복이 있나니 그들이 하나님을 볼 것임이요 화평하게 하는 자는 복이 있나니 그들이 하나님의 아들이라 일컬음을 받을 것임이요 의를 위하여 박해를 받은 자는 복이 있나니 천국이 그들의 것임이라",
-    "text_ko_new": "마음이 가난한 사람은 복이 있다. 하늘 나라가 그들의 것이다. 슬퍼하는 사람은 복이 있다. 그들이 위로를 받을 것이다. 온유한 사람은 복이 있다. 그들이 땅을 차지할 것이다. 의에 주리고 목마른 사람은 복이 있다. 그들이 배부를 것이다. 자비로운 사람은 복이 있다. 그들이 자비를 입을 것이다. 마음이 청결한 사람은 복이 있다. 그들이 하나님을 볼 것이다. 평화를 이루는 사람은 복이 있다. 그들이 하나님의 자녀라고 불릴 것이다. 의를 위하여 박해를 받는 사람은 복이 있다. 하늘 나라가 그들의 것이다.",
-    "text_en": "Blessed are the poor in spirit, for theirs is the kingdom of heaven. Blessed are those who mourn, for they will be comforted. Blessed are the meek, for they will inherit the earth. Blessed are those who hunger and thirst for righteousness, for they will be filled. Blessed are the merciful, for they will be shown mercy. Blessed are the pure in heart, for they will see God. Blessed are the peacemakers, for they will be called children of God. Blessed are those who are persecuted because of righteousness, for theirs is the kingdom of heaven.",
-    "text_de": "Selig sind, die geistlich arm sind, denn ihnen gehört das Himmelreich. Selig sind die Trauernden, denn sie werden getröstet werden. Selig sind die Sanftmütigen, denn sie werden das Erdreich besitzen. Selig sind die nach Gerechtigkeit Hungernden und Dürstenden, denn sie werden gesättigt werden. Selig sind die Barmherzigen, denn sie werden Barmherzigkeit erlangen. Selig sind, die reinen Herzens sind, denn sie werden Gott schauen. Selig sind die Friedensstifter, denn sie werden Söhne Gottes heißen. Selig sind, die um der Gerechtigkeit willen verfolgt werden, denn ihnen gehört das Himmelreich.",
-    "context_ko": "산상수훈의 서두로, 갈릴리 호수 근처 산에서 군중과 제자들에게 하신 말씀입니다. 팔복(八福)은 하나님 나라의 가치 체계를 세상의 가치 체계와 완전히 뒤집는 선언입니다. 헬라-로마 세계의 '복 있는 자'(영웅, 부자, 강자)와 정반대되는 사람들에게 복을 선포하십니다. 첫 번째 복과 마지막 복이 동일하게 '천국이 그들의 것'으로 수미쌍관(inclusio) 구조를 이루며, 천국이 이미 주어진 현재의 실재임을 강조합니다.",
-    "context_en": "The Beatitudes open the Sermon on the Mount, delivered on a hillside near the Sea of Galilee. Jesus inverts the Roman-Hellenistic understanding of the blessed (eudaimon) — the powerful, wealthy, and successful — by pronouncing blessing on the humble, mourning, and persecuted. The first and eighth beatitudes form an inclusio, both promising the kingdom of heaven in the present tense.",
+    "text_ko_krv": "심령이 가난한 자는 복이 있나니 천국이 그들의 것임이요 애통하는 자는 복이 있나니 그들이 위로를 받을 것임이요 온유한 자는 복이 있나니 그들이 땅을 기업으로 받을 것임이요 의에 주리고 목마른 자는 복이 있나니 그들이 배부를 것임이요 긍휼히 여기는 자는 복이 있나니 그들이 긍휼히 여김을 받을 것임이요 마음이 청결한 자는 복이 있나니 그들이 하나님을 볼 것임이요 화평하게 하는 자는 복이 있나니 그들이 하나님의 아들이라 일컬음을 받을 것임이요 의를 위하여 박해를 받은 자는 복이 있나니 천국이 그들의 것임이라 나로 말미암아 너희를 욕하고 박해하고 거짓으로 너희를 거슬러 모든 악한 말을 할 때에는 너희에게 복이 있나니 기뻐하고 즐거워하라 하늘에서 너희의 상이 큼이라 너희 전에 있던 선지자들도 이같이 박해하였느니라",
+    "text_ko_new": "마음이 가난한 사람은 복이 있다. 하늘 나라가 그들의 것이다. 슬퍼하는 사람은 복이 있다. 그들이 위로를 받을 것이다. 온유한 사람은 복이 있다. 그들이 땅을 차지할 것이다. 의에 주리고 목마른 사람은 복이 있다. 그들이 배부를 것이다. 자비를 베푸는 사람은 복이 있다. 그들이 자비를 입을 것이다. 마음이 깨끗한 사람은 복이 있다. 그들이 하나님을 볼 것이다. 평화를 이루는 사람은 복이 있다. 그들이 하나님의 자녀라고 불릴 것이다. 의를 위하여 박해를 받은 사람은 복이 있다. 하늘 나라가 그들의 것이다. 나 때문에 사람들이 너희를 모욕하고 박해하고 터무니없는 말로 온갖 악한 것을 너희에게 뒤집어씌울 때에는, 너희에게 복이 있다. 기뻐하고 뛰어 즐거워하여라. 하늘에서 받을 너희의 상이 크다. 너희보다 먼저 살았던 예언자들도 이와 같이 박해를 받았다.",
+    "text_en": "Blessed are the poor in spirit, for theirs is the kingdom of heaven. Blessed are those who mourn, for they will be comforted. Blessed are the meek, for they will inherit the earth. Blessed are those who hunger and thirst for righteousness, for they will be filled. Blessed are the merciful, for they will be shown mercy. Blessed are the pure in heart, for they will see God. Blessed are the peacemakers, for they will be called children of God. Blessed are those who are persecuted because of righteousness, for theirs is the kingdom of heaven. Blessed are you when people insult you, persecute you and falsely say all kinds of evil against you because of me. Rejoice and be glad, because great is your reward in heaven, for in the same way they persecuted the prophets who were before you.",
+    "text_de": "Selig sind, die geistlich arm sind, denn ihnen gehört das Himmelreich. Selig sind die Trauernden, denn sie werden getröstet werden. Selig sind die Sanftmütigen, denn sie werden das Land besitzen. Selig sind, die nach Gerechtigkeit hungern und dürsten, denn sie werden gesättigt werden. Selig sind die Barmherzigen, denn sie werden Barmherzigkeit erlangen. Selig sind, die reinen Herzens sind, denn sie werden Gott schauen. Selig sind die Friedensstifter, denn sie werden Söhne Gottes genannt werden. Selig sind, die um der Gerechtigkeit willen verfolgt werden, denn ihnen gehört das Himmelreich. Selig seid ihr, wenn man euch schmäht und verfolgt und lügnerisch allerlei Böses gegen euch redet um meinetwillen. Freut euch und jubelt, denn euer Lohn ist groß im Himmel.",
+    "context_ko": "산상수훈의 서문으로 팔복(八福)이라 불립니다. 예수님은 산에 오르시어(모세의 시내산을 연상시킴) 제자들에게 하나님 나라 백성의 정체성과 특징을 선언하십니다. 각 복은 세상의 가치 체계를 역전시키는 역설적 선언입니다. 첫 번째(3절)와 마지막(10절) 복이 '천국이 그들의 것'으로 수미상관 구조를 이룹니다.",
+    "context_en": "The Beatitudes open the Sermon on the Mount (Matt 5-7), the first of five major discourses in Matthew. Jesus as the new Moses ascends a mountain to deliver God's law. The Beatitudes are not entry requirements but descriptions of kingdom character. The inclusio of 'theirs is the kingdom of heaven' (vv.3,10) frames the entire section. Each beatitude follows a present-future tension: the blessing is announced now, the fulfillment is eschatological.",
     "keywords": [
       {
         "word": "복이 있나니",
         "original": "μακάριος",
         "transliteration": "마카리오스",
-        "meaning": "행복한, 복 있는. 헬라어로 신들의 행복 상태를 가리키던 단어. 외부 상황과 무관한 내적 충만함"
+        "meaning": "복된, 행복한. 단순한 감정적 행복이 아닌 하나님의 은혜 안에 있는 객관적으로 복된 상태. 구약의 '아쉬레(אַשְׁרֵי)'와 상응"
       },
       {
         "word": "심령이 가난한",
         "original": "πτωχοὶ τῷ πνεύματι",
         "transliteration": "프토코이 토 프뉴마티",
-        "meaning": "영 안에서 가난한 자들. 프토코스(πτωχός)는 절대적 빈곤자, 구걸하는 자. 자신의 영적 무력함을 인정하는 자"
+        "meaning": "영적으로 가난한, 영 안에서 가난한. 하나님 앞에 완전히 의존하는 겸손. 이사야 61:1의 배경. 자기 충족감의 반대"
       },
       {
         "word": "온유한",
         "original": "πραεῖς",
         "transliteration": "프라에이스",
-        "meaning": "길들여진 힘, 통제된 강함. 난폭하지 않으면서도 내면의 힘을 가진 상태. 모세와 예수님께 사용된 단어"
+        "meaning": "온화한, 길들여진. 통제된 힘. 분노나 자기 주장을 억제하는 능동적 겸손. 시 37:11 인용. 예수님 자신을 묘사하는 단어(마 11:29)"
+      },
+      {
+        "word": "마음이 청결한",
+        "original": "καθαροὶ τῇ καρδίᾳ",
+        "transliteration": "카타로이 테 카르디아",
+        "meaning": "마음이 순수한. 단일한 동기, 분열되지 않은 내면. 시 24:4 배경. 외적 종교 의식이 아닌 내면의 순수성"
       },
       {
         "word": "화평하게 하는 자",
         "original": "εἰρηνοποιοί",
         "transliteration": "에이레노포이오이",
-        "meaning": "평화를 만드는 사람들. 에이레네(εἰρήνη)는 히브리어 샬롬(שָׁלוֹם)에 해당. 단순한 갈등 회피가 아닌 적극적 화해의 행위자"
+        "meaning": "평화를 만드는 자들. 단순히 평화를 좋아하는 것이 아닌 능동적으로 평화를 창조하는 자. 히브리어 샬롬(שָׁלוֹם)의 충만한 의미"
       }
     ],
-    "audience": "crowd",
+    "audience": "disciples",
     "occasion": "산상수훈 — 팔복",
-    "season": "ordinary",
+    "season": "sermon_on_the_mount",
     "slide_cycle": 1,
-    "slide_order": 21,
-    "themes": ["kingdom", "discipleship"],
-    "parallel_groups": []
+    "slide_order": 7,
+    "themes": [
+      "kingdom",
+      "discipleship",
+      "ethics",
+      "beatitudes",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "눅 6:20-23",
+      "사 61:1-3",
+      "시 37:11"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",
     "chapter": 5,
     "verse_start": 13,
-    "verse_end": 16,
-    "size": "M",
-    "text_ko_krv": "너희는 세상의 소금이니 소금이 만일 그 맛을 잃으면 무엇으로 짜게 하리요 후에는 아무 쓸 데 없어 다만 밖에 버려져 사람에게 밟힐 뿐이니라 너희는 세상의 빛이라 산 위에 있는 동네가 숨겨지지 못할 것이요 사람이 등불을 켜서 말 아래에 두지 아니하고 등경 위에 두나니 이러므로 집 안 모든 사람에게 비치느니라 이같이 너희 빛이 사람 앞에 비치게 하여 그들로 너희 착한 행실을 보고 하늘에 계신 너희 아버지께 영광을 돌리게 하라",
-    "text_ko_new": "너희는 세상의 소금이다. 소금이 짠맛을 잃으면, 무엇으로 다시 짜게 하겠느냐? 그런 소금은 아무 쓸모가 없어서, 밖에 버려져 사람들에게 짓밟힐 뿐이다. 너희는 세상의 빛이다. 산 위에 세운 도시는 숨길 수가 없다. 등불을 켜서 됫박으로 덮어 두는 사람은 없다. 등잔대 위에 놓아 두어야, 집 안에 있는 모든 사람에게 빛을 준다. 이와 같이 너희 빛을 사람들 앞에 비추어서, 그들이 너희의 착한 행실을 보고, 하늘에 계신 너희 아버지께 영광을 돌리게 하여라.",
-    "text_en": "You are the salt of the earth. But if the salt loses its saltiness, how can it be made salty again? It is no longer good for anything, except to be thrown out and trampled underfoot. You are the light of the world. A town built on a hill cannot be hidden. Neither do people light a lamp and put it under a bowl. Instead they put it on its stand, and it gives light to everyone in the house. In the same way, let your light shine before others, that they may see your good deeds and glorify your Father in heaven.",
-    "text_de": "Ihr seid das Salz der Erde. Wenn nun das Salz kraftlos wird, womit soll man salzen? Es taugt zu nichts mehr, als hinausgeworfen und von den Menschen zertreten zu werden. Ihr seid das Licht der Welt. Eine Stadt, die oben auf einem Berg liegt, kann nicht verborgen bleiben. Man zündet auch nicht eine Lampe an und stellt sie unter den Scheffel, sondern auf den Leuchter, so leuchtet sie allen, die im Haus sind.",
-    "context_ko": "팔복 선언에 이어서 제자들의 정체성과 사명을 규정하신 말씀입니다. 소금은 부패 방지와 풍미를 더하는 역할을 하며, 당시 매우 귀한 물질이었습니다(salary의 어원). 예수님은 제자들이 세상에서 소금과 빛의 역할을 해야 한다고 선언하시며 사회적 영향력과 가시적 증언을 강조하십니다.",
-    "context_en": "Following the Beatitudes, Jesus defines the identity and mission of his disciples using two powerful metaphors — salt and light. Salt was a precious commodity in the ancient world used for preservation and seasoning. Light dispels darkness. Together, these metaphors describe disciples as agents of transformation in the world.",
+    "verse_end": 13,
+    "size": "S",
+    "text_ko_krv": "너희는 세상의 소금이니 소금이 만일 그 맛을 잃으면 무엇으로 짜게 하리요 후에는 아무 쓸 데 없어 다만 밖에 버려져 사람에게 밟힐 뿐이니라",
+    "text_ko_new": "너희는 세상의 소금이다. 소금이 그 맛을 잃으면, 무엇으로 다시 짜게 하겠느냐? 그것은 아무 데도 쓸 데가 없어 밖에 내버려서 사람들에게 짓밟힐 뿐이다.",
+    "text_en": "You are the salt of the earth. But if the salt loses its saltiness, how can it be made salty again? It is no longer good for anything, except to be thrown out and trampled underfoot.",
+    "text_de": "Ihr seid das Salz der Erde. Wenn das Salz aber kraftlos wird, womit soll man salzen? Es taugt zu nichts mehr, als dass es hinausgeworfen und von den Menschen zertreten wird.",
+    "context_ko": "팔복 직후에 제자들의 정체성과 사명을 선언하는 말씀입니다. 소금은 방부제, 조미료, 언약의 상징(레 2:13)으로 쓰였습니다. '맛을 잃다'는 헬라어 '모라이노(μωρανθῇ)'는 어리석어지다는 뜻도 있어, 제자도의 본질을 잃는 것이 어리석음임을 암시합니다.",
+    "context_en": "Immediately following the Beatitudes, Jesus defines the disciples' identity and mission in the world. Salt (ἅλας) preserves, flavors, and was used in covenant sacrifices (Lev 2:13). 'Loses its saltiness' (μωρανθῇ) literally means 'becomes foolish' — losing kingdom character is spiritual foolishness.",
     "keywords": [
       {
-        "word": "소금",
-        "original": "ἅλας",
-        "transliteration": "할라스",
-        "meaning": "소금. 부패를 막고 맛을 내는 물질. 당시 로마 군인 급여의 일부로 지급될 만큼 귀한 것(salary의 어원)"
+        "word": "세상의 소금",
+        "original": "τὸ ἅλας τῆς γῆς",
+        "transliteration": "토 할라스 테스 게스",
+        "meaning": "세상의 소금. 소금은 방부·정화·조미·언약의 상징. 제자들이 세상에서 도덕적 부패를 막고 생명을 보존하는 역할임을 선언"
       },
       {
-        "word": "빛",
-        "original": "φῶς",
-        "transliteration": "포스",
-        "meaning": "빛, 광명. 하나님의 임재를 상징하는 단어. 요한복음에서 예수님이 자신을 '세상의 빛'이라 하신 것과 연결"
+        "word": "맛을 잃으면",
+        "original": "μωρανθῇ",
+        "transliteration": "모란테",
+        "meaning": "맛없어지다, 어리석어지다. 이중적 의미. 소금이 짠맛을 잃는 것 = 제자가 하나님 나라의 본질을 잃는 것 = 어리석음"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 소금과 빛의 비유",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 8,
+    "themes": [
+      "discipleship",
+      "mission",
+      "kingdom",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "막 9:50",
+      "눅 14:34-35"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 14,
+    "verse_end": 16,
+    "size": "M",
+    "text_ko_krv": "너희는 세상의 빛이라 산 위에 있는 동네가 숨겨지지 못할 것이요 사람이 등불을 켜서 말 아래에 두지 아니하고 등경 위에 두나니 이러므로 집 안 모든 사람에게 비치느니라 이같이 너희 빛이 사람 앞에 비치게 하여 그들로 너희 착한 행실을 보고 하늘에 계신 너희 아버지께 영광을 돌리게 하라",
+    "text_ko_new": "너희는 세상의 빛이다. 산 위에 세운 도시는 숨길 수가 없다. 등불을 켜서 됫박 아래에다 놓아두는 사람은 없다. 등경 위에 놓아 두어서, 집 안에 있는 모든 사람에게 환히 비추게 한다. 이와 같이, 너희 빛을 사람들 앞에 비추어서, 그들이 너희의 착한 행실을 보고, 하늘에 계신 너희 아버지께 영광을 돌리게 하여라.",
+    "text_en": "You are the light of the world. A town built on a hill cannot be hidden. Neither do people light a lamp and put it under a bowl. Instead they put it on its stand, and it gives light to everyone in the house. In the same way, let your light shine before others, that they may see your good deeds and glorify your Father in heaven.",
+    "text_de": "Ihr seid das Licht der Welt. Eine Stadt, die auf einem Berg liegt, kann nicht verborgen bleiben. Man zündet auch nicht eine Lampe an und stellt sie unter den Scheffel, sondern auf den Leuchter, und sie leuchtet allen im Haus. So soll euer Licht leuchten vor den Menschen, damit sie eure guten Werke sehen und euren Vater im Himmel preisen.",
+    "context_ko": "소금 비유와 짝을 이루는 빛의 비유입니다. 요한복음에서 예수님은 '세상의 빛'이라 자칭하시지만(요 8:12), 여기서는 제자들이 세상의 빛이라고 선언하십니다. 빛은 숨겨질 수 없고 드러나야 합니다. 목적은 자기 영광이 아닌 아버지께 영광을 돌리는 것입니다.",
+    "context_en": "Paired with the salt saying. In John, Jesus is 'the light of the world' (John 8:12); here his disciples bear that light. The lamp (λύχνος) on a lampstand (λυχνία) illuminates all — the good works (καλὰ ἔργα) of disciples point not to themselves but to the Father. The purpose of visibility is doxology.",
+    "keywords": [
+      {
+        "word": "세상의 빛",
+        "original": "τὸ φῶς τοῦ κόσμου",
+        "transliteration": "토 포스 투 코스무",
+        "meaning": "세상의 빛. 요 8:12에서 예수님의 자기 선언. 제자들은 예수님의 빛을 반사하고 전달하는 존재"
       },
       {
         "word": "착한 행실",
         "original": "καλὰ ἔργα",
         "transliteration": "칼라 에르가",
-        "meaning": "선한 일들. 믿음의 결실로 나타나는 구체적 행위. 빛의 목적은 자기 영광이 아니라 하나님께 영광을 돌리는 것"
+        "meaning": "선한 행위들. 추상적 신앙이 아닌 가시적 선행. 빛이 보여지듯 삶으로 드러나는 하나님 나라의 증거"
+      },
+      {
+        "word": "영광을 돌리게 하라",
+        "original": "δοξάσωσιν",
+        "transliteration": "독사소신",
+        "meaning": "영광을 돌리다. 선한 행실의 궁극적 목적. 자기 과시가 아닌 아버지를 드러내는 투명한 삶"
       }
     ],
     "audience": "disciples",
-    "occasion": "산상수훈 — 소금과 빛",
-    "season": "ordinary",
-    "slide_cycle": 2,
-    "slide_order": 1,
-    "themes": ["discipleship", "kingdom"],
-    "parallel_groups": []
+    "occasion": "산상수훈 — 소금과 빛의 비유",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 9,
+    "themes": [
+      "discipleship",
+      "mission",
+      "kingdom",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "막 4:21",
+      "눅 8:16",
+      "요 8:12"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",
     "chapter": 5,
     "verse_start": 17,
-    "verse_end": 18,
-    "size": "S",
-    "text_ko_krv": "내가 율법이나 선지자를 폐하러 온 줄로 생각하지 말라 폐하러 온 것이 아니요 완전하게 하려 함이라 진실로 너희에게 이르노니 천지가 없어지기 전에는 율법의 일점 일획도 결코 없어지지 아니하고 다 이루리라",
-    "text_ko_new": "내가 율법이나 예언서를 폐지하러 온 줄로 생각하지 말아라. 폐지하러 온 것이 아니라 완성하러 왔다. 내가 진정으로 너희에게 말한다. 천지가 없어지기 전에는, 율법의 일점일획도 없어지지 않고, 다 이루어질 것이다.",
-    "text_en": "Do not think that I have come to abolish the Law or the Prophets; I have not come to abolish them but to fulfill them. For truly I tell you, until heaven and earth disappear, not the smallest letter, not the least stroke of a pen, will by any means disappear from the Law until everything is accomplished.",
-    "text_de": "Meint nicht, dass ich gekommen bin, das Gesetz oder die Propheten aufzulösen; ich bin nicht gekommen aufzulösen, sondern zu erfüllen. Denn wahrlich, ich sage euch: Bis der Himmel und die Erde vergehen, wird nicht ein Jota oder ein Strichlein vom Gesetz vergehen, bis alles geschehen ist.",
-    "context_ko": "산상수훈의 여섯 가지 반대명제(5:21-48)를 도입하기 전, 예수님이 자신과 율법의 관계를 명확히 하신 말씀입니다. '완전하게 하다'(πληρόω)는 율법의 심층적 의도를 드러내고 성취하는 것입니다. 예수님은 율법을 폐기하는 것이 아니라, 율법이 가리키던 목적지가 되십니다.",
-    "context_en": "Before presenting six antitheses (5:21-48), Jesus clarifies his relationship to the Law. 'Fulfill' (πληρόω) means to bring to complete expression and accomplishment — Jesus is not abolishing the Law but bringing it to its intended goal.",
+    "verse_end": 20,
+    "size": "M",
+    "text_ko_krv": "내가 율법이나 선지자를 폐하러 온 줄로 생각하지 말라 폐하러 온 것이 아니요 완전하게 하려 함이라 진실로 너희에게 이르노니 천지가 없어지기 전에는 율법의 일점 일획도 결코 없어지지 아니하고 다 이루리라 그러므로 누구든지 이 계명 중의 지극히 작은 것 하나라도 버리고 또 그같이 사람을 가르치는 자는 천국에서 지극히 작다 일컬음을 받을 것이요 누구든지 이를 행하며 가르치는 자는 천국에서 크다 일컬음을 받으리라 내가 너희에게 이르노니 너희 의가 서기관과 바리새인보다 더 낫지 못하면 결코 천국에 들어가지 못하리라",
+    "text_ko_new": "내가 율법이나 예언자들의 말을 폐하러 온 줄로 생각하지 말아라. 폐하러 온 것이 아니라, 완성하러 왔다. 내가 진정으로 너희에게 말한다. 천지가 없어지기 전에는, 율법은 일점일획도 없어지지 않고, 모두 다 이루어질 것이다. 그러므로 이 계명 가운데서 지극히 작은 것 하나라도 어기고 또 남에게 그렇게 하도록 가르치는 사람은, 하늘 나라에서 지극히 작은 사람이라 불릴 것이다. 그러나 이 계명을 지키고 또 가르치는 사람은 하늘 나라에서 큰 사람이라 불릴 것이다. 내가 너희에게 말한다. 너희의 의가 율법학자들과 바리새파 사람들의 의보다 낫지 않으면, 너희는 하늘 나라에 들어가지 못할 것이다.",
+    "text_en": "Do not think that I have come to abolish the Law or the Prophets; I have not come to abolish them but to fulfill them. For truly I tell you, until heaven and earth disappear, not the smallest letter, not the least stroke of a pen, will by any means disappear from the Law until everything is accomplished. Therefore anyone who sets aside one of the least of these commands and teaches others accordingly will be called least in the kingdom of heaven, but whoever practices and teaches these commands will be called great in the kingdom of heaven. For I tell you that unless your righteousness surpasses that of the Pharisees and the teachers of the law, you will certainly not enter the kingdom of heaven.",
+    "text_de": "Ihr sollt nicht meinen, dass ich gekommen bin, das Gesetz oder die Propheten aufzulösen. Ich bin nicht gekommen aufzulösen, sondern zu erfüllen. Denn wahrlich, ich sage euch: Bis Himmel und Erde vergehen, wird nicht ein Jota oder ein Häkchen vom Gesetz vergehen, bis alles geschieht.",
+    "context_ko": "산상수훈의 신학적 선언입니다. 예수님은 율법 폐지자가 아니라 완성자이심을 밝히십니다. '완전하게 하다(πληρῶσαι)'는 3:15의 '모든 의를 이루다'와 동일한 단어입니다. 바리새인보다 더 나은 의는 더 많은 규칙이 아닌 더 깊은 내면의 변화를 요구합니다.",
+    "context_en": "The hermeneutical key to the Sermon on the Mount. 'Fulfill' (πληρῶσαι) means to bring to full expression — Jesus deepens, radicalizes, and completes the law's intent. The 'antitheses' (5:21-48) that follow demonstrate this. The scribes and Pharisees had external compliance; Jesus demands transformed interiority.",
     "keywords": [
       {
-        "word": "완전하게 하려",
+        "word": "완전하게 하려 함이라",
         "original": "πληρῶσαι",
         "transliteration": "플레로사이",
-        "meaning": "완성하다, 성취하다. 플레로오(πληρόω)는 가득 채우다. 율법의 참뜻을 드러내어 완성하는 것"
+        "meaning": "성취하다, 완성하다, 가득 채우다. 단순 준수가 아닌 율법의 본래 의도를 완전히 실현하심. 마태복음의 성취 공식과 동일 어근"
       },
       {
         "word": "일점 일획",
         "original": "ἰῶτα ἓν ἢ μία κεραία",
         "transliteration": "이오타 헨 에 미아 케라이아",
-        "meaning": "이오타(ι)는 헬라어 최소 글자. 케라이아는 히브리어 자음을 구별하는 작은 획. 율법 전체의 영속성을 강조"
+        "meaning": "히브리어 알파벳 중 가장 작은 요드(י)와 자음을 구별하는 작은 획. 율법의 세부 사항 하나도 폐기되지 않음을 강조"
+      },
+      {
+        "word": "서기관과 바리새인보다 더 나은 의",
+        "original": "περισσεύσῃ ὑμῶν ἡ δικαιοσύνη",
+        "transliteration": "페리슈에 휘몬 헤 디카이오쉬네",
+        "meaning": "넘쳐흐르는 의. 외적 규범 준수를 넘어서는 내면에서 우러나오는 의. 하나님 나라의 윤리는 더 많은 규칙이 아닌 더 깊은 변화를 요구함"
       }
     ],
-    "audience": "crowd",
-    "occasion": "산상수훈 — 율법과의 관계",
-    "season": "ordinary",
-    "slide_cycle": 2,
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 10,
+    "themes": [
+      "law",
+      "kingdom",
+      "ethics",
+      "discipleship",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "눅 16:17",
+      "롬 3:31",
+      "마 3:15"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 21,
+    "verse_end": 26,
+    "size": "M",
+    "text_ko_krv": "옛 사람에게 말한 바 살인하지 말라 누구든지 살인하면 심판을 받게 되리라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 형제에게 노하는 자마다 심판을 받게 되고 형제를 대하여 라가라 하는 자는 공회에 잡혀가게 되고 미련한 놈이라 하는 자는 지옥 불에 들어가게 되리라 그러므로 예물을 제단에 드리려다가 거기서 네 형제에게 원망들을 만한 일이 있는 것이 생각나거든 예물을 제단 앞에 두고 먼저 가서 형제와 화목하고 그 후에 와서 예물을 드리라 너를 고발하는 자와 함께 길에 있을 때에 급히 사화하라 그 고발하는 자가 재판관에게 내어 주고 재판관이 옥리에게 내어 주어 옥에 가둘까 염려하라 진실로 네게 이르노니 네가 한 푼이라도 남김이 없이 다 갚기 전에는 결코 거기서 나오지 못하리라",
+    "text_ko_new": "살인하지 말아라. 살인하는 사람은 누구나 심판을 받는다고 옛 사람들에게 하신 말씀을 너희는 들었다. 그러나 나는 너희에게 말한다. 자기 형제나 자매에게 성내는 사람은 누구나 심판을 받는다. 자기 형제나 자매에게 욕하는 사람은 누구나 공의회에 넘겨질 것이요, 자기 형제나 자매를 보고 어리석은 자라고 하는 사람은 지옥 불에 떨어질 것이다. 그러므로 네가 제단에 예물을 드리려고 할 때에, 거기서 네 형제나 자매가 네게 원망을 품고 있다는 생각이 나거든, 예물을 제단 앞에 놓아 두고, 먼저 가서 그 형제나 자매와 화해하여라. 그런 다음에 돌아와서 예물을 드려라. 너를 고소하는 사람과 함께 법정에 가는 길에 있을 때에, 서둘러 그와 화해하여라. 그렇지 않으면, 그가 너를 재판관에게 넘기고, 재판관은 너를 옥리에게 내주어, 네가 감옥에 갇히게 될 것이다. 내가 진정으로 너희에게 말한다. 네가 마지막 한 푼까지 다 갚기 전에는, 결코 거기서 나오지 못할 것이다.",
+    "text_en": "You have heard that it was said to the people long ago, 'You shall not murder, and anyone who murders will be subject to judgment.' But I tell you that anyone who is angry with a brother or sister will be subject to judgment.",
+    "text_de": "Ihr habt gehört, dass zu den Alten gesagt worden ist: Du sollst nicht töten; wer aber tötet, soll dem Gericht verfallen sein. Ich aber sage euch: Jeder, der seinem Bruder zürnt, soll dem Gericht verfallen sein.",
+    "context_ko": "6개의 반대명제('옛 사람에게 말씀하였으되... 나는 너희에게 이르노니') 중 첫 번째입니다. 예수님은 율법을 폐하지 않고 더 깊은 차원으로 확장하십니다. 살인은 분노에서 시작됩니다. 하나님과의 화해보다 형제와의 화목이 먼저여야 한다는 것은 당시 제의 중심 종교에 대한 근본적 도전입니다.",
+    "context_en": "First of six 'antitheses' (ἠκούσατε... ἐγὼ δὲ λέγω ὑμῖν). Jesus radicalizes the sixth commandment inward — murder begins with anger. The priority of reconciliation over worship (vv.23-24) subverts the temple cult: relational wholeness precedes ritual performance.",
+    "keywords": [
+      {
+        "word": "나는 너희에게 이르노니",
+        "original": "ἐγὼ δὲ λέγω ὑμῖν",
+        "transliteration": "에고 데 레고 휘민",
+        "meaning": "그러나 나는 너희에게 말한다. 6회 반복되는 반명제 공식. 예수님이 모세의 권위와 동등하거나 그 이상의 권위로 율법을 재해석하심을 나타냄"
+      },
+      {
+        "word": "라가",
+        "original": "Ῥακά",
+        "transliteration": "라카",
+        "meaning": "아람어 욕설. '빈 머리, 쓸모없는 자'. 인격 모독. 말의 폭력이 살인의 씨앗임을 보여줌"
+      },
+      {
+        "word": "지옥",
+        "original": "γέεννα",
+        "transliteration": "게엔나",
+        "meaning": "힌놈의 골짜기(גֵּיא הִנֹּם). 예루살렘 남쪽 쓰레기 소각 장소. 종말론적 심판 장소의 상징. 헬라어 하데스(죽음의 영역)와 구별됨"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 살인과 분노",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
     "slide_order": 11,
-    "themes": ["discipleship", "kingdom"],
-    "parallel_groups": []
+    "themes": [
+      "ethics",
+      "forgiveness",
+      "judgment",
+      "discipleship",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "출 20:13",
+      "신 5:17",
+      "마 18:15-17"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 27,
+    "verse_end": 30,
+    "size": "M",
+    "text_ko_krv": "또 간음하지 말라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 음욕을 품고 여자를 보는 자마다 마음에 이미 간음하였느니라 만일 네 오른 눈이 너로 실족하게 하거든 빼어 내버리라 네 백체 중 하나가 없어지고 온 몸이 지옥에 던져지지 않는 것이 유익하며 또한 만일 네 오른손이 너로 실족하게 하거든 찍어 내버리라 네 백체 중 하나가 없어지고 온 몸이 지옥에 던져지지 않는 것이 유익하니라",
+    "text_ko_new": "간음하지 말아라 하고 말씀하신 것을 너희는 들었다. 그러나 나는 너희에게 말한다. 여자를 보고 음욕을 품는 사람은 누구나 이미 마음으로 그 여자를 간음한 것이다. 오른 눈이 너를 죄짓게 하거든, 그 눈을 빼어서 버려라. 몸의 한 부분을 잃는 것이, 온 몸이 지옥에 던져지는 것보다 나을 것이다. 오른손이 너를 죄짓게 하거든, 그 손을 찍어서 버려라. 몸의 한 부분을 잃는 것이, 온 몸이 지옥에 던져지는 것보다 나을 것이다.",
+    "text_en": "You have heard that it was said, 'You shall not commit adultery.' But I tell you that anyone who looks at a woman lustfully has already committed adultery with her in his heart.",
+    "text_de": "Ihr habt gehört, dass gesagt worden ist: Du sollst nicht ehebrechen. Ich aber sage euch: Jeder, der eine Frau ansieht, sie zu begehren, hat in seinem Herzen schon Ehebruch mit ihr begangen.",
+    "context_ko": "두 번째 반명제. 간음을 외적 행위가 아닌 내면의 욕망까지 확장합니다. '눈을 빼라, 손을 찍으라'는 표현은 과장법(hyperbole)으로, 죄의 원인이 되는 것을 극단적으로 제거하라는 촉구입니다. 신체 절단이 아닌 죄에 대한 단호함을 요구합니다.",
+    "context_en": "Second antithesis. Jesus internalizes the seventh commandment. The gaze of desire (ἐπιθυμῆσαι) is already the act in God's sight. The hyperbolic language of self-mutilation (vv.29-30) demands radical discipleship — better to sacrifice anything than to lose eternal life.",
+    "keywords": [
+      {
+        "word": "음욕을 품고",
+        "original": "πρὸς τὸ ἐπιθυμῆσαι αὐτήν",
+        "transliteration": "프로스 토 에피튀메사이 아우텐",
+        "meaning": "그녀를 탐하기 위해 바라보다. 단순히 보는 것이 아닌 의도적 욕망을 가진 시선. 내면의 의도가 행위와 동등한 도덕적 무게를 가짐"
+      },
+      {
+        "word": "마음에 이미 간음하였느니라",
+        "original": "ἤδη ἐμοίχευσεν αὐτὴν ἐν τῇ καρδίᾳ αὐτοῦ",
+        "transliteration": "에데 에모이큐센 아우텐 엔 테 카르디아 아우투",
+        "meaning": "이미 마음 안에서 간음했다. 완료적 현실. 하나님은 외적 행위만이 아닌 내면의 의도를 심판하심"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 간음과 내면의 순결",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 12,
+    "themes": [
+      "ethics",
+      "purity",
+      "judgment",
+      "discipleship",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "출 20:14",
+      "욥 31:1",
+      "마 18:8-9"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 31,
+    "verse_end": 32,
+    "size": "S",
+    "text_ko_krv": "또 일렀으되 누구든지 아내를 버리려거든 이혼 증서를 줄 것이라 하였으나 나는 너희에게 이르노니 누구든지 음행한 이유 없이 아내를 버리면 이는 그로 간음하게 함이요 또 누구든지 버림받은 여자에게 장가드는 자도 간음함이니라",
+    "text_ko_new": "또 누구든지 자기 아내를 버리려거든, 이혼 증서를 주어라 하고 말씀하신 것도 너희는 들었다. 그러나 나는 너희에게 말한다. 음행한 경우를 제외하고, 아내를 버리는 사람은 그 아내를 간음하게 만드는 것이다. 버림받은 여자에게 장가드는 사람도 간음하는 것이다.",
+    "text_en": "It has been said, 'Anyone who divorces his wife must give her a certificate of divorce.' But I tell you that anyone who divorces his wife, except for sexual immorality, makes her the victim of adultery, and anyone who marries a divorced woman commits adultery.",
+    "text_de": "Es ist auch gesagt worden: Wer seine Frau entlässt, der soll ihr einen Scheidebrief geben. Ich aber sage euch: Wer seine Frau entlässt, außer im Fall der Unzucht, der macht, dass sie Ehebruch begeht.",
+    "context_ko": "세 번째 반명제. 신명기 24:1의 이혼 허용 규정을 넘어서십니다. 당시 히브리 사회에서 아내는 이혼 요구권이 없었기에, 이 말씀은 여성의 존엄을 보호하는 혁명적 선언입니다. '음행'의 예외 조항은 마태복음만에 나타납니다.",
+    "context_en": "Third antithesis on Deut 24:1. Jesus restricts the grounds for divorce, protecting women who had no right to initiate divorce in Jewish law. The exception clause (πορνεία) appears only in Matthew (cf. Mark 10:11-12, Luke 16:18). This was a radical elevation of women's dignity.",
+    "keywords": [
+      {
+        "word": "이혼 증서",
+        "original": "ἀποστάσιον",
+        "transliteration": "아포스타시온",
+        "meaning": "이혼 문서. 신 24:1의 '이혼증서'. 당시 남성만이 이혼을 요구할 수 있었음. 예수님은 이 관행을 제한하심으로 여성을 보호"
+      },
+      {
+        "word": "음행",
+        "original": "πορνεία",
+        "transliteration": "포르네이아",
+        "meaning": "성적 부도덕, 간음. 마태의 예외 조항. 학자들은 이를 혼전 성관계, 근친결혼, 또는 간음으로 다양하게 해석"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 이혼",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 13,
+    "themes": [
+      "ethics",
+      "marriage",
+      "discipleship",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "신 24:1",
+      "막 10:11-12",
+      "눅 16:18",
+      "마 19:9"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 33,
+    "verse_end": 37,
+    "size": "M",
+    "text_ko_krv": "또 옛 사람에게 말한 바 헛 맹세를 하지 말고 네 맹세한 것을 주께 지키라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 도무지 맹세하지 말지니 하늘로도 하지 말라 이는 하나님의 보좌임이요 땅으로도 하지 말라 이는 하나님의 발등상임이요 예루살렘으로도 하지 말라 이는 큰 임금의 성임이요 네 머리로도 하지 말라 이는 네가 한 터럭도 희고 검게 할 수 없음이라 오직 너희 말은 옳다 옳다, 아니라 아니라 하라 이에서 지나는 것은 악으로부터 나느니라",
+    "text_ko_new": "또 옛 사람들에게 거짓 맹세를 하지 말고 주님께 맹세한 것을 지켜라 하고 말씀하신 것을 너희는 들었다. 그러나 나는 너희에게 말한다. 아예 맹세하지 말아라. 하늘을 두고도 맹세하지 말아라. 하늘은 하나님의 옥좌이기 때문이다. 땅을 두고도 맹세하지 말아라. 땅은 하나님의 발판이기 때문이다. 예루살렘을 두고도 맹세하지 말아라. 그것은 위대한 임금님의 도성이기 때문이다. 네 머리를 두고도 맹세하지 말아라. 너는 머리카락 하나도 희거나 검게 할 수 없기 때문이다. 너희는 '예' 할 때에는 '예' 하고, '아니오' 할 때에는 '아니오'라고만 하여라. 이보다 지나치는 것은 악에서 나오는 것이다.",
+    "text_en": "Again, you have heard that it was said to the people long ago, 'Do not break your oath, but fulfill to the Lord the vows you have made.' But I tell you, do not swear an oath at all... All you need to say is simply 'Yes' or 'No'; anything beyond this comes from the evil one.",
+    "text_de": "Ihr habt ferner gehört, dass zu den Alten gesagt worden ist: Du sollst keinen falschen Eid schwören, sondern dem Herrn deine Eide halten. Ich aber sage euch, überhaupt nicht zu schwören... Eure Rede aber sei: Ja, ja; nein, nein. Was darüber hinausgeht, ist vom Bösen.",
+    "context_ko": "네 번째 반명제. 맹세 자체를 금하십니다. 당시 유대인들은 하나님의 이름을 직접 사용하지 않으려고 하늘, 땅, 예루살렘을 두고 맹세했습니다. 예수님은 이런 우회적 맹세도 하나님과 연결되므로 무의미하다고 하십니다. 진실된 말이 맹세를 불필요하게 만든다는 원칙입니다.",
+    "context_en": "Fourth antithesis. Jews of the time used substitute oaths (heaven, earth, Jerusalem) to avoid God's name directly. Jesus shows all creation belongs to God, making substitute oaths equally binding. The solution is radical truthfulness — 'yes' means yes, making oaths superfluous.",
+    "keywords": [
+      {
+        "word": "옳다 옳다, 아니라 아니라",
+        "original": "ναὶ ναί, οὒ οὔ",
+        "transliteration": "나이 나이, 우 우",
+        "meaning": "예 예, 아니오 아니오. 단순하고 직접적인 진실된 소통. 추가적 보증이 필요 없는 신뢰할 수 있는 말"
+      },
+      {
+        "word": "악으로부터 나느니라",
+        "original": "ἐκ τοῦ πονηροῦ ἐστιν",
+        "transliteration": "에크 투 포네루 에스틴",
+        "meaning": "악한 자(사탄)에게서 나오다. 맹세의 필요성은 신뢰 부재에서 오며, 신뢰 부재는 악의 결과"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 맹세와 진실",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 14,
+    "themes": [
+      "ethics",
+      "truth",
+      "discipleship",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "레 19:12",
+      "민 30:2",
+      "약 5:12"
+    ],
+    "is_active": true
+  },
+  {
+    "book": "MAT",
+    "chapter": 5,
+    "verse_start": 38,
+    "verse_end": 42,
+    "size": "M",
+    "text_ko_krv": "또 눈은 눈으로, 이는 이로 갚으라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 악한 자를 대적하지 말라 누구든지 네 오른편 뺨을 치거든 왼편도 돌려 대며 또 너를 고발하여 속옷을 가지고자 하는 자에게 겉옷까지도 가지게 하며 또 누구든지 너로 억지로 오 리를 가게 하거든 그 사람과 십 리를 동행하고 네게 구하는 자에게 주며 네게 꾸고자 하는 자에게 거절하지 말라",
+    "text_ko_new": "눈은 눈으로, 이는 이로 갚아라 하고 말씀하신 것을 너희는 들었다. 그러나 나는 너희에게 말한다. 악한 사람에게 맞서지 말아라. 누가 네 오른쪽 뺨을 치거든, 왼쪽 뺨마저 돌려 대어라. 너를 재판에 걸어 속옷을 가지려는 사람에게는 겉옷까지도 내주어라. 누가 너에게 억지로 오 리를 걷게 하거든, 십 리를 같이 가 주어라. 달라고 하는 사람에게 주고, 꾸려는 사람에게 거절하지 말아라.",
+    "text_en": "You have heard that it was said, 'Eye for eye, and tooth for tooth.' But I tell you, do not resist an evil person. If anyone slaps you on the right cheek, turn to them the other cheek also.",
+    "text_de": "Ihr habt gehört, dass gesagt worden ist: Auge um Auge und Zahn um Zahn. Ich aber sage euch, dem Bösen nicht zu widerstehen, sondern wenn jemand dich auf deine rechte Wange schlägt, dem halte auch die andere hin.",
+    "context_ko": "다섯 번째 반명제. 탈리오 원칙(lex talionis, 동해복수법)을 넘어서십니다. 이 원칙은 원래 보복을 제한하는 진보적 법이었지만, 예수님은 보복 자체를 포기하라고 하십니다. 오른쪽 뺨을 치는 것은 손등으로 치는 것으로 최대 모욕이었습니다. 악을 악으로 갚지 않는 적극적 비저항입니다.",
+    "context_en": "Fifth antithesis. The lex talionis (Exod 21:24) originally limited retribution; Jesus abolishes retaliatory thinking entirely. A slap on the right cheek (with the back of the hand) was the greatest insult in Jewish culture. 'Do not resist' (μὴ ἀντιστῆναι) means do not respond in kind — not passive defeat but creative nonviolent resistance.",
+    "keywords": [
+      {
+        "word": "눈은 눈으로 이는 이로",
+        "original": "ὀφθαλμὸν ἀντὶ ὀφθαλμοῦ",
+        "transliteration": "오프탈몬 안티 오프탈무",
+        "meaning": "동해복수법(lex talionis). 출 21:24, 레 24:20. 원래 무제한 보복을 제한하는 법. 예수님은 이를 넘어 보복 자체를 포기하도록 하심"
+      },
+      {
+        "word": "악한 자를 대적하지 말라",
+        "original": "μὴ ἀντιστῆναι τῷ πονηρῷ",
+        "transliteration": "메 안티스테나이 토 포네로",
+        "meaning": "악한 자에게 맞서지 말라. 단순한 수동성이 아닌 악의 사이클을 끊는 능동적 선택. 악을 악으로 갚지 않는 창조적 대응"
+      }
+    ],
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 보복 금지",
+    "season": "sermon_on_the_mount",
+    "slide_cycle": 1,
+    "slide_order": 15,
+    "themes": [
+      "ethics",
+      "love",
+      "discipleship",
+      "forgiveness",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "출 21:24",
+      "눅 6:29-30",
+      "롬 12:17-21"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",
     "chapter": 5,
     "verse_start": 43,
-    "verse_end": 45,
+    "verse_end": 48,
     "size": "M",
-    "text_ko_krv": "또 네 이웃을 사랑하고 네 원수를 미워하라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 너희 원수를 사랑하며 너희를 박해하는 자를 위하여 기도하라 이같이 한즉 하늘에 계신 너희 아버지의 아들이 되리니 이는 하나님이 그 해를 악인과 선인에게 비추시며 비를 의로운 자와 불의한 자에게 내려주심이라",
-    "text_ko_new": "또 '네 이웃을 사랑하고, 네 원수를 미워하여라' 하고 말한 것을 너희는 들었다. 그러나 나는 너희에게 말한다. 너희 원수를 사랑하고, 너희를 박해하는 사람을 위하여 기도하여라. 그래야 너희가 하늘에 계신 너희 아버지의 자녀가 될 것이다. 아버지께서는, 악한 사람에게나 선한 사람에게나 똑같이 해를 떠오르게 하시고, 의로운 사람에게나 불의한 사람에게나 똑같이 비를 내려 주신다.",
-    "text_en": "You have heard that it was said, 'Love your neighbor and hate your enemy.' But I tell you, love your enemies and pray for those who persecute you, that you may be children of your Father in heaven. He causes his sun to rise on the evil and the good, and sends rain on the righteous and the unrighteous.",
-    "text_de": "Ihr habt gehört, dass gesagt worden ist: Du sollst deinen Nächsten lieben und deinen Feind hassen. Ich aber sage euch: Liebt eure Feinde und betet für die, die euch verfolgen, damit ihr Söhne eures Vaters seid, der in den Himmeln ist; denn er lässt seine Sonne aufgehen über Böse und Gute und lässt es regnen über Gerechte und Ungerechte.",
-    "context_ko": "율법의 완성에 관한 여섯 가지 '너희가 들었으나 나는 말하노니' 구조의 마지막 항목입니다. 예수님은 당시의 율법 해석을 넘어, 원수 사랑이라는 하나님 나라의 급진적 윤리를 제시하십니다. 이 명령은 인간적 한계를 넘어 하나님의 성품을 닮으라는 요청입니다.",
-    "context_en": "The final of six antitheses in the Sermon on the Mount. Jesus radicalizes the love commandment beyond its conventional boundaries to include enemies and persecutors, reflecting the character of God who provides sun and rain for all people.",
+    "text_ko_krv": "또 네 이웃을 사랑하고 네 원수를 미워하라 하였다는 것을 너희가 들었으나 나는 너희에게 이르노니 너희 원수를 사랑하며 너희를 박해하는 자를 위하여 기도하라 이같이 한즉 하늘에 계신 너희 아버지의 아들이 되리니 이는 하나님이 그 해를 악인과 선인에게 비추시며 비를 의로운 자와 불의한 자에게 내려주심이라 너희가 너희를 사랑하는 자를 사랑하면 무슨 상이 있으리요 세리도 이같이 아니하느냐 또 너희가 너희 형제에게만 문안하면 남보다 더하는 것이 무엇이냐 이방인들도 이같이 아니하느냐 그러므로 하늘에 계신 너희 아버지의 온전하심과 같이 너희도 온전하라",
+    "text_ko_new": "네 이웃을 사랑하고 네 원수를 미워하여라 하고 말씀하신 것을 너희는 들었다. 그러나 나는 너희에게 말한다. 너희 원수를 사랑하고, 너희를 박해하는 사람을 위하여 기도하여라. 그래야만 너희가 하늘에 계신 너희 아버지의 자녀가 될 것이다. 아버지께서는 악한 사람에게나 선한 사람에게나 똑같이 해를 떠오르게 하시고, 의로운 사람에게나 불의한 사람에게나 똑같이 비를 내려 주신다. 너희가 너희를 사랑하는 사람만 사랑하면, 무슨 상을 받겠느냐? 세리들도 그렇게 하지 않느냐? 너희가 너희 형제 자매에게만 인사하면, 남보다 나을 것이 무엇이냐? 이방 사람들도 그렇게 하지 않느냐? 하늘에 계신 너희 아버지께서 완전하신 것 같이, 너희도 완전하여라.",
+    "text_en": "You have heard that it was said, 'Love your neighbor and hate your enemy.' But I tell you, love your enemies and pray for those who persecute you, that you may be children of your Father in heaven... Be perfect, therefore, as your heavenly Father is perfect.",
+    "text_de": "Ihr habt gehört, dass gesagt worden ist: Du sollst deinen Nächsten lieben und deinen Feind hassen. Ich aber sage euch: Liebt eure Feinde und betet für die, die euch verfolgen... Ihr nun sollt vollkommen sein, wie euer himmlischer Vater vollkommen ist.",
+    "context_ko": "여섯 번째이자 마지막 반명제이며 산상수훈 첫 부분의 절정입니다. '원수를 미워하라'는 성경 구절이 없음에도 예수님이 인용하시는 것은 당시 유대인들의 해석 전통(쿰란 공동체 포함)을 지칭합니다. 원수 사랑의 근거는 하나님의 무차별적 은혜(해와 비)입니다. '온전하라'는 레위기 19:2의 '거룩하라'에 대응하는 새 언약의 요구입니다.",
+    "context_en": "Sixth and climactic antithesis. 'Hate your enemy' was not in scripture but in sectarian tradition (cf. Qumran texts). The motivation for enemy-love is theological: God's non-discriminatory grace (sun and rain). 'Be perfect' (τέλειος) means 'complete, whole, undivided in loyalty' — not sinless perfectionism but wholehearted love mirroring the Father.",
     "keywords": [
       {
         "word": "원수를 사랑하라",
         "original": "ἀγαπᾶτε τοὺς ἐχθροὺς ὑμῶν",
         "transliteration": "아가파테 투스 에크트루스 휘몬",
-        "meaning": "아가파오(ἀγαπάω)는 의지적·헌신적 사랑. 감정이 아닌 결단으로 원수를 대하라는 명령"
+        "meaning": "원수들을 사랑하라. 아가페(ἀγάπη) — 감정이 아닌 의지적 선택에 의한 사랑. 당시 세계에서 전례 없는 윤리 혁명. 사랑의 대상을 무제한으로 확장"
       },
       {
-        "word": "위하여 기도하라",
-        "original": "προσεύχεσθε ὑπὲρ",
-        "transliteration": "프로세우케스테 휘페르",
-        "meaning": "~을 위하여 기도하라. 휘페르(ὑπέρ)는 '위하여, 대신하여'. 원수를 위한 중보기도"
+        "word": "온전하라",
+        "original": "τέλειοι",
+        "transliteration": "텔레이오이",
+        "meaning": "완전한, 성숙한, 목적에 도달한. 도덕적 무결함이 아닌 사랑의 완전성. 레 19:2 '거룩하라'의 새 언약적 표현. 하나님의 성품을 닮아가는 것"
+      },
+      {
+        "word": "하늘에 계신 너희 아버지",
+        "original": "ὁ πατὴρ ὑμῶν ὁ οὐράνιος",
+        "transliteration": "호 파테르 휘몬 호 우라니오스",
+        "meaning": "하늘에 계신 너희 아버지. 하나님을 '아버지'로 부르는 것은 유대 기도에서 드물었음. 예수님은 이 친밀한 관계를 제자들에게 열어주심"
       }
     ],
-    "audience": "crowd",
-    "occasion": "산상수훈 — 원수 사랑",
-    "season": "ordinary",
+    "audience": "disciples",
+    "occasion": "산상수훈 — 율법의 완성: 원수 사랑",
+    "season": "sermon_on_the_mount",
     "slide_cycle": 1,
-    "slide_order": 22,
-    "themes": ["love", "kingdom", "discipleship"],
-    "parallel_groups": ["원수 사랑 명령"]
+    "slide_order": 16,
+    "themes": [
+      "love",
+      "ethics",
+      "discipleship",
+      "prayer",
+      "sermon_on_the_mount"
+    ],
+    "parallel_groups": [
+      "눅 6:27-36",
+      "레 19:2",
+      "롬 5:8-10"
+    ],
+    "is_active": true
   },
   {
     "book": "MAT",

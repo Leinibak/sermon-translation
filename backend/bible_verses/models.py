@@ -221,6 +221,7 @@ class Meditation(models.Model):
     content    = models.TextField(verbose_name='묵상 내용')
     is_private = models.BooleanField(default=True, verbose_name='비공개',
                                      help_text='True: 본인만 / False: 그룹 공유')
+    date       = models.DateField(null=True, blank=True, verbose_name='묵상 날짜')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

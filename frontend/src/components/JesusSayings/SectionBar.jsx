@@ -105,6 +105,7 @@ function getActiveTab(pathname) {
   if (pathname.startsWith('/sayings/parallels'))      return 'sayings/parallels';
   if (pathname.startsWith('/sayings/bible-explorer')) return 'sayings/bible-explorer';
   if (pathname.startsWith('/sayings/meditations'))    return 'sayings/meditations';
+  if (/^\/sayings\/\d+\/meditate/.test(pathname)) return 'sayings/meditations';
   return '';
 }
 
