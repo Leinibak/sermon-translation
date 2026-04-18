@@ -8,6 +8,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
 
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'django.log'),  # ⭐ 핵심
+        },
+    },
+}
+
 # 환경 구분
 ENVIRONMENT = os.getenv("DJANGO_ENV", "dev")
 
