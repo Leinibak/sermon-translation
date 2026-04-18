@@ -4,6 +4,10 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# 👇 여기 추가
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
 # 환경 구분
 ENVIRONMENT = os.getenv("DJANGO_ENV", "dev")
 
