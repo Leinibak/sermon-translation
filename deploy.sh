@@ -476,7 +476,7 @@ echo ""
 echo "📥 Loading Jesus sayings data from JSON..."
 
 # 4개 복음서 데이터를 차례대로 로드 (이미 있으면 스킵함)
-docker compose -f $COMPOSE_FILE exec -T backend python manage.py load_gospel_sayings
+docker compose -f $COMPOSE_FILE exec -T backend python manage.py load_jesus_sayings
 
 echo "✅ Data loading completed"
 

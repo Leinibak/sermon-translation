@@ -208,7 +208,9 @@ class MeditationSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'saying', 'saying_ref', 'saying_text',
             'username', 'content', 'is_private',
+            'date',                              # ← 추가
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'username', 'saying_ref', 'saying_text',
                             'created_at', 'updated_at']
+        # date는 read_only_fields에 넣지 않음 → 프론트에서 값 전송 가능

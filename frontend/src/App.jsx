@@ -35,6 +35,7 @@ import VideoMeetingRoom from './components/VideoMeetingRoom';
 import SayingsHomePage  from './pages/SayingsHomePage';      // ★ 신규
 import SayingListPage   from './pages/SayingListPage';
 import SayingDetailPage from './pages/SayingDetailPage';
+import SayingMeditationPage from './pages/SayingMeditationPage';
 import BibleExplorerPage from './pages/BibleExplorerPage';
 import { ThemePage, ParallelPage, MeditationPage } from './pages/SayingsSubPages';
 
@@ -51,11 +52,13 @@ function PrivateRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
+// ✅ 변경
 function AppLayout({ children }) {
   const location = useLocation();
   const isVideoRoom = /^\/video-meetings\/[^/]+/.test(location.pathname);
+  const isMeditationPage = /^\/sayings\/[^/]+\/meditate/.test(location.pathname);
 
-  if (isVideoRoom) {
+  if (isVideoRoom || isMeditationPage) {
     return (
       <div className="min-h-screen flex flex-col">
         <main className="flex-grow">{children}</main>
@@ -87,12 +90,19 @@ function AppContent() {
   );
 }
 
+function NavbarConditional() {
+  const location = useLocation();
+  const isMeditationPage = /^\/sayings\/[^/]+\/meditate/.test(location.pathname);
+  if (isMeditationPage) return null;
+  return <Navbar />;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <ScrollToTop />
-        <Navbar />
+        <NavbarConditional />
         <AppLayout>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -137,6 +147,7 @@ function App() {
             <Route path="/sayings/bible-explorer" element={<BibleExplorerPage />} />
             {/* /sayings/:id → 말씀 상세 (반드시 맨 마지막에!) */}
             <Route path="/sayings/:id"          element={<SayingDetailPage />} />
+            <Route path="/sayings/:id/meditate" element={<SayingMeditationPage />} />
 
           </Routes>
         </AppLayout>
