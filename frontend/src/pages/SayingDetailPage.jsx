@@ -221,13 +221,13 @@ function SectionLabel({ children, sub }) {
   return (
     <div style={{ marginBottom: '16px' }}>
       <p style={{
-        fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em',
-        textTransform: 'uppercase', color: '#b0aaa0', margin: 0,
+        fontSize: '13px', fontWeight: 700, letterSpacing: '0.06em',
+        textTransform: 'uppercase', color: '#7a7470', margin: 0,
       }}>
         {children}
       </p>
       {sub && (
-        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', fontFamily: "'Gowun Batang', serif" }}>
+        <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px', fontFamily: "'Gowun Batang', serif" }}>
           {sub}
         </p>
       )}
@@ -412,8 +412,8 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
           {s.roman}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '11px', color: T.ink4, fontStyle: 'italic', marginBottom: '1px' }}>{s.latin}</div>
-          <div style={{ fontSize: '15px', fontWeight: 500, color: T.ink }}>{s.label}</div>
+          <div style={{ fontSize: '12px', color: T.ink4, fontStyle: 'italic', marginBottom: '1px' }}>{s.latin}</div>
+          <div style={{ fontSize: '16px', fontWeight: 500, color: T.ink }}>{s.label}</div>
         </div>
         <span style={{
           fontSize: '11px', padding: '3px 9px',
@@ -436,7 +436,7 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
 
             {/* 설명 */}
             <div style={{
-              fontSize: '13px', color: T.ink3, lineHeight: 1.85,
+              fontSize: '14px', color: T.ink3, lineHeight: 1.85,
               padding: '10px 14px', background: T.paper,
               borderRadius: '8px', borderLeft: `2.5px solid ${T.paper3}`,
               marginBottom: '14px',
@@ -465,8 +465,8 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
                 {s.miniCards.map((mc, i) => (
                   <div key={i} style={{ background: T.paper, borderRadius: '8px', padding: '10px 12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: T.ink2, marginBottom: '3px' }}>{mc.title}</div>
-                    <div style={{ fontSize: '11.5px', color: T.ink3, lineHeight: 1.55 }}>{mc.desc}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: T.ink2, marginBottom: '3px' }}>{mc.title}</div>
+                    <div style={{ fontSize: '12.5px', color: T.ink3, lineHeight: 1.55 }}>{mc.desc}</div>
                   </div>
                 ))}
               </div>
@@ -494,7 +494,7 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
                       borderLeft: `2.5px solid ${T.m4mid}`,
                     }}>
                       <span style={{ fontStyle: 'italic', fontSize: '13px', color: T.m4, minWidth: 18, fontWeight: 500 }}>{a.num}</span>
-                      <span style={{ fontSize: '12.5px', color: T.ink2, lineHeight: 1.65 }}>
+                      <span style={{ fontSize: '13.5px', color: T.ink2, lineHeight: 1.65 }}>
                         <strong style={{ color: T.m4 }}>{a.title}</strong> — {a.text}
                       </span>
                     </div>
@@ -599,7 +599,7 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
             {s.fields.map(f => (
               <div key={f.id} style={{ marginBottom: '10px' }}>
                 <div style={{
-                  fontSize: '11px', fontWeight: 600, color: T.ink4,
+                  fontSize: '12px', fontWeight: 600, color: T.ink4,
                   textTransform: 'uppercase', letterSpacing: '0.07em',
                   marginBottom: '5px',
                 }}>
@@ -613,7 +613,7 @@ function StepCard({ stepData, values, onChange, isOpen, onToggle }) {
                   style={{
                     width: '100%', border: `1px solid ${T.paper3}`,
                     borderRadius: '8px', padding: '10px 12px',
-                    fontSize: '13px', fontFamily: "'Gowun Batang', serif",
+                    fontSize: '14px', fontFamily: "'Gowun Batang', serif",
                     color: T.ink, background: '#fff',
                     resize: 'vertical', lineHeight: 1.75,
                     outline: 'none', boxSizing: 'border-box',
@@ -715,20 +715,20 @@ function SacraLectioGuide({ onSendToNote }) {
       background: '#fff',
     }}>
       <div style={{
-        fontSize: '11px', color: T.ink4,
+        fontSize: '12px', color: T.ink4,
         letterSpacing: '0.14em', marginBottom: '8px',
         fontStyle: 'italic',
       }}>
         Lectio · Meditatio · Oratio · Contemplatio
       </div>
       <div style={{
-        fontSize: '17px', fontWeight: 500, color: T.ink,
+        fontSize: '18px', fontWeight: 500, color: T.ink,
         marginBottom: '6px',
         fontFamily: "'Gowun Batang', serif",
       }}>
         말씀 앞에 고요히 머무는 시간
       </div>
-      <div style={{ fontSize: '12px', color: T.ink3, lineHeight: 1.9 }}>
+      <div style={{ fontSize: '13px', color: T.ink3, lineHeight: 1.9 }}>
         듣고, 깨닫고, 응답하고, 그분 안에 거합니다
       </div>
     </div>
@@ -783,7 +783,7 @@ function SacraLectioGuide({ onSendToNote }) {
         padding: '10px 16px', margin: '14px 16px',
         borderRadius: '10px',
         background: T.m1bg, border: `1px solid ${T.m1mid}`,
-        color: T.m1, fontSize: '12.5px', lineHeight: 1.6,
+        color: T.m1, fontSize: '13.5px', lineHeight: 1.6,
       }}>
         <span style={{ fontSize: '18px' }}>🌅</span>
         <span>
@@ -1167,7 +1167,7 @@ export default function SayingDetailPage() {
               onClick={goBack}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '13px', color: '#9ca3af',
+                fontSize: '14px', color: '#9ca3af',
                 background: 'none', border: 'none', cursor: 'pointer',
                 padding: '6px 10px 6px 0', fontFamily: 'inherit',
               }}
@@ -1182,7 +1182,7 @@ export default function SayingDetailPage() {
                   to={`/sayings/${saying.related_sayings[0].id}`}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '4px',
-                    fontSize: '12px', color: ac.text,
+                    fontSize: '13px', color: ac.text,
                     textDecoration: 'none', padding: '6px 12px',
                     border: `1px solid ${ac.border}`, borderRadius: '8px',
                     background: '#fff',
@@ -1198,7 +1198,7 @@ export default function SayingDetailPage() {
           {saying.occasion && (
             <div style={{ marginBottom: '10px' }}>
               <span style={{
-                fontSize: '11px', fontWeight: 600,
+                fontSize: '12px', fontWeight: 600,
                 letterSpacing: '0.05em', color: ac.text,
                 background: ac.bg, border: `1px solid ${ac.border}`,
                 padding: '4px 12px', borderRadius: '999px',
@@ -1226,7 +1226,7 @@ export default function SayingDetailPage() {
                   key={t.key}
                   to={`/sayings?theme=${t.key}`}
                   style={{
-                    fontSize: '12px', fontWeight: 500,
+                    fontSize: '13px', fontWeight: 500,
                     padding: '4px 12px', borderRadius: '999px',
                     background: c.bg, color: c.text,
                     border: `1px solid ${c.border}`,
@@ -1239,7 +1239,7 @@ export default function SayingDetailPage() {
             })}
             {saying.size && (
               <span style={{
-                fontSize: '12px', padding: '4px 12px', borderRadius: '999px',
+                fontSize: '13px', padding: '4px 12px', borderRadius: '999px',
                 background: '#F1EFE8', color: '#5F5E5A', border: '1px solid #D3D1C7',
               }}>
                 {{ S: '단문', M: '중문', L: '장문' }[saying.size] || saying.size}
@@ -1271,7 +1271,7 @@ export default function SayingDetailPage() {
                   onClick={() => setTrans(t)}
                   style={{
                     padding: '5px 14px', borderRadius: '7px',
-                    fontSize: '12px', fontWeight: trans === t ? 600 : 400,
+                    fontSize: '13px', fontWeight: trans === t ? 600 : 400,
                     border: trans === t ? `1px solid ${ac.border}` : '1px solid #e5e7eb',
                     background: trans === t ? ac.bg : 'transparent',
                     color: trans === t ? ac.text : '#9ca3af',
@@ -1287,7 +1287,7 @@ export default function SayingDetailPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
                 padding: '5px 12px', borderRadius: '7px',
-                fontSize: '12px', color: copied ? '#27500A' : '#9ca3af',
+                fontSize: '13px', color: copied ? '#27500A' : '#9ca3af',
                 background: copied ? '#EAF3DE' : 'transparent',
                 border: `1px solid ${copied ? '#97C459' : '#e5e7eb'}`,
                 cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
@@ -1301,7 +1301,7 @@ export default function SayingDetailPage() {
           {/* 말씀 본문 */}
           <p style={{
             fontFamily: "'Gowun Batang', serif",
-            fontSize: 'clamp(17px, 2.4vw, 21px)',
+            fontSize: 'clamp(18px, 2.6vw, 23px)',
             lineHeight: 2.1, color: '#1f2937',
             margin: 0, letterSpacing: '0.01em',
           }}>
@@ -1310,7 +1310,7 @@ export default function SayingDetailPage() {
         </div>
 
         {/* 번역 출처 */}
-        <p style={{ fontSize: '11px', color: '#c4bfb8', textAlign: 'right', marginBottom: '0' }}>
+        <p style={{ fontSize: '12px', color: '#c4bfb8', textAlign: 'right', marginBottom: '0' }}>
           {trans === 'krv' ? '개역개정' : '새번역'} · {saying.reference}
         </p>
       </div>
@@ -1342,7 +1342,7 @@ export default function SayingDetailPage() {
             }}>
               <p style={{
                 fontFamily: "'Gowun Batang', serif",
-                fontSize: '14px', lineHeight: 1.95,
+                fontSize: '15px', lineHeight: 1.95,
                 color: '#374151', margin: 0,
               }}>
                 {saying.context_ko || '배경 설명이 준비 중입니다.'}
@@ -1354,7 +1354,7 @@ export default function SayingDetailPage() {
                   borderTop: '1px solid #f3f4f6',
                 }}>
                   <BookOpen size={12} style={{ color: '#c4bfb8' }} />
-                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  <span style={{ fontSize: '13px', color: '#9ca3af' }}>
                     {saying.occasion} — {saying.reference}
                   </span>
                 </div>
@@ -1449,7 +1449,7 @@ export default function SayingDetailPage() {
                             <Link
                               to={`/sayings/${p.id}`}
                               style={{
-                                fontSize: '12px', color: bc.text,
+                                fontSize: '13px', color: bc.text,
                                 textDecoration: 'none',
                                 display: 'inline-flex', alignItems: 'center', gap: '3px',
                               }}
@@ -1491,13 +1491,13 @@ export default function SayingDetailPage() {
                     }}
                   >
                     <span style={{
-                      fontSize: '12px', fontWeight: 700, color: ac.text,
+                      fontSize: '13px', fontWeight: 700, color: ac.text,
                       whiteSpace: 'nowrap', marginTop: '2px', flexShrink: 0,
                     }}>
                       {r.reference}
                     </span>
                     <span style={{
-                      fontSize: '13px', color: '#4b5563', lineHeight: 1.75,
+                      fontSize: '14px', color: '#4b5563', lineHeight: 1.75,
                       fontFamily: "'Gowun Batang', serif", flex: 1,
                     }}>
                       {r.text_ko_krv?.slice(0, 80)}{r.text_ko_krv?.length > 80 ? '…' : ''}
@@ -1528,13 +1528,13 @@ export default function SayingDetailPage() {
               }} />
               <div>
                 <p style={{
-                  fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em',
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em',
                   textTransform: 'uppercase', color: '#b0aaa0', margin: '0 0 4px',
                 }}>
                   Lectio · Meditatio · Oratio · Contemplatio
                 </p>
                 <p style={{
-                  fontSize: '14px', color: ac.text,
+                  fontSize: '15px', color: ac.text,
                   fontFamily: "'Gowun Batang', serif", margin: 0,
                   lineHeight: 1.7,
                 }}>
@@ -1547,7 +1547,7 @@ export default function SayingDetailPage() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                 padding: '10px 20px', borderRadius: '10px',
-                fontSize: '13px', fontWeight: 600,
+                fontSize: '14px', fontWeight: 600,
                 color: '#fff', background: ac.text,
                 textDecoration: 'none', flexShrink: 0,
                 fontFamily: 'inherit',
@@ -1568,7 +1568,7 @@ export default function SayingDetailPage() {
             onClick={goBack}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '13px', color: '#9ca3af',
+              fontSize: '14px', color: '#9ca3af',
               background: 'none', border: '1px solid #e5e7eb',
               borderRadius: '8px', padding: '10px 18px',
               cursor: 'pointer', fontFamily: 'inherit',

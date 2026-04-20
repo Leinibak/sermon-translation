@@ -56,15 +56,15 @@ function SayingListItem({ saying }) {
       {/* 본문 */}
       <div style={{ flex: 1, padding: '16px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#3C3489' }}>
+          <span style={{ fontSize: '14px', fontWeight: 700, color: '#3C3489' }}>
             {reference}
           </span>
           {occasion && (
-            <span style={{ fontSize: '11px', color: '#9ca3af' }}>— {occasion}</span>
+            <span style={{ fontSize: '12px', color: '#9ca3af' }}>— {occasion}</span>
           )}
           {size && (
             <span style={{
-              fontSize: '10px', padding: '2px 7px', borderRadius: '999px',
+              fontSize: '11px', padding: '2px 7px', borderRadius: '999px',
               background: '#F1EFE8', color: '#888780', border: '1px solid #D3D1C7',
               marginLeft: 'auto',
             }}>
@@ -86,7 +86,7 @@ function SayingListItem({ saying }) {
             const tc = THEME_COLORS[t.key] ?? { bg: '#F1EFE8', text: '#444441' };
             return (
               <span key={t.key} style={{
-                fontSize: '11px', fontWeight: 500,
+                fontSize: '12px', fontWeight: 500,
                 padding: '2px 8px', borderRadius: '999px',
                 background: tc.bg, color: tc.text,
               }}>
@@ -192,7 +192,7 @@ export default function SayingListPage() {
           {/* 복음서 */}
           <div style={{ marginBottom: '28px' }}>
             <p style={{
-              fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
               textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px',
             }}>
               복음서
@@ -225,7 +225,7 @@ export default function SayingListPage() {
           {/* 주제 */}
           <div>
             <p style={{
-              fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
               textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px',
             }}>
               주제
@@ -457,7 +457,7 @@ export default function SayingListPage() {
           )}
 
           {/* 결과 수 */}
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
+          <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '12px' }}>
             {loading ? '불러오는 중...' : `${sayings.length}개 말씀`}
           </p>
 

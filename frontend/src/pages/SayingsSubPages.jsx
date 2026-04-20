@@ -408,7 +408,7 @@ export function ParallelPage() {
               onClick={() => handleSelect(g)}
               style={{
                 padding: '8px 18px', borderRadius: '999px',
-                fontSize: '13px', border: '1px solid',
+                fontSize: '14px', border: '1px solid',
                 borderColor: selected === g.id ? '#AFA9EC' : '#e9e4dc',
                 background: selected === g.id ? '#EEEDFE' : '#fff',
                 color: selected === g.id ? '#3C3489' : '#6b7280',
@@ -425,7 +425,7 @@ export function ParallelPage() {
         {/* 비교 그리드 */}
         {detail ? (
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1f2937', marginBottom: '16px' }}>
               {detail.name}
             </h2>
             <div style={{
@@ -450,13 +450,13 @@ export function ParallelPage() {
                       borderBottom: `1px solid ${s.id ? bc.border + '50' : '#f3f4f6'}`,
                     }}>
                       <span style={{
-                        fontSize: '12px', fontWeight: 700,
+                        fontSize: '13px', fontWeight: 700,
                         color: s.id ? bc.text : '#9ca3af',
                       }}>
                         {s.book_display}
                       </span>
                       {s.reference && (
-                        <span style={{ fontSize: '11px', color: s.id ? bc.text + '99' : '#9ca3af', marginLeft: '6px' }}>
+                        <span style={{ fontSize: '12px', color: s.id ? bc.text + '99' : '#9ca3af', marginLeft: '6px' }}>
                           {s.reference}
                         </span>
                       )}
@@ -465,7 +465,7 @@ export function ParallelPage() {
                       {s.id ? (
                         <>
                           <p style={{
-                            fontSize: '13px', lineHeight: 1.8,
+                            fontSize: '14px', lineHeight: 1.8,
                             color: '#1f2937', margin: '0 0 10px',
                             fontFamily: "'Gowun Batang', serif",
                           }}>
@@ -474,7 +474,7 @@ export function ParallelPage() {
                           <Link
                             to={`/sayings/${s.id}`}
                             style={{
-                              fontSize: '12px', color: '#7F77DD',
+                              fontSize: '13px', color: '#7F77DD',
                               textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px',
                             }}
                           >
@@ -483,7 +483,7 @@ export function ParallelPage() {
                           </Link>
                         </>
                       ) : (
-                        <p style={{ fontSize: '12px', color: '#d1d5db', fontStyle: 'italic' }}>
+                        <p style={{ fontSize: '13px', color: '#d1d5db', fontStyle: 'italic' }}>
                           이 사건의 기록 없음
                         </p>
                       )}
@@ -499,7 +499,7 @@ export function ParallelPage() {
             background: '#fff', border: '1px solid #e9e4dc', borderRadius: '14px',
           }}>
             <p style={{
-              fontSize: '14px', color: '#9ca3af',
+              fontSize: '15px', color: '#9ca3af',
               fontFamily: "'Gowun Batang', serif",
             }}>
               위에서 사건을 선택하면 4복음서를 나란히 비교합니다.

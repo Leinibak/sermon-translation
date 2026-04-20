@@ -35,7 +35,7 @@ import VideoMeetingRoom from './components/VideoMeetingRoom';
 import SayingsHomePage  from './pages/SayingsHomePage';      // ★ 신규
 import SayingListPage   from './pages/SayingListPage';
 import SayingDetailPage from './pages/SayingDetailPage';
-import SayingMeditationPage from './pages/SayingMeditationPage';
+import SayingMeditationPage from './pages/SayingMeditationPage.jsx';
 import BibleExplorerPage from './pages/BibleExplorerPage';
 import { ThemePage, ParallelPage, MeditationPage } from './pages/SayingsSubPages';
 
