@@ -113,12 +113,12 @@ function SayingItem({ saying, isSelected, onClick, bookColor }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: bookColor.text }}>
+        <span style={{ fontSize: '12px', fontWeight: 700, color: bookColor.text }}>
           {reference}
         </span>
         {size && (
           <span style={{
-            fontSize: '10px', padding: '1px 6px', borderRadius: '999px',
+            fontSize: '11px', padding: '1px 6px', borderRadius: '999px',
             background: '#F1EFE8', color: '#5F5E5A',
           }}>
             {SIZE_LABELS[size] ?? size}
@@ -126,7 +126,7 @@ function SayingItem({ saying, isSelected, onClick, bookColor }) {
         )}
       </div>
       <p style={{
-        fontSize: '12px', color: '#374151', lineHeight: 1.65, margin: '0 0 6px',
+        fontSize: '13px', color: '#374151', lineHeight: 1.65, margin: '0 0 6px',
         fontFamily: "'Gowun Batang', serif",
       }}>
         {preview}
@@ -138,7 +138,7 @@ function SayingItem({ saying, isSelected, onClick, bookColor }) {
             <span
               key={t.key}
               style={{
-                fontSize: '10px', padding: '1px 7px', borderRadius: '999px',
+                fontSize: '11px', padding: '1px 7px', borderRadius: '999px',
                 background: c.bg, color: c.text, fontWeight: 500,
               }}
             >
@@ -171,7 +171,7 @@ function DetailPanel({ saying, bookColor, onClose }) {
         }}>
           <BookOpen size={16} style={{ color: '#d1d5db' }} />
         </div>
-        <p style={{ fontSize: '13px', color: '#d1d5db', fontFamily: "'Gowun Batang', serif" }}>
+        <p style={{ fontSize: '14px', color: '#d1d5db', fontFamily: "'Gowun Batang', serif" }}>
           말씀을 선택하면 여기에 표시됩니다
         </p>
       </div>
@@ -190,7 +190,7 @@ function DetailPanel({ saying, bookColor, onClose }) {
     <div style={{ padding: '20px', overflowY: 'auto', height: '100%' }}>
 
       {/* 구절 참조 */}
-      <p style={{ fontSize: '12px', fontWeight: 700, color: bookColor.text, marginBottom: '10px' }}>
+      <p style={{ fontSize: '13px', fontWeight: 700, color: bookColor.text, marginBottom: '10px' }}>
         {saying.reference}
         {saying.occasion && (
           <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400, marginLeft: '8px' }}>
@@ -232,7 +232,7 @@ function DetailPanel({ saying, bookColor, onClose }) {
       }}>
         <p style={{
           fontFamily: "'Gowun Batang', serif",
-          fontSize: 'clamp(14px, 1.8vw, 17px)',
+          fontSize: 'clamp(15px, 2.0vw, 19px)',
           lineHeight: 1.95,
           color: '#1f2937',
           margin: 0,
@@ -251,7 +251,7 @@ function DetailPanel({ saying, bookColor, onClose }) {
             배경
           </p>
           <p style={{
-            fontSize: '13px', color: '#4b5563', lineHeight: 1.85,
+            fontSize: '14px', color: '#4b5563', lineHeight: 1.85,
             fontFamily: "'Gowun Batang', serif", margin: 0,
           }}>
             {saying.context_ko}
@@ -530,7 +530,7 @@ export default function BibleExplorer() {
               borderBottom: '1px solid #f3f4f6',
             }}>
               <p style={{
-                fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+                fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
                 textTransform: 'uppercase', color: '#b0aaa0', margin: 0,
               }}>
                 복음서
@@ -563,13 +563,13 @@ export default function BibleExplorer() {
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
-                      fontSize: '13px', fontWeight: active ? 600 : 400,
+                      fontSize: '14px', fontWeight: active ? 600 : 400,
                       color: active ? b.color.text : '#374151',
                       margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>
                       {b.name}
                     </p>
-                    <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
                       {countLabel}
                     </p>
                   </div>
@@ -582,7 +582,7 @@ export default function BibleExplorer() {
           <div style={{ borderRight: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #f3f4f6' }}>
               <p style={{
-                fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+                fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
                 textTransform: 'uppercase', color: '#b0aaa0', margin: 0,
               }}>
                 장 선택 — {BOOK_LABELS[selBook]}
@@ -626,7 +626,7 @@ export default function BibleExplorer() {
                       <style>{`@keyframes spin{to{transform:rotate(360deg);}}`}</style>
                     </div>
                   ) : sayings.length === 0 ? (
-                    <p style={{ padding: '20px 14px', fontSize: '12px', color: '#d1d5db', fontStyle: 'italic' }}>
+                    <p style={{ padding: '20px 14px', fontSize: '13px', color: '#d1d5db', fontStyle: 'italic' }}>
                       이 장에 예수님 말씀 없음
                     </p>
                   ) : sayings.map((s) => (
@@ -647,7 +647,7 @@ export default function BibleExplorer() {
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '20px',
               }}>
-                <p style={{ fontSize: '12px', color: '#d1d5db', fontStyle: 'italic', textAlign: 'center' }}>
+                <p style={{ fontSize: '13px', color: '#d1d5db', fontStyle: 'italic', textAlign: 'center' }}>
                   위에서 장을 선택하세요
                 </p>
               </div>
