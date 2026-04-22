@@ -444,7 +444,7 @@ export default function SayingSlide() {
             </Link>
             {saying.id > 0 && (
               <Link
-                to={`/sayings/${saying.id}`}
+                to={`/sayings/${saying.id}/meditate`}
                 style={{
                   padding: '8px 16px', borderRadius: '8px', fontSize: '13px',
                   color: '#fff', background: '#3C3489', border: 'none',

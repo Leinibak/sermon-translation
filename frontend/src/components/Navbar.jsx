@@ -91,19 +91,19 @@ function Navbar() {
         onTouchStart={isVideoRoom ? handleShowNav : undefined}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center h-16">
 
             {/* 로고 */}
             <Link to="/" onClick={() => setIsOpen(false)}>
               <img
                 src={logo}
                 alt="Logo"
-                className="h-12 w-auto object-contain select-none border-none outline-none focus:outline-none focus:ring-0"
+                className="h-10 w-auto object-contain select-none border-none outline-none focus:outline-none focus:ring-0"
               />
             </Link>
 
             {/* 데스크톱 메뉴 */}
-            <div className="hidden md:flex space-x-8 items-center font-bold font-dodum text-lg">
+            <div className="hidden md:flex space-x-8 items-center font-bold font-dodum text-base">
               <Link to="/" className="hover:text-blue-600 font-medium">주님의 음성</Link>
               <Link to="/sermons" className="hover:text-blue-600 font-medium">설교</Link>
               <Link to="/pastoral-letters" className="hover:text-blue-600 font-medium">목회서신</Link>
@@ -119,7 +119,7 @@ function Navbar() {
                   </span>
                   <button
                     onClick={logout}
-                    className={`text-lg uppercase tracking-wider font-light hover:opacity-70 transition ${
+                    className={`text-base uppercase tracking-wider font-light hover:opacity-70 transition ${
                       isScrolled ? 'text-pink-500' : 'text-pink-700'
                     }`}
                   >
@@ -129,7 +129,7 @@ function Navbar() {
               ) : (
                 <Link
                   to="/login"
-                  className={`text-lg uppercase tracking-wider font-light hover:opacity-70 transition ${
+                  className={`text-base uppercase tracking-wider font-light hover:opacity-70 transition ${
                     isScrolled ? 'text-blue-500' : 'text-blue-700'
                   }`}
                 >

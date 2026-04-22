@@ -236,7 +236,7 @@ export default function SectionBar() {
     <div
       className="sticky z-40 bg-white"
       style={{
-        top: '80px',
+        top: '64px',
         borderBottom: '1px solid #e9e4dc',
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       }}

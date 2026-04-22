@@ -9,11 +9,11 @@
 // ============================================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Save, BookOpen,
   Play, Pause, RotateCcw, Check, Copy,
-  CalendarDays, ArrowLeft, X, ChevronDown, ChevronUp,
+  CalendarDays, ArrowLeft, X, ChevronDown, ChevronUp, NotebookPen,
 } from 'lucide-react';
 import {
   getSaying,
@@ -22,6 +22,8 @@ import {
   updateMeditation,
 } from '../api/sayings';
 import { useAuth } from '../contexts/AuthContext';
+
+
 
 // ─────────────────────────────────────────────────────────
 // 디자인 토큰
@@ -208,190 +210,409 @@ function useStepTimer(totalMinutes) {
 }
 
 // ─────────────────────────────────────────────────────────
-// StepPanel — 단계별 입력 패널
+// StepPanel — 포커스 모드
 // ─────────────────────────────────────────────────────────
 function StepPanel({ stepData: s, values, onChange }) {
   const { elapsed, running, mm, ss, progress, start, pause, reset } = useStepTimer(s.minutes);
   const [timerMin, setTimerMin] = useState(s.minutes);
   const [chipsOpen, setChipsOpen] = useState(false);
+  const [focusedField, setFocusedField] = useState(0); // 현재 집중 필드 인덱스
   const isDone = elapsed >= timerMin * 60;
-
+  const textareaRef = useRef(null);
+ 
+  // 단계가 바뀌면 첫 필드로 리셋
+  useEffect(() => {
+    setFocusedField(0);
+    setChipsOpen(false);
+  }, [s.key]);
+ 
+  // 포커스 필드 이동 시 textarea 자동 포커스
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [focusedField]);
+ 
+  const currentField = s.fields[focusedField];
+  const totalFields = s.fields.length;
+  const filledCount = s.fields.filter(f => (values[f.id] || '').trim().length > 0).length;
+ 
+  const goNext = () => {
+    if (focusedField < totalFields - 1) setFocusedField(focusedField + 1);
+  };
+  const goPrev = () => {
+    if (focusedField > 0) setFocusedField(focusedField - 1);
+  };
+ 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* 단계 설명 */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+ 
+      {/* ── 슬림 타이머 바 ──────────────────────────────────── */}
       <div style={{
-        fontSize: '13px', color: T.ink3, lineHeight: 1.85,
-        padding: '12px 16px', background: T.paper,
-        borderRadius: '10px', borderLeft: `3px solid ${s.colorMid}`,
-        whiteSpace: 'pre-line', 
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '10px 14px',
+        background: '#fff',
+        border: `1px solid ${T.paper3}`,
+        borderRadius: '10px',
+        marginBottom: '20px',
       }}>
-        {s.desc}
-      </div>
-
-      {/* 안내 칩 */}
-      {s.chips && s.chips.length > 0 && (
-        <div>
-          <button
-            onClick={() => setChipsOpen(v => !v)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '11px', fontWeight: 600, color: T.ink4,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '0 0 8px', fontFamily: 'inherit', width: '100%',
-            }}
-          >
-            <span style={{ flex: 1, textAlign: 'left' }}>묵상 가이드 보기</span>
-            {chipsOpen
-              ? <ChevronUp size={13} style={{ color: T.ink5 }} />
-              : <ChevronDown size={13} style={{ color: T.ink5 }} />}
+        {/* 진행 링 (작게) */}
+        <CircleTimer progress={progress} color={s.color} mm={mm} ss={ss} size={40} />
+ 
+        {/* 진행 바 */}
+        <div style={{ flex: 1, height: 3, background: T.paper3, borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 2,
+            width: `${Math.min(100, (elapsed / (timerMin * 60)) * 100)}%`,
+            background: s.color,
+            transition: 'width 1s linear',
+          }} />
+        </div>
+ 
+        {/* 타이머 옵션 (Contemplatio만) */}
+        {s.timerOptions && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {s.timerOptions.map(m => (
+              <button key={m} onClick={() => { setTimerMin(m); reset(); }} style={{
+                fontSize: '10px', padding: '2px 7px', borderRadius: '20px',
+                cursor: 'pointer', fontFamily: 'inherit',
+                background: timerMin === m ? s.color : '#fff',
+                color: timerMin === m ? '#fff' : s.color,
+                border: `1px solid ${s.colorMid}`, transition: 'all 0.15s',
+              }}>
+                {m}분
+              </button>
+            ))}
+          </div>
+        )}
+ 
+        {/* 시작/정지/리셋 */}
+        <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
+          {!running ? (
+            <button onClick={() => start(timerMin)} disabled={isDone} style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              padding: '5px 10px', borderRadius: '7px',
+              fontSize: '11px', fontWeight: 600,
+              background: isDone ? '#e5e7eb' : s.color,
+              color: isDone ? T.ink4 : '#fff',
+              border: 'none', cursor: isDone ? 'default' : 'pointer',
+              fontFamily: 'inherit',
+            }}>
+              <Play size={10} /> {isDone ? '완료 ✓' : elapsed > 0 ? '계속' : '시작'}
+            </button>
+          ) : (
+            <button onClick={pause} style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              padding: '5px 10px', borderRadius: '7px',
+              fontSize: '11px', fontWeight: 600,
+              background: s.color, color: '#fff',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              <Pause size={10} /> 정지
+            </button>
+          )}
+          <button onClick={reset} style={{
+            display: 'flex', alignItems: 'center', gap: '3px',
+            padding: '5px 8px', borderRadius: '7px',
+            fontSize: '11px', color: T.ink4,
+            background: 'transparent', border: `1px solid ${T.paper3}`,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <RotateCcw size={10} /> 초기화
           </button>
-
-          {chipsOpen && (
+        </div>
+ 
+        <span style={{ fontSize: '10px', color: T.ink5, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          권장 {s.minutes}분
+        </span>
+      </div>
+ 
+      {/* ── 단계 설명 + 가이드 (접힘) ──────────────────────────── */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{
+          fontSize: '13px', color: T.ink3, lineHeight: 1.8,
+          padding: '11px 15px',
+          background: T.paper,
+          borderRadius: '10px',
+          borderLeft: `3px solid ${s.colorMid}`,
+          whiteSpace: 'pre-line',
+        }}>
+          {s.desc}
+        </div>
+ 
+        {/* 가이드 칩 토글 */}
+        {s.chips && s.chips.length > 0 && (
+          <div style={{ marginTop: '8px' }}>
+            <button
+              onClick={() => setChipsOpen(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                fontSize: '11px', fontWeight: 600, color: T.ink4,
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '6px 0', fontFamily: 'inherit',
+              }}
+            >
+              <span>묵상 가이드</span>
+              {chipsOpen
+                ? <ChevronUp size={12} style={{ color: T.ink5 }} />
+                : <ChevronDown size={12} style={{ color: T.ink5 }} />}
+            </button>
+            {chipsOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                {s.chips.map((c, i) => (
+                  <div key={i} style={{
+                    fontSize: '12.5px', color: T.ink2,
+                    padding: '7px 11px', background: '#fff',
+                    border: `1px solid ${T.paper3}`,
+                    borderRadius: '8px', lineHeight: 1.55,
+                    display: 'flex', alignItems: 'flex-start', gap: '7px',
+                  }}>
+                    <span style={{ color: s.color, flexShrink: 0, fontWeight: 700 }}>·</span> {c}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+ 
+        {/* Contemplatio 머물기 가이드 */}
+        {s.abidePractices && (
+          <div style={{
+            marginTop: '10px',
+            background: T.m4bg, borderRadius: '10px', padding: '13px 15px',
+          }}>
+            <div style={{
+              fontSize: '11px', fontWeight: 600, color: T.m4,
+              letterSpacing: '0.05em', marginBottom: '9px', textTransform: 'uppercase',
+            }}>
+              머물기 실천 가이드
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {s.chips.map((c, i) => (
+              {s.abidePractices.map((a, i) => (
                 <div key={i} style={{
-                  fontSize: '12.5px', color: T.ink2,
-                  padding: '8px 12px', background: '#fff',
-                  border: `1px solid ${T.paper3}`,
-                  borderRadius: '8px', lineHeight: 1.55,
-                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                  display: 'flex', alignItems: 'flex-start', gap: '9px',
+                  background: '#fff', borderRadius: '8px', padding: '8px 11px',
+                  borderLeft: `3px solid ${T.m4mid}`,
                 }}>
-                  <span style={{ color: s.color, flexShrink: 0, fontWeight: 700 }}>·</span> {c}
+                  <span style={{ fontStyle: 'italic', fontSize: '13px', color: T.m4, minWidth: 16, fontWeight: 600 }}>{a.num}</span>
+                  <span style={{ fontSize: '13px', color: T.ink2, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
+                    <strong style={{ color: T.m4 }}>{a.title}</strong> — {a.text}
+                  </span>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+ 
+      {/* ── 필드 진행 표시 ──────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: '12px',
+      }}>
+        {/* 필드 도트 인디케이터 */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {s.fields.map((f, i) => {
+            const isFocused = i === focusedField;
+            const isFilled = (values[f.id] || '').trim().length > 0;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFocusedField(i)}
+                style={{
+                  width: isFocused ? 24 : 8,
+                  height: 8,
+                  borderRadius: 4,
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  background: isFocused
+                    ? s.color
+                    : isFilled
+                      ? s.color + '60'
+                      : T.paper3,
+                  transition: 'all 0.25s ease',
+                  flexShrink: 0,
+                }}
+                title={f.label}
+              />
+            );
+          })}
         </div>
-      )}
-
-      {/* Contemplatio 머물기 실천 가이드 */}
-      {s.abidePractices && (
+        {/* 작성 현황 */}
+        <span style={{ fontSize: '11px', color: T.ink5 }}>
+          {filledCount}/{totalFields} 작성됨
+        </span>
+      </div>
+ 
+      {/* ── 포커스 필드 (현재 활성 입력창) ─────────────────────── */}
+      <div
+        key={currentField.id}
+        style={{
+          background: '#fff',
+          border: `1.5px solid ${s.colorMid}`,
+          borderRadius: '14px',
+          padding: '20px 20px 16px',
+          marginBottom: '12px',
+          boxShadow: `0 2px 16px ${s.color}12`,
+          animation: 'focusFieldIn 0.22s ease both',
+        }}
+      >
+        {/* 필드 레이블 */}
         <div style={{
-          background: T.m4bg, borderRadius: '10px', padding: '14px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: '12px',
         }}>
           <div style={{
-            fontSize: '11px', fontWeight: 600, color: T.m4,
-            letterSpacing: '0.05em', marginBottom: '10px', textTransform: 'uppercase',
+            fontSize: '12px', fontWeight: 700, color: s.color,
+            textTransform: 'uppercase', letterSpacing: '0.07em',
           }}>
-            머물기 실천 가이드
+            {currentField.label}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {s.abidePractices.map((a, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px',
-                background: '#fff', borderRadius: '8px', padding: '9px 12px',
-                borderLeft: `3px solid ${T.m4mid}`,
-              }}>
-                <span style={{ fontStyle: 'italic', fontSize: '13px', color: T.m4, minWidth: 18, fontWeight: 600 }}>{a.num}</span>
-                <span style={{ fontSize: '13.5px', color: T.ink2, lineHeight: 1.65,whiteSpace: 'pre-line' }}>
-                  <strong style={{ color: T.m4 }}>{a.title}</strong> — {a.text}
-                </span>
-              </div>
-            ))}
-          </div>
+          <span style={{ fontSize: '10px', color: T.ink5 }}>
+            {focusedField + 1} / {totalFields}
+          </span>
         </div>
-      )}
-
-      {/* 타이머 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '14px',
-        padding: '12px 16px', background: '#fff',
-        border: `1px solid ${T.paper3}`, borderRadius: '10px',
-        flexWrap: 'wrap',
-      }}>
-        <CircleTimer progress={progress} color={s.color} mm={mm} ss={ss} />
-        <div style={{ flex: 1 }}>
-          {s.timerOptions && (
-            <div style={{ display: 'flex', gap: '5px', marginBottom: '8px', flexWrap: 'wrap' }}>
-              {s.timerOptions.map(m => (
-                <button key={m} onClick={() => { setTimerMin(m); reset(); }} style={{
-                  fontSize: '11px', padding: '3px 9px', borderRadius: '20px',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  background: timerMin === m ? s.color : '#fff',
-                  color: timerMin === m ? '#fff' : s.color,
-                  border: `1px solid ${s.colorMid}`, transition: 'all 0.15s',
-                }}>
-                  {m}분
-                </button>
-              ))}
+ 
+        {/* 활성 textarea */}
+        <textarea
+          ref={textareaRef}
+          value={values[currentField.id] || ''}
+          onChange={e => onChange(currentField.id, e.target.value)}
+          placeholder={currentField.placeholder}
+          rows={currentField.rows || 4}
+          style={{
+            width: '100%',
+            border: 'none',
+            borderRadius: '0',
+            padding: '0',
+            fontSize: '14.5px',
+            fontFamily: "'Gowun Batang', serif",
+            color: T.ink,
+            background: 'transparent',
+            resize: 'vertical',
+            lineHeight: 1.9,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+ 
+        {/* 이전 / 다음 버튼 */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginTop: '14px',
+          paddingTop: '12px',
+          borderTop: `1px solid ${T.paper3}`,
+        }}>
+          <button
+            onClick={goPrev}
+            disabled={focusedField === 0}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '12px', color: focusedField === 0 ? T.ink5 : T.ink3,
+              background: 'transparent', border: `1px solid ${T.paper3}`,
+              borderRadius: '7px', padding: '6px 12px',
+              cursor: focusedField === 0 ? 'default' : 'pointer',
+              fontFamily: 'inherit', opacity: focusedField === 0 ? 0.35 : 1,
+            }}
+          >
+            <ChevronLeft size={13} /> 이전
+          </button>
+ 
+          {focusedField < totalFields - 1 ? (
+            <button
+              onClick={goNext}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '12px', fontWeight: 600,
+                color: '#fff', background: s.color,
+                border: 'none', borderRadius: '7px',
+                padding: '6px 14px', cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              다음 질문 <ChevronRight size={13} />
+            </button>
+          ) : (
+            <div style={{
+              fontSize: '11px', color: s.color, fontWeight: 600,
+              padding: '5px 10px',
+              background: s.colorBg,
+              borderRadius: '7px',
+              border: `1px solid ${s.colorMid}`,
+            }}>
+              ✓ 이 단계 완료
             </div>
           )}
-          <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
-            {!running ? (
-              <button onClick={() => start(timerMin)} disabled={isDone} style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '6px 12px', borderRadius: '8px',
-                fontSize: '12px', fontWeight: 600,
-                background: isDone ? '#e5e7eb' : s.color,
-                color: isDone ? T.ink4 : '#fff',
-                border: 'none', cursor: isDone ? 'default' : 'pointer',
-                fontFamily: 'inherit',
-              }}>
-                <Play size={11} /> {isDone ? '완료 ✓' : elapsed > 0 ? '계속' : '시작'}
-              </button>
-            ) : (
-              <button onClick={pause} style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '6px 12px', borderRadius: '8px',
-                fontSize: '12px', fontWeight: 600,
-                background: s.color, color: '#fff',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              }}>
-                <Pause size={11} /> 일시정지
-              </button>
-            )}
-            <button onClick={reset} style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '6px 10px', borderRadius: '8px',
-              fontSize: '12px', color: T.ink4,
-              background: 'transparent', border: `1px solid ${T.paper3}`,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-              <RotateCcw size={11} /> 초기화
-            </button>
-            <span style={{ fontSize: '11px', color: T.ink5, alignSelf: 'center' }}>
-              권장 {s.minutes}분
-            </span>
-          </div>
         </div>
       </div>
-
-      {/* 입력 필드들 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {s.fields.map(f => (
-          <div key={f.id}>
-            <div style={{
-              fontSize: '11px', fontWeight: 700, color: s.color,
-              textTransform: 'uppercase', letterSpacing: '0.07em',
-              marginBottom: '6px',
-            }}>
-              {f.label}
-            </div>
-            <textarea
-              value={values[f.id] || ''}
-              onChange={e => onChange(f.id, e.target.value)}
-              placeholder={f.placeholder}
-              rows={f.rows || 3}
-              style={{
-                width: '100%', border: `1px solid ${T.paper3}`,
-                borderRadius: '10px', padding: '12px 14px',
-                fontSize: '14px', fontFamily: "'Gowun Batang', serif",
-                color: T.ink, background: '#fff',
-                resize: 'vertical', lineHeight: 1.85,
-                outline: 'none', boxSizing: 'border-box',
-                transition: 'border-color 0.2s',
-              }}
-              onFocus={e => e.target.style.borderColor = s.colorMid}
-              onBlur={e => e.target.style.borderColor = T.paper3}
-            />
-          </div>
-        ))}
-      </div>
-
+ 
+      {/* ── 다른 필드 요약 카드들 ──────────────────────────────── */}
+      {s.fields.length > 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {s.fields.map((f, i) => {
+            if (i === focusedField) return null;
+            const val = (values[f.id] || '').trim();
+            const isFilled = val.length > 0;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFocusedField(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '11px 14px',
+                  background: isFilled ? '#fff' : T.paper,
+                  border: `1px solid ${isFilled ? T.paper3 : 'transparent'}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s',
+                  opacity: 0.75,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = s.colorMid; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.borderColor = isFilled ? T.paper3 : 'transparent'; }}
+              >
+                {/* 채움 표시 */}
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: isFilled ? s.color : T.paper3,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: '11px', fontWeight: 600, color: s.color,
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    marginBottom: isFilled ? '3px' : 0,
+                  }}>
+                    {f.label}
+                  </div>
+                  {isFilled ? (
+                    <div style={{
+                      fontSize: '13px', color: T.ink3,
+                      fontFamily: "'Gowun Batang', serif",
+                      lineHeight: 1.5,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {val.slice(0, 60)}{val.length > 60 ? '…' : ''}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: T.ink5 }}>
+                      탭하여 작성하기
+                    </div>
+                  )}
+                </div>
+                <ChevronRight size={12} style={{ color: T.ink5, flexShrink: 0 }} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+ 
       {/* Propositum 마무리 안내 */}
       {s.key === 'propositum' && (
         <div style={{
+          marginTop: '20px',
           padding: '12px 16px', background: T.m5bg,
           borderRadius: '10px', fontSize: '12.5px',
           color: T.m5, lineHeight: 1.7,
@@ -400,6 +621,14 @@ function StepPanel({ stepData: s, values, onChange }) {
           🌅 저녁 묵상을 시작할 때, 오늘 기록한 핵심 말씀과 결단을 먼저 읽으며 시작하세요. 아침과 저녁이 하나로 이어집니다.
         </div>
       )}
+ 
+      {/* 포커스 필드 진입 애니메이션 */}
+      <style>{`
+        @keyframes focusFieldIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -827,6 +1056,7 @@ const GLOBAL_CSS = `
 export default function SayingMeditationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
 
   const [saying, setSaying] = useState(null);
@@ -959,8 +1189,41 @@ export default function SayingMeditationPage() {
             </div>
           </div>
 
-          {/* 우: 날짜 + 진행도 + 저장 */}
+          {/* 우: 내 묵상 + 날짜 + 진행도 + 저장 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+
+            {/* ★ 내 묵상 버튼 — 로그인한 경우만 표시 */}
+            {isAuthenticated && (
+              <button
+                onClick={() => navigate('/sayings/meditations')}
+                title="내 묵상 노트로 이동"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  fontSize: '13px', fontWeight: 600,
+                  color: existingId ? '#3C3489' : '#6b7280',
+                  background: existingId ? '#EEEDFE' : '#fff',
+                  border: `1px solid ${existingId ? '#AFA9EC' : T.paper3}`,
+                  borderRadius: '8px', padding: '6px 12px',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all 0.18s',
+                  position: 'relative',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#3C3489'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#3C3489'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = existingId ? '#EEEDFE' : '#fff'; e.currentTarget.style.color = existingId ? '#3C3489' : '#6b7280'; e.currentTarget.style.borderColor = existingId ? '#AFA9EC' : T.paper3; }}
+              >
+                <NotebookPen size={13} />
+                내 묵상
+                {/* 오늘 이 말씀의 묵상이 저장되어 있으면 점 표시 */}
+                {existingId && (
+                  <span style={{
+                    position: 'absolute', top: '-3px', right: '-3px',
+                    width: '7px', height: '7px', borderRadius: '50%',
+                    background: '#3C3489', border: '1.5px solid #fff',
+                  }} />
+                )}
+              </button>
+            )}
+
             <div style={{
               display: 'flex', alignItems: 'center', gap: '5px',
               fontSize: '12px', color: T.ink4,
@@ -1009,7 +1272,7 @@ export default function SayingMeditationPage() {
                 )}
               </button>
             ) : (
-              <Link to="/login" style={{
+              <Link to="/login" state={{ from: location.pathname }} style={{
                 fontSize: '12px', padding: '7px 14px', borderRadius: '8px',
                 background: T.paper2, color: T.m1, border: `1px solid ${T.m1mid}`,
                 textDecoration: 'none',
