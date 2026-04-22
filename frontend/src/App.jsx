@@ -38,10 +38,11 @@ import SayingDetailPage from './pages/SayingDetailPage';
 import SayingMeditationPage from './pages/SayingMeditationPage.jsx';
 import BibleExplorerPage from './pages/BibleExplorerPage';
 import { ThemePage, ParallelPage, MeditationPage } from './pages/SayingsSubPages';
-
+import MeditationDetailPage from './pages/MeditationDetailPage';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -49,7 +50,9 @@ function PrivateRoute({ children }) {
       </div>
     );
   }
-  return isAuthenticated ? children : <Navigate to="/login" />;
+    return isAuthenticated 
+    ? children 
+    : <Navigate to="/login" state={{ from: location.pathname }} />;
 }
 
 // ✅ 변경
@@ -144,6 +147,7 @@ function App() {
             <Route path="/sayings/parallels"    element={<ParallelPage />} />
             {/* /sayings/meditations → 내 묵상 노트 (로그인 필요) */}
             <Route path="/sayings/meditations"  element={<MeditationPage />} />
+            <Route path="/sayings/meditations/:id" element={<MeditationDetailPage />} />
             <Route path="/sayings/bible-explorer" element={<BibleExplorerPage />} />
             {/* /sayings/:id → 말씀 상세 (반드시 맨 마지막에!) */}
             <Route path="/sayings/:id"          element={<SayingDetailPage />} />

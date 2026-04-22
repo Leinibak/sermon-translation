@@ -3,7 +3,7 @@
 // ==============================
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
@@ -14,6 +14,7 @@ function Login() {
   
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,7 +24,8 @@ function Login() {
     const result = await login(username, password);
     
     if (result.success) {
-      navigate('/');
+      const from = location.state?.from || '/';
+      navigate(from, { replace: true });  // ← 이전 페이지로, 없으면 첫 페이지
     } else {
       setError(result.error);
     }

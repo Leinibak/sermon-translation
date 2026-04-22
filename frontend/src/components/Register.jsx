@@ -1,11 +1,12 @@
 // frontend/src/components/Register.jsx (수정)
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from '../api/axios';
 import API_ENDPOINTS from '../config/api';
 import { Info, Check } from 'lucide-react';
 
 function Register() {
+  const location = useLocation();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -71,7 +72,7 @@ function Register() {
       setSuccessMessage(message);
       
       setTimeout(() => {
-        navigate('/login');
+        navigate('/login', { state: location.state });  // from을 그대로 전달
       }, 3000);
 
     } catch (err) {
@@ -243,7 +244,7 @@ function Register() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             이미 계정이 있으신가요?{' '}
-            <Link to="/login" className="text-slate-700 hover:text-slate-900 font-medium">
+            <Link to="/login" state={location.state} className="text-slate-700 hover:text-slate-900 font-medium">
               로그인
             </Link>
           </p>
